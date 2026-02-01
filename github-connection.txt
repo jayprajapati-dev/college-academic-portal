@@ -1,0 +1,119 @@
+GitHub Connection Steps:
+
+1. Checked existing git repository using `git status`:-
+"🔍 Step 2: Check karo Git already hai?
+
+Terminal me likho:
+git status
+
+Agar ye aaye:
+fatal: not a git repository
+
+👉 Matlab Git abhi set nahi hai (GOOD, clean start)
+
+Agar ye aaye:
+On branch main
+
+👉 Matlab Git pehle se hai → remove karna padega"
+
+
+2. Removed old git configuration if present:-
+"❌ PART 2: AGAR PEHLE GIT HAI TO REMOVE KAISE KARE?
+🗑️ Step 3: Old Git remove karo (SAFE)
+
+Project folder ke andar:
+Windows:
+rmdir /s /q .git
+
+👉 Ye sirf Git history hataata hai,
+👉 Tumhari files safe rahengi."
+
+
+3. Cleared old GitHub credentials
+"Ye tab karo jab:
+Galat GitHub account use ho gaya ho
+Password / token issue aaye
+
+🔹 Windows me:
+Control Panel → Credential Manager
+Windows Credentials
+
+GitHub related entries delete karo:
+git:https://github.com
+github.com
+
+🔹 Global git config reset (optional but safe):
+git config --global --unset user.name
+git config --global --unset user.email"
+
+
+4. Created new GitHub repository
+"🧑‍💻 Step 4: GitHub account login
+https://github.com
+- open karo
+- Login karo
+
+➕ Step 5: New Repository banao
+- Click New Repository
+
+Name:
+"Smart-College-Academic-Portal"
+
+- Public (recommended)
+- ❌ README auto mat add karo
+- ❌ .gitignore auto mat add karo
+- ❌ License mat add karo
+- Create Repository"
+
+
+5. Initialized git in local project folder
+"🔗 PART 5: LOCAL PROJECT KO GITHUB SE CONNECT KARO
+Terminal me Project folder ke andar ye steps follow karo 👇
+Step 6: Git initialize
+"git init"
+
+Step 7: Git user set karo (IMPORTANT)👇
+git config user.name "Your Name"
+git config user.email "your-email@gmail.com"
+
+(Ye project-level hai, global nahi)
+
+Step 8: Files add karo
+"git add ."
+
+Step 9: First commit
+git commit -m "Phase-1 completed: planning, flowcharts, database design"
+
+Step 🔟 GitHub remote add karo
+(Repo create ke baad jo URL mile, wo use karo)
+git remote add origin https://github.com/USERNAME/Smart-College-Academic-Portal.git
+
+
+Check:
+git remote -v
+
+Step 11: Push to GitHub
+git branch -M main
+git push -u origin main
+
+
+👉 Browser me repo refresh karo → files dikh jayengi ✅"
+
+
+6. GitHub remote
+"(Repo create ke baad jo URL mile, wo use karo)
+git remote add origin https://github.com/USERNAME/Smart-College-Academic-Portal.git
+
+Check:
+git remote -v
+
+Step 11: Push to GitHub
+git branch -M main
+git push -u origin main
+
+
+👉 Browser me repo refresh karo → files dikh jayengi ✅"
+
+
+7. Connected local repository to GitHub remote
+8. Successfully pushed Phase-1 project files to GitHub

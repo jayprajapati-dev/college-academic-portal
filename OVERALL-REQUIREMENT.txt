@@ -1,0 +1,108 @@
+🧱 OVERALL REQUIREMENT (SIMPLE WORDS)
+
+Required:
+1 Working Software Project
+GitHub repo code
+Documentation (SRS + Report)
+PPT + Poster
+3 Reviews
+Final Viva
+
+🗓️ When-What need do (STEP-BY-STEP)
+🔵 PHASE 1 – PLANNING
+👉 Review-1 by sir
+What need:
+Project title + domain
+Problem statement
+System overview
+User roles
+6 modules list
+Process model name
+Flowchart
+
+Form:
+📄 Paper / PDF
+✍️ Hand-drawn or digital flowchart
+❌ Coding No
+👉 Teacher by check: thinking & planning
+
+🟡 PHASE 2 – BLUEPRINT / HALF WORK
+👉 Review-2 by sir
+What need:
+GitHub repository created
+Folder structure (client/server/docs)
+Basic React app running
+Basic Node server running
+Database design (MongoDB collections)
+Admin login (basic)
+
+Form:
+💻 Laptop demo
+📸 Screenshots
+🔗 GitHub link
+
+🟠 PHASE 3 – FULL DEVELOPMENT
+👉 Review-3 by sir
+What need:
+All modules working
+Admin panel working
+Student view working
+Assignment/notice working
+Download button working
+Data coming from database
+
+Form:
+💻 Live demo
+🔗 GitHub updated code
+👉 Project should WORK
+
+🔴 PHASE 4 – DOCUMENTATION & SUBMISSION (LAST)
+What need(MANDATORY):
+1️⃣ SRS Document
+2️⃣ Final Project Report
+3️⃣ PPT (Presentation)
+4️⃣ Poster
+5️⃣ GitHub repo with README.md
+6️⃣ References (min 15)
+
+Form:
+📄 PDF (SRS + Report)
+📊 PPT
+🖼️ Poster
+🔗 GitHub
+
+📘 DOCUMENT BREAKDOWN (CONFUSION CLEAR)
+📄 SRS (Software Requirement Specification)
+Problem statement
+Functional requirements
+Non-functional requirements
+Modules
+Flowchart
+👉 Early stage document
+
+/docs
+  ├─ flowchart.png
+  ├─ modules.md
+  ├─ srs.md
+
+📄 Final Report
+Introduction
+SRS summary
+System design
+Backend / Frontend explanation
+Database design
+Testing
+Conclusion
+👉 End stage document
+
+📊 PPT
+Idea
+Problem
+Modules
+Screenshots
+Conclusion
+
+🔗 GitHub
+Complete source code
+README.md (project info)
+Proper commits
