@@ -1,0 +1,24 @@
+{
+  "name": "smart-college-academic-portal",
+  "version": "1.0.0",
+  "description": "Smart College Academic Portal - Full Stack Application",
+  "main": "index.js",
+  "scripts": {
+    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && npm start",
+    "client": "cd client && npm start",
+    "install-all": "npm install && cd server && npm install && cd ../client && npm install",
+    "dev": "concurrently \"npm run server\" \"npm run client\""
+  },
+  "keywords": [
+    "education",
+    "academic",
+    "portal",
+    "college"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

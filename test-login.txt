@@ -1,0 +1,15 @@
+*Admin:
+Email: admin@smartacademic.com
+Password: admin123
+
+*Student:
+john.student@example.com
+student123
+
+*HOD:
+neha.hod@example.com
+hod123
+
+*Teacher:
+rahul.teacher@example.com
+teacher123
