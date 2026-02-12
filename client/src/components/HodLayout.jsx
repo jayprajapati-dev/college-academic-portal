@@ -13,6 +13,7 @@ const HodLayout = ({ title, children, userName = 'HOD', onLogout = null }) => {
     { label: 'Notices', to: '/hod/notices', icon: 'notifications' },
     { label: 'Tasks', to: '/hod/tasks', icon: 'assignment' },
     { label: 'Materials', to: '/hod/materials', icon: 'menu_book' },
+    { label: 'Library', to: '/hod/library', icon: 'library_books' },
     { label: 'Reports', to: '/hod/reports', icon: 'insights' },
     { label: 'Timetable', to: '/hod/timetable', icon: 'calendar_today' }
   ]), []);

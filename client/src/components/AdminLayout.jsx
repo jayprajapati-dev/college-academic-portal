@@ -10,6 +10,7 @@ const AdminLayout = ({ title, children, userName = 'Admin', onLogout = null }) =
     { label: 'Semesters', to: '/admin/semesters', icon: 'calendar_month' },
     { label: 'Branches', to: '/admin/branches', icon: 'apartment' },
     { label: 'Subjects', to: '/admin/subjects', icon: 'menu_book' },
+    { label: 'Library', to: '/admin/library', icon: 'library_books' },
     { label: 'Timetable', to: '/admin/timetable', icon: 'calendar_today' },
     { label: 'Notice Board', to: '/admin/notices', icon: 'notifications' },
     { label: 'Task/Assignment', to: '/admin/tasks', icon: 'assignment' },

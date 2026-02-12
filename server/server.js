@@ -47,6 +47,7 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/tasks', require('./routes/task'));
 app.use('/api/notices', require('./routes/notice'));
 app.use('/api/timetable', require('./routes/timetable'));
+app.use('/api/library', require('./routes/library'));
 
 // Error Handler Middleware
 const errorHandler = require('./middleware/errorHandler');

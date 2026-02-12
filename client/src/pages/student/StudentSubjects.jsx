@@ -136,6 +136,13 @@ const StudentSubjects = () => {
                   >
                     Tasks
                   </Button>
+                  <Button
+                    onClick={() => navigate(`/student/library?subjectId=${subject._id}`)}
+                    variant="secondary"
+                    className="text-sm"
+                  >
+                    Library
+                  </Button>
                 </div>
               </Card>
             ))}

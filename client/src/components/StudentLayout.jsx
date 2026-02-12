@@ -7,6 +7,7 @@ const StudentLayout = ({ title, children, userName = 'Student', onLogout = null 
   const navItems = useMemo(() => ([
     { label: 'Dashboard', to: '/student/dashboard', icon: 'space_dashboard' },
     { label: 'Subjects', to: '/student/subjects', icon: 'menu_book' },
+    { label: 'Library', to: '/student/library', icon: 'library_books' },
     { label: 'Notice Board', to: '/notices', icon: 'notifications' },
     { label: 'Timetable', to: '/student/timetable', icon: 'calendar_today' },
     { label: 'Profile', to: '/student/profile', icon: 'account_circle' }

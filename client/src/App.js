@@ -38,6 +38,7 @@ import AdminMaterials from './pages/AdminMaterials';
 import PasswordSetup from './pages/PasswordSetup';
 import NoticeManagement from './pages/NoticeManagement';
 import TaskManagement from './pages/TaskManagement';
+import LibraryManagement from './pages/LibraryManagement';
 
 // Import HOD pages
 import AddTeacher from './pages/hod/AddTeacher';
@@ -55,6 +56,7 @@ import StudentTimetableView from './pages/student/TimetableView';
 import StudentTaskView from './pages/student/TaskView';
 import StudentSubjects from './pages/student/StudentSubjects';
 import StudentTaskDetail from './pages/student/TaskDetail';
+import StudentLibrary from './pages/student/StudentLibrary';
 
 function App() {
   return (
@@ -82,6 +84,7 @@ function App() {
         {/* Dashboards (Role-based) */}
         <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route path="/student/subjects" element={<StudentSubjects />} />
+        <Route path="/student/library" element={<StudentLibrary />} />
         <Route path="/student/profile" element={<StudentProfile />} />
         <Route path="/student/timetable" element={<StudentTimetableView />} />
         <Route path="/subjects/:subjectId/tasks" element={<StudentTaskView />} />
@@ -91,6 +94,7 @@ function App() {
         <Route path="/teacher/materials" element={<TeacherMaterials />} />
         <Route path="/teacher/notices" element={<NoticeManagement />} />
         <Route path="/teacher/tasks" element={<TaskManagement />} />
+        <Route path="/teacher/library" element={<LibraryManagement />} />
         <Route path="/hod/dashboard" element={<HODDashboard />} />
         <Route path="/hod/profile" element={<HODProfile />} />
         <Route path="/hod/add-teacher" element={<AddTeacher />} />
@@ -100,6 +104,7 @@ function App() {
         <Route path="/hod/timetable" element={<HodTeacherTimetableManagement />} />
         <Route path="/hod/notices" element={<NoticeManagement />} />
         <Route path="/hod/tasks" element={<TaskManagement />} />
+        <Route path="/hod/library" element={<LibraryManagement />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/users" element={<UserManagement />} />
         <Route path="/admin/manage-users" element={<UserManagement />} />
@@ -115,6 +120,7 @@ function App() {
         <Route path="/admin/notices" element={<NoticeManagement />} />
         <Route path="/admin/tasks" element={<TaskManagement />} />
         <Route path="/admin/materials" element={<AdminMaterials />} />
+        <Route path="/admin/library" element={<LibraryManagement />} />
         
         {/* Catch All */}
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -7,6 +7,7 @@ const TeacherLayout = ({ title, children, userName = 'Teacher', onLogout = null 
   const navItems = useMemo(() => ([
     { label: 'Dashboard', to: '/teacher/dashboard', icon: 'space_dashboard' },
     { label: 'Materials', to: '/teacher/materials', icon: 'menu_book' },
+    { label: 'Library', to: '/teacher/library', icon: 'library_books' },
     { label: 'Tasks', to: '/teacher/tasks', icon: 'assignment' },
     { label: 'Notices', to: '/teacher/notices', icon: 'notifications' },
     { label: 'Profile', to: '/teacher/profile', icon: 'account_circle' }
