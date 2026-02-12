@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Header from '../components/Header';
+import { TeacherLayout } from '../components';
 
 const TeacherProfile = () => {
   const navigate = useNavigate();
@@ -73,6 +73,12 @@ const TeacherProfile = () => {
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login');
+  };
 
   const handleEditToggle = () => {
     if (editMode) {
@@ -160,19 +166,16 @@ const TeacherProfile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-[#F8F9FB] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-2 border-[#111318] border-t-transparent"></div>
       </div>
     );
   }
 
   return (
-    <div className="font-display bg-background-light dark:bg-background-dark text-[#111318] dark:text-white min-h-screen">
-      <Header />
-
-      {/* Main Content */}
-      <main className="pt-32 mesh-background min-h-screen">
-        <div className="max-w-4xl mx-auto px-6 py-12">
+    <TeacherLayout title="Profile" userName={profile?.name || 'Teacher'} onLogout={handleLogout}>
+      <main className="mesh-background min-h-screen">
+        <div className="max-w-4xl mx-auto px-6 py-6">
           <div className="bg-white dark:bg-background-dark/50 border border-[#dcdee5] dark:border-white/10 rounded-2xl shadow-sm overflow-hidden">
             {/* Profile Header */}
             <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-8 text-white">
@@ -452,23 +455,7 @@ const TeacherProfile = () => {
           </div>
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-white dark:bg-background-dark/50 border-t border-[#dcdee5] dark:border-white/10 py-8">
-        <div className="max-w-[1280px] mx-auto px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              © 2026 SmartAcademics. All rights reserved.
-            </p>
-            <div className="flex items-center gap-6">
-              <a href="/privacy" className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary transition-colors">Privacy Policy</a>
-              <a href="/terms" className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary transition-colors">Terms of Service</a>
-              <a href="/contact" className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary transition-colors">Contact</a>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </TeacherLayout>
   );
 };
 

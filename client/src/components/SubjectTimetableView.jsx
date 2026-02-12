@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import axios from 'axios';
 import { Modal, Card, LoadingSpinner } from './index';
 
@@ -10,7 +10,9 @@ const SubjectTimetableView = ({ subjectId, subjectName }) => {
   const [selectedSchedule, setSelectedSchedule] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const days = useMemo(() => (
+    ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  ), []);
 
   // Fetch subject timetable
   useEffect(() => {
@@ -41,7 +43,7 @@ const SubjectTimetableView = ({ subjectId, subjectName }) => {
     if (subjectId) {
       fetchTimetable();
     }
-  }, [subjectId]);
+  }, [subjectId, days]);
 
   // Group timetable by day
   const groupedByDay = days.reduce((acc, day) => {

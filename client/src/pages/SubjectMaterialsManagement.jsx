@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -12,7 +12,6 @@ const SubjectMaterialsManagement = () => {
   const [selectedType, setSelectedType] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [currentPage, setCurrentPage] = useState(1);
-  const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('add'); // 'add' or 'edit'
   const [selectedMaterial, setSelectedMaterial] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -27,12 +26,7 @@ const SubjectMaterialsManagement = () => {
   const itemsPerPage = 10;
   const resourceTypes = ['Notes', 'Video', 'Assignment', 'Reference', 'Practice'];
 
-  useEffect(() => {
-    fetchSubjectDetails();
-    fetchMaterials();
-  }, [id]);
-
-  const fetchSubjectDetails = async () => {
+  const fetchSubjectDetails = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(`/api/academic/subjects/${id}`, {
@@ -43,9 +37,9 @@ const SubjectMaterialsManagement = () => {
       console.error('Error fetching subject:', error);
       showToast('Failed to load subject details', 'error');
     }
-  };
+  }, [id]);
 
-  const fetchMaterials = async () => {
+  const fetchMaterials = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
@@ -59,7 +53,12 @@ const SubjectMaterialsManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchSubjectDetails();
+    fetchMaterials();
+  }, [fetchSubjectDetails, fetchMaterials]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -148,11 +147,9 @@ const SubjectMaterialsManagement = () => {
         resourceType: 'Notes'
       });
     }
-    setShowModal(true);
   };
 
   const closeModal = () => {
-    setShowModal(false);
     setSelectedMaterial(null);
     setFormData({
       title: '',

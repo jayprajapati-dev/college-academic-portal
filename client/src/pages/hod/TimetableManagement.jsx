@@ -27,7 +27,6 @@ const HodTeacherTimetableManagement = () => {
   });
 
   const [subjects, setSubjects] = useState([]);
-  const [teachers, setTeachers] = useState([]);
   const [saving, setSaving] = useState(false);
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -46,17 +45,13 @@ const HodTeacherTimetableManagement = () => {
     const fetchMetadata = async () => {
       try {
         const token = localStorage.getItem('token');
-        const [subjRes, teachRes] = await Promise.all([
+        const [subjRes] = await Promise.all([
           axios.get('/api/academic/subjects', { 
-            headers: { Authorization: `Bearer ${token}` } 
-          }),
-          axios.get('/api/admin/users?role=teacher', { 
             headers: { Authorization: `Bearer ${token}` } 
           })
         ]);
 
         if (subjRes.data.success) setSubjects(subjRes.data.data);
-        if (teachRes.data.success) setTeachers(teachRes.data.data);
       } catch (error) {
         console.error('Error fetching metadata:', error);
       }

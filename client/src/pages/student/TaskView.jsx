@@ -64,7 +64,7 @@ const StudentTaskView = () => {
   }, [fetchTasks]);
 
   const handleViewTask = (taskId) => {
-    navigate(`/task/${taskId}`);
+    navigate(`/student/tasks/${taskId}`);
   };
 
   if (loading) {

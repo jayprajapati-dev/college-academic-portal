@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import Header from '../components/Header';
-import { HodLayout } from '../components';
+import { HodLayout, TeacherLayout } from '../components';
 
 const TeacherMaterials = () => {
   const navigate = useNavigate();
@@ -254,9 +253,15 @@ const TeacherMaterials = () => {
       );
     }
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#194ce6]"></div>
-      </div>
+      <TeacherLayout title="Materials" userName={storedUser?.name || 'Teacher'} onLogout={() => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+      }}>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-2 border-[#111318] border-t-transparent"></div>
+        </div>
+      </TeacherLayout>
     );
   }
 
@@ -472,10 +477,13 @@ const TeacherMaterials = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <Header />
+    <TeacherLayout title="Materials" userName={storedUser?.name || 'Teacher'} onLogout={() => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      navigate('/login');
+    }}>
       {content}
-    </div>
+    </TeacherLayout>
   );
 };
 

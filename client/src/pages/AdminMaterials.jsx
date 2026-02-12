@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AdminLayout } from '../components';
 
 const AdminMaterials = () => {
   const navigate = useNavigate();
-  
+  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+
   const [subjects, setSubjects] = useState([]);
   const [selectedSubject, setSelectedSubject] = useState('');
   const [materials, setMaterials] = useState([]);
@@ -14,15 +16,40 @@ const AdminMaterials = () => {
   const [editingId, setEditingId] = useState(null);
   const [filterRole, setFilterRole] = useState('All');
 
-  // Form state
   const [formData, setFormData] = useState({
     title: '',
     category: '',
     description: '',
-    link: '',
+    link: ''
   });
 
-  // Load user and verify admin access
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login');
+  };
+
+  const loadSubjects = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/academic/subjects', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      const subjectList = data?.data || data?.subjects || [];
+      setSubjects(subjectList);
+      if (subjectList.length > 0) {
+        setSelectedSubject(subjectList[0]._id);
+      }
+    } catch (err) {
+      console.error('Failed to load subjects:', err);
+      setError('Failed to load subjects');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
@@ -45,31 +72,6 @@ const AdminMaterials = () => {
     }
   }, [navigate]);
 
-  const loadSubjects = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/academic/subjects', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const data = await res.json();
-      if (data?.success) {
-        setSubjects(data.subjects);
-        if (data.subjects.length > 0) {
-          setSelectedSubject(data.subjects[0]._id);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load subjects:', err);
-      setError('Failed to load subjects');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Load materials and categories for selected subject
   useEffect(() => {
     if (!selectedSubject) return;
 
@@ -79,7 +81,7 @@ const AdminMaterials = () => {
         const token = localStorage.getItem('token');
         const [resMaterials, resCategories] = await Promise.all([
           fetch(`/api/academic/subjects/${selectedSubject}/materials`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` }
           }),
           fetch(`/api/academic/subjects/${selectedSubject}/materials/categories`)
         ]);
@@ -88,11 +90,11 @@ const AdminMaterials = () => {
         const dataCategories = await resCategories.json();
 
         if (dataMaterials?.success) {
-          setMaterials(dataMaterials.materials);
+          setMaterials(dataMaterials.materials || []);
         }
 
         if (dataCategories?.success) {
-          setCategories(dataCategories.categories);
+          setCategories(dataCategories.categories || []);
         }
       } catch (err) {
         console.error('Failed to load materials:', err);
@@ -107,7 +109,7 @@ const AdminMaterials = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value
     }));
@@ -115,7 +117,7 @@ const AdminMaterials = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!selectedSubject || !formData.title || !formData.category || !formData.link) {
       setError('Please fill in all required fields');
       return;
@@ -132,9 +134,9 @@ const AdminMaterials = () => {
 
       const res = await fetch(url, {
         method,
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify(formData)
       });
@@ -145,14 +147,13 @@ const AdminMaterials = () => {
         setFormData({ title: '', category: '', description: '', link: '' });
         setShowForm(false);
         setEditingId(null);
-        
-        // Reload materials
+
         const resMaterials = await fetch(`/api/academic/subjects/${selectedSubject}/materials`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` }
         });
         const dataMaterials = await resMaterials.json();
         if (dataMaterials?.success) {
-          setMaterials(dataMaterials.materials);
+          setMaterials(dataMaterials.materials || []);
         }
 
         setError('');
@@ -186,13 +187,13 @@ const AdminMaterials = () => {
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/academic/subjects/${selectedSubject}/materials/${materialId}/link`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       const data = await res.json();
 
       if (data?.success) {
-        setMaterials(prev => prev.filter(m => m._id !== materialId));
+        setMaterials((prev) => prev.filter((m) => m._id !== materialId));
         setError('');
       } else {
         setError(data?.message || 'Failed to delete material');
@@ -213,143 +214,74 @@ const AdminMaterials = () => {
 
   const filteredMaterials = filterRole === 'All'
     ? materials
-    : materials.filter(m => m.addedByRole === filterRole);
+    : materials.filter((m) => m.addedByRole === filterRole);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#194ce6]"></div>
-      </div>
+      <AdminLayout title="Materials" userName={storedUser?.name || 'Admin'} onLogout={handleLogout}>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-2 border-[#111318] border-t-transparent"></div>
+        </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Header */}
-      <header className="bg-white shadow-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="p-1.5 rounded-lg bg-gradient-to-r from-[#194ce6] to-purple-500">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-800">Smart College Portal</h1>
-                <p className="text-xs text-gray-500">Manage All Study Materials</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm font-semibold text-gray-800">Administrator</p>
-                <p className="text-xs text-gray-500">Admin</p>
-              </div>
-              <button
-                onClick={() => {
-                  localStorage.removeItem('token');
-                  localStorage.removeItem('user');
-                  navigate('/login');
-                }}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
+    <AdminLayout title="Materials" userName={storedUser?.name || 'Admin'} onLogout={handleLogout}>
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Subject Selection */}
+        <div className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-6 mb-6">
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            Select Subject
+          </label>
+          <select
+            value={selectedSubject}
+            onChange={(e) => setSelectedSubject(e.target.value)}
+            className="w-full px-4 py-2 rounded-lg border border-[#dcdee5] dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-white"
+          >
+            <option value="">Choose a subject...</option>
+            {subjects.map((subject) => (
+              <option key={subject._id} value={subject._id}>
+                {subject.code} - {subject.name}
+              </option>
+            ))}
+          </select>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-6">
-          {/* Subject Selection */}
-          <div className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-6 mb-6">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              Select Subject
-            </label>
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg border border-[#dcdee5] dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-white"
+        {/* Add New Material Button */}
+        {selectedSubject && (
+          <div className="mb-6">
+            <button
+              onClick={() => {
+                setShowForm(!showForm);
+                if (showForm) handleCancel();
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90 transition-opacity"
             >
-              <option value="">Choose a subject...</option>
-              {subjects.map(subject => (
-                <option key={subject._id} value={subject._id}>
-                  {subject.code} - {subject.name}
-                </option>
-              ))}
-            </select>
+              <span className="material-symbols-outlined">add</span>
+              {showForm ? 'Cancel' : 'Add New Material'}
+            </button>
           </div>
+        )}
 
-          {/* Add New Material Button */}
-          {selectedSubject && (
-            <div className="mb-6">
-              <button
-                onClick={() => {
-                  setShowForm(!showForm);
-                  if (showForm) handleCancel();
-                }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90 transition-opacity"
-              >
-                <span className="material-symbols-outlined">add</span>
-                {showForm ? 'Cancel' : 'Add New Material'}
-              </button>
-            </div>
-          )}
-
-          {/* Add/Edit Material Form */}
-          {showForm && (
-            <div className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-6 mb-6">
-              <h3 className="text-lg font-bold mb-4">
-                {editingId ? 'Edit Material' : 'Add New Material'}
-              </h3>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      Title *
-                    </label>
-                    <input
-                      type="text"
-                      name="title"
-                      value={formData.title}
-                      onChange={handleInputChange}
-                      placeholder="Material title"
-                      className="w-full px-4 py-2 rounded-lg border border-[#dcdee5] dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-white"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                      Category *
-                    </label>
-                    <select
-                      name="category"
-                      value={formData.category}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 rounded-lg border border-[#dcdee5] dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-white"
-                      required
-                    >
-                      <option value="">Select category...</option>
-                      {categories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
+        {/* Add/Edit Material Form */}
+        {showForm && (
+          <div className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-6 mb-6">
+            <h3 className="text-lg font-bold mb-4">
+              {editingId ? 'Edit Material' : 'Add New Material'}
+            </h3>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Link *
+                    Title *
                   </label>
                   <input
-                    type="url"
-                    name="link"
-                    value={formData.link}
+                    type="text"
+                    name="title"
+                    value={formData.title}
                     onChange={handleInputChange}
-                    placeholder="https://example.com"
+                    placeholder="Material title"
                     className="w-full px-4 py-2 rounded-lg border border-[#dcdee5] dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-white"
                     required
                   />
@@ -357,137 +289,170 @@ const AdminMaterials = () => {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Description
+                    Category *
                   </label>
-                  <textarea
-                    name="description"
-                    value={formData.description}
+                  <select
+                    name="category"
+                    value={formData.category}
                     onChange={handleInputChange}
-                    placeholder="Brief description of the material"
-                    rows="3"
                     className="w-full px-4 py-2 rounded-lg border border-[#dcdee5] dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-white"
-                  />
+                    required
+                  >
+                    <option value="">Select category...</option>
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
                 </div>
-
-                {error && (
-                  <div className="p-3 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm">
-                    {error}
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90 disabled:opacity-50"
-                  >
-                    {loading ? 'Saving...' : (editingId ? 'Update' : 'Add')} Material
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCancel}
-                    className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-300 dark:hover:bg-white/20"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* Filter by Role */}
-          {selectedSubject && (
-            <div className="mb-6 bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-4">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Filter by Added By</p>
-              <div className="flex flex-wrap gap-2">
-                {['All', 'teacher', 'hod', 'admin'].map(role => (
-                  <button
-                    key={role}
-                    onClick={() => setFilterRole(role)}
-                    className={`px-3 py-1.5 rounded-lg font-semibold text-sm transition-all capitalize ${
-                      filterRole === role
-                        ? 'bg-primary text-white'
-                        : 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
-                    }`}
-                  >
-                    {role}
-                  </button>
-                ))}
               </div>
-            </div>
-          )}
 
-          {/* Materials List */}
-          {selectedSubject && (
-            <div className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-6">
-              <h3 className="text-lg font-bold mb-4">
-                Materials ({filteredMaterials.length} / {materials.length})
-              </h3>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Link *
+                </label>
+                <input
+                  type="url"
+                  name="link"
+                  value={formData.link}
+                  onChange={handleInputChange}
+                  placeholder="https://example.com"
+                  className="w-full px-4 py-2 rounded-lg border border-[#dcdee5] dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-white"
+                  required
+                />
+              </div>
 
-              {filteredMaterials.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <span className="material-symbols-outlined text-4xl mb-2 block opacity-30">folder_open</span>
-                  {materials.length === 0 
-                    ? 'No materials uploaded yet.'
-                    : `No materials found with role "${filterRole}"`
-                  }
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {filteredMaterials.map(mat => (
-                    <div key={mat._id} className="border border-[#f0f1f4] dark:border-white/10 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            <h4 className="font-semibold text-gray-900 dark:text-white">{mat.title}</h4>
-                            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-                              {mat.category}
-                            </span>
-                            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 capitalize">
-                              Added by: {mat.addedByRole}
-                            </span>
-                          </div>
-                          {mat.description && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{mat.description}</p>
-                          )}
-                          <a
-                            href={mat.link}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs text-primary hover:underline block mb-1"
-                          >
-                            {mat.link}
-                          </a>
-                          <p className="text-xs text-gray-500 dark:text-gray-500">
-                            Added: {new Date(mat.uploadedAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEdit(mat)}
-                            className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
-                            title="Edit"
-                          >
-                            <span className="material-symbols-outlined text-sm">edit</span>
-                          </button>
-                          <button
-                            onClick={() => handleDelete(mat._id)}
-                            className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
-                            title="Delete"
-                          >
-                            <span className="material-symbols-outlined text-sm">delete</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Description
+                </label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  placeholder="Brief description of the material"
+                  rows="3"
+                  className="w-full px-4 py-2 rounded-lg border border-[#dcdee5] dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              {error && (
+                <div className="p-3 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm">
+                  {error}
                 </div>
               )}
+
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90 disabled:opacity-50"
+                >
+                  {loading ? 'Saving...' : (editingId ? 'Update' : 'Add')} Material
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300 font-semibold hover:bg-gray-300 dark:hover:bg-white/20"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Filter by Role */}
+        {selectedSubject && (
+          <div className="mb-6 bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Filter by Added By</p>
+            <div className="flex flex-wrap gap-2">
+              {['All', 'teacher', 'hod', 'admin'].map((role) => (
+                <button
+                  key={role}
+                  onClick={() => setFilterRole(role)}
+                  className={`px-3 py-1.5 rounded-lg font-semibold text-sm transition-all capitalize ${
+                    filterRole === role
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
+                  }`}
+                >
+                  {role}
+                </button>
+              ))}
             </div>
-          )}
-        </div>
-      </main>
-    </div>
+          </div>
+        )}
+
+        {/* Materials List */}
+        {selectedSubject && (
+          <div className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-6">
+            <h3 className="text-lg font-bold mb-4">
+              Materials ({filteredMaterials.length} / {materials.length})
+            </h3>
+
+            {filteredMaterials.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <span className="material-symbols-outlined text-4xl mb-2 block opacity-30">folder_open</span>
+                {materials.length === 0
+                  ? 'No materials uploaded yet.'
+                  : `No materials found with role "${filterRole}"`
+                }
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredMaterials.map((mat) => (
+                  <div key={mat._id} className="border border-[#f0f1f4] dark:border-white/10 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <h4 className="font-semibold text-gray-900 dark:text-white">{mat.title}</h4>
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                            {mat.category}
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 capitalize">
+                            Added by: {mat.addedByRole}
+                          </span>
+                        </div>
+                        {mat.description && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{mat.description}</p>
+                        )}
+                        <a
+                          href={mat.link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-primary hover:underline block mb-1"
+                        >
+                          {mat.link}
+                        </a>
+                        <p className="text-xs text-gray-500 dark:text-gray-500">
+                          Added: {new Date(mat.uploadedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEdit(mat)}
+                          className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                          title="Edit"
+                        >
+                          <span className="material-symbols-outlined text-sm">edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDelete(mat._id)}
+                          className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                          title="Delete"
+                        >
+                          <span className="material-symbols-outlined text-sm">delete</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </AdminLayout>
   );
 };
 

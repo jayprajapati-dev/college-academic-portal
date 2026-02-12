@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import axios from 'axios';
-import { Card, LoadingSpinner, Modal } from '../../components';
-import Header from '../../components/Header';
+import { Card, LoadingSpinner, Modal, StudentLayout } from '../../components';
 import SubjectTimetableView from '../../components/SubjectTimetableView';
 
 const StudentTimetableView = () => {
@@ -15,7 +14,15 @@ const StudentTimetableView = () => {
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [user, setUser] = useState(null);
 
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+  };
+
+  const days = useMemo(() => (
+    ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  ), []);
 
   useEffect(() => {
     // Get user info
@@ -81,12 +88,11 @@ const StudentTimetableView = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-        <Header />
-        <div className="flex items-center justify-center h-screen pt-24">
+      <StudentLayout title="My Timetable" onLogout={handleLogout} userName={user?.name || 'Student'}>
+        <div className="flex items-center justify-center h-64">
           <LoadingSpinner />
         </div>
-      </div>
+      </StudentLayout>
     );
   }
 
@@ -230,9 +236,8 @@ const StudentTimetableView = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-32">
+    <StudentLayout title="My Timetable" onLogout={handleLogout} userName={user?.name || 'Student'}>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="space-y-6">
         {/* Header */}
         <div>
@@ -465,7 +470,7 @@ const StudentTimetableView = () => {
         )}
       </div>
       </main>
-    </div>
+    </StudentLayout>
   );
 };
 

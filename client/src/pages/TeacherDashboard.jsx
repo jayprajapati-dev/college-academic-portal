@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Header from '../components/Header';
+import { TeacherLayout } from '../components';
 
 const TeacherDashboard = () => {
   const navigate = useNavigate();
@@ -94,18 +94,19 @@ const TeacherDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#194ce6]"></div>
+      <div className="min-h-screen bg-[#F8F9FB] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-2 border-[#111318] border-t-transparent"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <Header />
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-32">
+    <TeacherLayout title="Dashboard" userName={user?.name || 'Teacher'} onLogout={() => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      navigate('/login');
+    }}>
+      <div className="max-w-7xl mx-auto space-y-8">
         {/* Welcome Section */}
         <div className="bg-gradient-to-r from-[#194ce6] to-purple-500 rounded-2xl shadow-lg p-8 mb-8 text-white">
           <div className="flex items-center justify-between">
@@ -208,17 +209,21 @@ const TeacherDashboard = () => {
               <p className="text-sm text-gray-600 mt-1">Your content</p>
             </button>
 
-            <button className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl hover:shadow-lg transition group">
+            <button 
+              onClick={() => navigate('/notices')}
+              className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl hover:shadow-lg transition group">
               <div className="p-3 bg-white rounded-lg w-fit mb-3 group-hover:scale-110 transition">
                 <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
               </div>
-              <p className="font-semibold text-gray-800">Post Notice</p>
-              <p className="text-sm text-gray-600 mt-1">Create announcement</p>
+              <p className="font-semibold text-gray-800">Notice Board</p>
+              <p className="text-sm text-gray-600 mt-1">View announcements</p>
             </button>
 
-            <button className="p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl hover:shadow-lg transition group">
+            <button 
+              onClick={() => navigate('/teacher/materials')}
+              className="p-6 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl hover:shadow-lg transition group">
               <div className="p-3 bg-white rounded-lg w-fit mb-3 group-hover:scale-110 transition">
                 <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -323,8 +328,8 @@ const TeacherDashboard = () => {
             </div>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </TeacherLayout>
   );
 };
 

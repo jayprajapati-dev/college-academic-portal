@@ -111,6 +111,48 @@ router.get('/subjects', async (req, res) => {
   }
 });
 
+// @route   GET /api/academic/subjects/hod
+// @desc    Get subjects for HOD's branch(es)
+// @access  Private (HOD/Admin)
+router.get('/subjects/hod', protect, authorize('hod', 'admin'), async (req, res) => {
+  try {
+    const branchIds = [];
+
+    if (req.user.branch) branchIds.push(req.user.branch);
+    if (req.user.department) branchIds.push(req.user.department);
+    if (Array.isArray(req.user.branches) && req.user.branches.length > 0) {
+      branchIds.push(...req.user.branches);
+    }
+
+    const uniqueBranchIds = [...new Set(branchIds.map(id => String(id)))]
+      .filter(Boolean)
+      .map(id => id);
+
+    if (uniqueBranchIds.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const query = { branchId: { $in: uniqueBranchIds } };
+    if (req.query.semesterId) {
+      query.semesterId = req.query.semesterId;
+    }
+
+    const subjects = await Subject.find(query)
+      .sort({ name: 1 })
+      .select('_id name code description semesterId branchId');
+
+    res.json({
+      success: true,
+      data: subjects
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 // @route   GET /api/academic/subjects/:id/public
 // @desc    Get subject details with materials (PUBLIC)
 // @access  Public

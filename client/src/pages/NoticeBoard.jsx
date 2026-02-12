@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { StudentLayout, Card, Badge, LoadingSpinner, Button, Modal } from '../../components';
+import { StudentLayout, Card, Badge, LoadingSpinner, Button, Modal } from '../components';
 import axios from 'axios';
 
 const NoticeBoard = () => {
@@ -254,7 +254,7 @@ const NoticeBoard = () => {
                           className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline"
                         >
                           <span className="material-symbols-outlined text-base">download</span>
-                          <span>{file.originalName}</span>
+                          <span>{file.name || 'Attachment'}</span>
                         </a>
                       ))}
                     </div>

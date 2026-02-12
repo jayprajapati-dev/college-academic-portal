@@ -13,3 +13,5 @@ export { default as ConfirmDialog } from './ConfirmDialog';
 export { default as EmptyState } from './EmptyState';
 export { default as AdminLayout } from './AdminLayout';
 export { default as HodLayout } from './HodLayout';
+export { default as StudentLayout } from './StudentLayout';
+export { default as TeacherLayout } from './TeacherLayout';

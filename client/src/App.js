@@ -16,6 +16,7 @@ import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import DisclaimerPage from './pages/DisclaimerPage';
 import SubjectMaterialsPublic from './pages/SubjectMaterialsPublic';
+import NoticeBoard from './pages/NoticeBoard';
 
 // Import dashboards
 import StudentDashboard from './pages/StudentDashboard';
@@ -51,6 +52,9 @@ import AdminTimetableManagement from './pages/admin/TimetableManagement';
 
 // Import Student pages
 import StudentTimetableView from './pages/student/TimetableView';
+import StudentTaskView from './pages/student/TaskView';
+import StudentSubjects from './pages/student/StudentSubjects';
+import StudentTaskDetail from './pages/student/TaskDetail';
 
 function App() {
   return (
@@ -68,6 +72,7 @@ function App() {
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/disclaimer" element={<DisclaimerPage />} />
         <Route path="/subjects/:id/materials" element={<SubjectMaterialsPublic />} />
+        <Route path="/notices" element={<NoticeBoard />} />
         
         {/* First Login & Profile Setup */}
         <Route path="/first-login" element={<FirstLoginPage />} />
@@ -76,8 +81,11 @@ function App() {
         
         {/* Dashboards (Role-based) */}
         <Route path="/student/dashboard" element={<StudentDashboard />} />
+        <Route path="/student/subjects" element={<StudentSubjects />} />
         <Route path="/student/profile" element={<StudentProfile />} />
         <Route path="/student/timetable" element={<StudentTimetableView />} />
+        <Route path="/subjects/:subjectId/tasks" element={<StudentTaskView />} />
+        <Route path="/student/tasks/:taskId" element={<StudentTaskDetail />} />
         <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
         <Route path="/teacher/profile" element={<TeacherProfile />} />
         <Route path="/teacher/materials" element={<TeacherMaterials />} />

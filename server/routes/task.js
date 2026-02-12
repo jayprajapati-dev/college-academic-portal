@@ -26,7 +26,7 @@ const notifyTaskRecipients = async (task, action = 'created') => {
       relatedType: 'Task',
       subjectId: task.subjectId,
       isNotice: false,
-      actionUrl: `/subjects/${task.subjectId}#tasks`
+      actionUrl: `/subjects/${task.subjectId}/tasks`
     }));
 
     if (notifications.length > 0) {
@@ -327,15 +327,12 @@ router.put('/:id', protect, async (req, res) => {
     if (category) task.category = category;
     if (dueDate) task.dueDate = dueDate;
 
-    // Handle new attachments
-    if (req.files && req.files.length > 0) {
-      const newAttachments = req.files.map(file => ({
-        fileName: file.originalname,
-        filePath: file.path,
-        fileSize: file.size,
-        mimeType: file.mimetype
+    // Links-based attachments only
+    if (attachments && Array.isArray(attachments)) {
+      task.attachments = attachments.map(att => ({
+        name: att.name || 'Attachment',
+        url: att.url
       }));
-      task.attachments = [...(task.attachments || []), ...newAttachments];
     }
 
     task.updatedAt = Date.now();
@@ -372,15 +369,6 @@ router.delete('/:id', protect, async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to delete this task'
-      });
-    }
-
-    // Delete attachments from filesystem
-    if (task.attachments && task.attachments.length > 0) {
-      task.attachments.forEach(attachment => {
-        if (fs.existsSync(attachment.filePath)) {
-          fs.unlinkSync(attachment.filePath);
-        }
       });
     }
 

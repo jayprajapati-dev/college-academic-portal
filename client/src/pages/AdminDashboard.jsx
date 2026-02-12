@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Header from '../components/Header';
 import { AdminLayout, Card, StatsCard, Button } from '../components';
 
 const AdminDashboard = () => {
