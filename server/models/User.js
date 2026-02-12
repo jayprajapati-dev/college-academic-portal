@@ -132,6 +132,9 @@ const userSchema = new mongoose.Schema({
   },
   lastLogin: {
     type: Date
+  },
+  permissions: [{
+    type: String
   }
 }, {
   timestamps: true

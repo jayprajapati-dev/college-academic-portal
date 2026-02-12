@@ -1,0 +1,101 @@
+import { useEffect, useMemo, useState } from 'react';
+
+const ROLE_NAV = {
+  admin: [
+    { key: 'dashboard', label: 'Dashboard', to: '/admin/dashboard', icon: 'space_dashboard' },
+    { key: 'academic-structure', label: 'Academic Structure', to: '/admin/academic-structure', icon: 'account_tree' },
+    { key: 'semesters', label: 'Semesters', to: '/admin/semesters', icon: 'calendar_month' },
+    { key: 'branches', label: 'Branches', to: '/admin/branches', icon: 'apartment' },
+    { key: 'subjects', label: 'Subjects', to: '/admin/subjects', icon: 'menu_book' },
+    { key: 'library', label: 'Library', to: '/admin/library', icon: 'library_books' },
+    { key: 'timetable', label: 'Timetable', to: '/admin/timetable', icon: 'calendar_today' },
+    { key: 'notices', label: 'Notice Board', to: '/admin/notices', icon: 'notifications' },
+    { key: 'tasks', label: 'Task/Assignment', to: '/admin/tasks', icon: 'assignment' },
+    { key: 'attendance', label: 'Attendance', to: '/admin/attendance', icon: 'fact_check' },
+    { key: 'exams', label: 'Exams', to: '/admin/exams', icon: 'quiz' },
+    { key: 'users', label: 'Users', to: '/admin/users', icon: 'group' },
+    { key: 'contacts', label: 'Contact Requests', to: '/admin/contacts', icon: 'contact_mail' }
+  ],
+  hod: [
+    { key: 'dashboard', label: 'Dashboard', to: '/hod/dashboard', icon: 'space_dashboard' },
+    { key: 'profile', label: 'Profile', to: '/hod/profile', icon: 'account_circle' },
+    { key: 'add-teacher', label: 'Add Teacher', to: '/hod/add-teacher', icon: 'person_add' },
+    { key: 'manage-teachers', label: 'Manage Teachers', to: '/hod/manage-teachers', icon: 'group' },
+    { key: 'notices', label: 'Notices', to: '/hod/notices', icon: 'notifications' },
+    { key: 'tasks', label: 'Tasks', to: '/hod/tasks', icon: 'assignment' },
+    { key: 'materials', label: 'Materials', to: '/hod/materials', icon: 'menu_book' },
+    { key: 'library', label: 'Library', to: '/hod/library', icon: 'library_books' },
+    { key: 'attendance', label: 'Attendance', to: '/hod/attendance', icon: 'fact_check' },
+    { key: 'exams', label: 'Exams', to: '/hod/exams', icon: 'quiz' },
+    { key: 'reports', label: 'Reports', to: '/hod/reports', icon: 'insights' },
+    { key: 'timetable', label: 'Timetable', to: '/hod/timetable', icon: 'calendar_today' }
+  ],
+  teacher: [
+    { key: 'dashboard', label: 'Dashboard', to: '/teacher/dashboard', icon: 'space_dashboard' },
+    { key: 'materials', label: 'Materials', to: '/teacher/materials', icon: 'menu_book' },
+    { key: 'library', label: 'Library', to: '/teacher/library', icon: 'library_books' },
+    { key: 'tasks', label: 'Tasks', to: '/teacher/tasks', icon: 'assignment' },
+    { key: 'notices', label: 'Notices', to: '/teacher/notices', icon: 'notifications' },
+    { key: 'attendance', label: 'Attendance', to: '/teacher/attendance', icon: 'fact_check' },
+    { key: 'exams', label: 'Exams', to: '/teacher/exams', icon: 'quiz' },
+    { key: 'profile', label: 'Profile', to: '/teacher/profile', icon: 'account_circle' }
+  ]
+};
+
+const useRoleNav = (role) => {
+  const defaultItems = useMemo(() => ROLE_NAV[role] || [], [role]);
+  const [navItems, setNavItems] = useState(defaultItems);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const load = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('token');
+        if (!token) {
+          if (isMounted) {
+            setNavItems(defaultItems);
+          }
+          return;
+        }
+
+        const res = await fetch('/api/permissions/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.success) {
+          throw new Error(data?.message || 'Failed to load permissions');
+        }
+
+        if (!isMounted) return;
+
+        if (Object.prototype.hasOwnProperty.call(data, 'allowedModules')) {
+          const allowed = Array.isArray(data.allowedModules) ? data.allowedModules : [];
+          const filtered = defaultItems.filter((item) => allowed.includes(item.key));
+          setNavItems(filtered);
+        } else {
+          setNavItems(defaultItems);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setNavItems(defaultItems);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [defaultItems]);
+
+  return { navItems, loading };
+};
+
+export default useRoleNav;

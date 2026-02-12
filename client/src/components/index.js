@@ -15,4 +15,5 @@ export { default as AdminLayout } from './AdminLayout';
 export { default as HodLayout } from './HodLayout';
 export { default as StudentLayout } from './StudentLayout';
 export { default as TeacherLayout } from './TeacherLayout';
+export { default as RoleLayout } from './RoleLayout';
 export { default as LandingFrame } from './LandingFrame';
