@@ -198,14 +198,14 @@ router.get('/board', protect, async (req, res) => {
   }
 });
 
-// GET ADMIN NOTICES (For management dashboard)
+// GET ADMIN/HOD NOTICES (For management dashboard)
 router.get('/admin', protect, authorize('admin', 'hod'), async (req, res) => {
   try {
     const { page = 1, limit = 10, status } = req.query;
 
-    let query = { createdBy: req.user._id };
+    let query = {};
 
-    // If HOD, also show notices from other teachers in their branch
+    // HOD sees notices from their branch users only
     if (req.user.role === 'hod') {
       const usersInBranch = await User.find({ branch: req.user.branch }).select('_id');
       const userIds = usersInBranch.map(u => u._id);
@@ -241,6 +241,41 @@ router.get('/admin', protect, authorize('admin', 'hod'), async (req, res) => {
   }
 });
 
+// GET TEACHER NOTICES (Own notices only)
+router.get('/teacher', protect, authorize('teacher'), async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status } = req.query;
+    const query = { createdBy: req.user._id };
+
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    const notices = await Notice.find(query)
+      .populate('createdBy', 'name email role')
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ createdAt: -1 });
+
+    const total = await Notice.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      count: notices.length,
+      total,
+      pages: Math.ceil(total / limit),
+      currentPage: page,
+      data: notices
+    });
+  } catch (error) {
+    console.error('Get teacher notices error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching notices'
+    });
+  }
+});
+
 // UPDATE NOTICE (edit or publish draft)
 router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
@@ -255,10 +290,21 @@ router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, re
     }
 
     if (!notice.createdBy.equals(req.user._id) && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to update this notice'
-      });
+      if (req.user.role !== 'hod') {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to update this notice'
+        });
+      }
+
+      const creator = await User.findById(notice.createdBy).select('branch');
+      const sameBranch = creator?.branch?.equals(req.user.branch) || notice.targetBranch?.equals(req.user.branch);
+      if (!sameBranch) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to update this notice'
+        });
+      }
     }
 
     let targetBranch = notice.targetBranch || null;
@@ -377,10 +423,21 @@ router.delete('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req,
 
     // Authorization check
     if (!notice.createdBy.equals(req.user._id) && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to delete this notice'
-      });
+      if (req.user.role !== 'hod') {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to delete this notice'
+        });
+      }
+
+      const creator = await User.findById(notice.createdBy).select('branch');
+      const sameBranch = creator?.branch?.equals(req.user.branch) || notice.targetBranch?.equals(req.user.branch);
+      if (!sameBranch) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to delete this notice'
+        });
+      }
     }
 
     // No files to delete - links only system

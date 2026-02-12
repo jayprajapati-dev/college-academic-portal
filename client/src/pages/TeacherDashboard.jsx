@@ -210,7 +210,7 @@ const TeacherDashboard = () => {
             </button>
 
             <button 
-              onClick={() => navigate('/notices')}
+              onClick={() => navigate('/teacher/notices')}
               className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl hover:shadow-lg transition group">
               <div className="p-3 bg-white rounded-lg w-fit mb-3 group-hover:scale-110 transition">
                 <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
