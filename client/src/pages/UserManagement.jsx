@@ -15,8 +15,11 @@ const UserManagement = () => {
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [newRole, setNewRole] = useState('');
+  const [permissionsMap, setPermissionsMap] = useState({});
+  const [selectedPermissions, setSelectedPermissions] = useState([]);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
@@ -32,7 +35,23 @@ const UserManagement = () => {
     const user = JSON.parse(localStorage.getItem('user'));
     setCurrentUser(user);
     fetchUsers();
+    fetchPermissionModules();
   }, []);
+
+  const fetchPermissionModules = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/admin/permissions/modules', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data?.success) {
+        setPermissionsMap(data.data || {});
+      }
+    } catch (error) {
+      console.error('Error fetching permissions:', error);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -116,6 +135,36 @@ const UserManagement = () => {
     }
   };
 
+  const handlePermissionsSave = async () => {
+    if (!selectedUser) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/admin/users/${selectedUser._id}/permissions`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ permissions: selectedPermissions })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data?.success) {
+        setUsers(users.map(u => u._id === selectedUser._id ? { ...u, permissions: data.data.permissions } : u));
+        setShowPermissionsModal(false);
+        setSuccessMessage('Permissions updated successfully!');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setErrorMessage(data.message || 'Failed to update permissions');
+      }
+    } catch (error) {
+      console.error('Error updating permissions:', error);
+      setErrorMessage('Error updating permissions');
+    }
+  };
+
 
   const handleDeleteUser = async (user) => {
     try {
@@ -167,6 +216,17 @@ const UserManagement = () => {
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
   const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+
+  const handleOpenPermissions = (user) => {
+    const roleDefaults = permissionsMap[user.role] || [];
+    const existing = Array.isArray(user.permissions) && user.permissions.length > 0
+      ? user.permissions
+      : roleDefaults;
+
+    setSelectedUser(user);
+    setSelectedPermissions(existing);
+    setShowPermissionsModal(true);
+  };
 
   if (loading) {
     return (
@@ -427,6 +487,17 @@ const UserManagement = () => {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                           </button>
+                          {['admin', 'hod', 'teacher'].includes(user.role) && (
+                            <button
+                              onClick={() => handleOpenPermissions(user)}
+                              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                              title="Edit Permissions"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8v-2m0 2a2 2 0 100 4m0-4a2 2 0 110 4m12-8v-2m0 2a2 2 0 100 4m0-4a2 2 0 110 4" />
+                              </svg>
+                            </button>
+                          )}
                           <button 
                             onClick={() => {
                               setSelectedUser(user);
@@ -517,6 +588,17 @@ const UserManagement = () => {
                   <p className="text-gray-900 font-semibold break-all">{selectedUser.email}</p>
                 </div>
 
+                {['admin', 'hod', 'teacher'].includes(selectedUser.role) && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-xs text-gray-500 font-semibold uppercase">Permissions</p>
+                    <p className="text-gray-900 font-semibold text-sm">
+                      {Array.isArray(selectedUser.permissions) && selectedUser.permissions.length > 0
+                        ? selectedUser.permissions.join(', ')
+                        : 'Default role permissions'}
+                    </p>
+                  </div>
+                )}
+
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <p className="text-xs text-gray-500 font-semibold uppercase">Mobile</p>
                   <p className="text-gray-900 font-semibold">{selectedUser.mobile || 'N/A'}</p>
@@ -556,6 +638,78 @@ const UserManagement = () => {
                 className="w-full px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors font-semibold"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Permissions Modal */}
+      {showPermissionsModal && selectedUser && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-200 dark:border-gray-700">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-emerald-500 to-teal-500">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-white">Edit Permissions</h3>
+                <button onClick={() => setShowPermissionsModal(false)} className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-sm text-emerald-50 mt-2">{selectedUser.name} • {selectedUser.role?.toUpperCase()}</p>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">Select the modules this user can access.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {(permissionsMap[selectedUser.role] || []).map((moduleKey) => (
+                  <label key={moduleKey} className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={selectedPermissions.includes(moduleKey)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setSelectedPermissions((prev) => {
+                          if (checked) return [...prev, moduleKey];
+                          return prev.filter((item) => item !== moduleKey);
+                        });
+                      }}
+                      className="h-4 w-4"
+                    />
+                    {moduleKey}
+                  </label>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-3 mt-6">
+                <button
+                  onClick={() => setSelectedPermissions(permissionsMap[selectedUser.role] || [])}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                >
+                  Reset to Role Default
+                </button>
+                <button
+                  onClick={() => setSelectedPermissions([])}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                >
+                  Clear Custom
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+              <button
+                onClick={() => setShowPermissionsModal(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePermissionsSave}
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:opacity-90"
+              >
+                Save Permissions
               </button>
             </div>
           </div>

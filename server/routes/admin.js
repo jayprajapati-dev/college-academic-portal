@@ -6,6 +6,7 @@ const Semester = require('../models/Semester');
 const Subject = require('../models/Subject');
 const { protect, authorize } = require('../middleware/auth');
 const crypto = require('crypto');
+const { ROLE_DEFAULTS, getRoleDefaults } = require('../utils/rolePermissions');
 
 // Generate random password
 const generateTempPassword = () => {
@@ -443,6 +444,70 @@ router.put('/users/:id/role', protect, authorize('admin'), async (req, res) => {
       message: 'Error in updating user role'
     });
   }
+});
+
+// @route   PUT /api/admin/users/:id/permissions
+// @desc    Update user permissions (nav modules)
+// @access  Private/Admin
+router.put('/users/:id/permissions', protect, authorize('admin'), async (req, res) => {
+  try {
+    const { permissions } = req.body;
+
+    if (!Array.isArray(permissions)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Permissions must be an array'
+      });
+    }
+
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (!['admin', 'hod', 'teacher'].includes(user.role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Permissions are only supported for admin, hod, or teacher'
+      });
+    }
+
+    const allowed = new Set(getRoleDefaults(user.role));
+    const cleaned = permissions.filter((item) => allowed.has(item));
+
+    user.permissions = cleaned;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Permissions updated successfully',
+      data: {
+        id: user._id,
+        role: user.role,
+        permissions: user.permissions
+      }
+    });
+  } catch (error) {
+    console.error('Update permissions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error in updating permissions'
+    });
+  }
+});
+
+// @route   GET /api/admin/permissions/modules
+// @desc    Get role module definitions
+// @access  Private/Admin
+router.get('/permissions/modules', protect, authorize('admin'), async (req, res) => {
+  res.status(200).json({
+    success: true,
+    data: ROLE_DEFAULTS
+  });
 });
 
 // @route   DELETE /api/admin/users/:id

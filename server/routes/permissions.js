@@ -2,48 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
-
-const ROLE_DEFAULTS = {
-  admin: [
-    'dashboard',
-    'academic-structure',
-    'semesters',
-    'branches',
-    'subjects',
-    'library',
-    'timetable',
-    'notices',
-    'tasks',
-    'attendance',
-    'exams',
-    'users',
-    'contacts'
-  ],
-  hod: [
-    'dashboard',
-    'profile',
-    'add-teacher',
-    'manage-teachers',
-    'notices',
-    'tasks',
-    'materials',
-    'library',
-    'attendance',
-    'exams',
-    'reports',
-    'timetable'
-  ],
-  teacher: [
-    'dashboard',
-    'materials',
-    'library',
-    'tasks',
-    'notices',
-    'attendance',
-    'exams',
-    'profile'
-  ]
-};
+const { getRoleDefaults } = require('../utils/rolePermissions');
 
 router.get('/me', protect, async (req, res) => {
   try {
@@ -57,7 +16,7 @@ router.get('/me', protect, async (req, res) => {
     }
 
     const hasCustom = Array.isArray(user.permissions) && user.permissions.length > 0;
-    const allowedModules = hasCustom ? user.permissions : (ROLE_DEFAULTS[user.role] || []);
+    const allowedModules = hasCustom ? user.permissions : getRoleDefaults(user.role);
 
     return res.status(200).json({
       success: true,
