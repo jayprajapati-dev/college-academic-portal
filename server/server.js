@@ -48,6 +48,8 @@ app.use('/api/tasks', require('./routes/task'));
 app.use('/api/notices', require('./routes/notice'));
 app.use('/api/timetable', require('./routes/timetable'));
 app.use('/api/library', require('./routes/library'));
+app.use('/api/attendance', require('./routes/attendance'));
+app.use('/api/exams', require('./routes/exam'));
 
 // Error Handler Middleware
 const errorHandler = require('./middleware/errorHandler');

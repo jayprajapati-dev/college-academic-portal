@@ -10,6 +10,8 @@ const TeacherLayout = ({ title, children, userName = 'Teacher', onLogout = null 
     { label: 'Library', to: '/teacher/library', icon: 'library_books' },
     { label: 'Tasks', to: '/teacher/tasks', icon: 'assignment' },
     { label: 'Notices', to: '/teacher/notices', icon: 'notifications' },
+    { label: 'Attendance', to: '/teacher/attendance', icon: 'fact_check' },
+    { label: 'Exams', to: '/teacher/exams', icon: 'quiz' },
     { label: 'Profile', to: '/teacher/profile', icon: 'account_circle' }
   ]), []);
 

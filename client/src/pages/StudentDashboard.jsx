@@ -187,6 +187,32 @@ const StudentDashboard = () => {
             </button>
 
             <button
+              onClick={() => navigate('/student/attendance')}
+              className="p-6 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl hover:shadow-lg transition group"
+            >
+              <div className="p-3 bg-white rounded-lg w-fit mb-3 group-hover:scale-110 transition">
+                <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5h6m-6 4h6m-7 4h8m-5 4h2m-9 0h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <p className="font-semibold text-gray-800">Attendance</p>
+              <p className="text-sm text-gray-600 mt-1">Check your stats</p>
+            </button>
+
+            <button
+              onClick={() => navigate('/student/exams')}
+              className="p-6 bg-gradient-to-br from-pink-50 to-rose-100 rounded-xl hover:shadow-lg transition group"
+            >
+              <div className="p-3 bg-white rounded-lg w-fit mb-3 group-hover:scale-110 transition">
+                <svg className="w-6 h-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5h6m-6 4h6m-7 4h8m-5 4h2m-9 0h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <p className="font-semibold text-gray-800">Exams</p>
+              <p className="text-sm text-gray-600 mt-1">Schedules & results</p>
+            </button>
+
+            <button
               onClick={() => navigate('/student/subjects')}
               className="p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl hover:shadow-lg transition group"
             >

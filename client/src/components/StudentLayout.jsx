@@ -9,6 +9,8 @@ const StudentLayout = ({ title, children, userName = 'Student', onLogout = null 
     { label: 'Subjects', to: '/student/subjects', icon: 'menu_book' },
     { label: 'Library', to: '/student/library', icon: 'library_books' },
     { label: 'Notice Board', to: '/notices', icon: 'notifications' },
+    { label: 'Attendance', to: '/student/attendance', icon: 'fact_check' },
+    { label: 'Exams', to: '/student/exams', icon: 'quiz' },
     { label: 'Timetable', to: '/student/timetable', icon: 'calendar_today' },
     { label: 'Profile', to: '/student/profile', icon: 'account_circle' }
   ]), []);

@@ -14,6 +14,8 @@ const AdminLayout = ({ title, children, userName = 'Admin', onLogout = null }) =
     { label: 'Timetable', to: '/admin/timetable', icon: 'calendar_today' },
     { label: 'Notice Board', to: '/admin/notices', icon: 'notifications' },
     { label: 'Task/Assignment', to: '/admin/tasks', icon: 'assignment' },
+    { label: 'Attendance', to: '/admin/attendance', icon: 'fact_check' },
+    { label: 'Exams', to: '/admin/exams', icon: 'quiz' },
     { label: 'Users', to: '/admin/users', icon: 'group' },
     { label: 'Contact Requests', to: '/admin/contacts', icon: 'contact_mail' }
   ]), []);
