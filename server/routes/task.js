@@ -40,7 +40,7 @@ const notifyTaskRecipients = async (task, action = 'created') => {
 // CREATE TASK (Admin, HOD, Teacher)
 router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
-    const { title, description, category, subjectId, dueDate, attachments } = req.body;
+    const { title, description, category, subjectId, dueDate, attachments, status } = req.body;
 
     // Validation
     if (!title || !description || !subjectId) {
@@ -86,6 +86,8 @@ router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req
       url: att.url
     })) : [];
 
+    const taskStatus = status === 'draft' ? 'draft' : 'active';
+
     // Create task
     const task = await Task.create({
       title,
@@ -98,15 +100,17 @@ router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req
       attachments: taskAttachments,
       createdBy: req.user._id,
       createdByRole: req.user.role,
-      status: 'active'
+      status: taskStatus
     });
 
-    // Send notifications to students
-    await notifyTaskRecipients(task, 'created');
+    if (taskStatus === 'active') {
+      // Send notifications to students
+      await notifyTaskRecipients(task, 'created');
+    }
 
     res.status(201).json({
       success: true,
-      message: 'Task created successfully',
+      message: taskStatus === 'draft' ? 'Task saved as draft' : 'Task created successfully',
       data: task
     });
   } catch (error) {
@@ -184,12 +188,17 @@ router.get('/subject/:subjectId', protect, async (req, res) => {
 // GET TASKS FOR HOD (HOD Dashboard)
 router.get('/hod', protect, authorize('hod'), async (req, res) => {
   try {
-    const { page = 1, limit = 10, category, semesterId } = req.query;
+    const { page = 1, limit = 10, category, semesterId, status } = req.query;
 
     const query = {
-      branchId: req.user.branch,
-      status: 'active'
+      branchId: req.user.branch
     };
+
+    if (status && status !== 'all') {
+      query.status = status;
+    } else {
+      query.status = { $in: ['active', 'draft'] };
+    }
 
     if (category) query.category = category;
     if (semesterId) query.semesterId = semesterId;
@@ -225,9 +234,15 @@ router.get('/hod', protect, authorize('hod'), async (req, res) => {
 
 router.get('/all', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
-    const { page = 1, limit = 10, category, branchId, semesterId } = req.query;
+    const { page = 1, limit = 10, category, branchId, semesterId, status } = req.query;
 
-    const query = { status: 'active' };
+    const query = {};
+
+    if (status && status !== 'all') {
+      query.status = status;
+    } else {
+      query.status = { $in: ['active', 'draft'] };
+    }
 
     if (category) query.category = category;
     if (branchId) query.branchId = branchId;
@@ -303,7 +318,7 @@ router.get('/:id', protect, async (req, res) => {
 // UPDATE TASK
 router.put('/:id', protect, async (req, res) => {
   try {
-    const { title, description, category, dueDate, attachments } = req.body;
+    const { title, description, category, dueDate, attachments, status } = req.body;
     const task = await Task.findById(req.params.id);
 
     if (!task) {
@@ -315,10 +330,20 @@ router.put('/:id', protect, async (req, res) => {
 
     // Authorization check
     if (req.user.role !== 'admin' && !task.createdBy.equals(req.user._id)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to update this task'
-      });
+      if (req.user.role !== 'hod') {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to update this task'
+        });
+      }
+
+      const sameBranch = task.branchId?.equals(req.user.branch);
+      if (!sameBranch) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to update this task'
+        });
+      }
     }
 
     // Update fields
@@ -334,6 +359,14 @@ router.put('/:id', protect, async (req, res) => {
         url: att.url
       }));
     }
+
+    const nextStatus = status === 'active' ? 'active' : status === 'draft' ? 'draft' : task.status;
+
+    if (task.status === 'draft' && nextStatus === 'active') {
+      await notifyTaskRecipients(task, 'created');
+    }
+
+    task.status = nextStatus;
 
     task.updatedAt = Date.now();
     await task.save();
@@ -366,10 +399,20 @@ router.delete('/:id', protect, async (req, res) => {
 
     // Authorization check
     if (req.user.role !== 'admin' && !task.createdBy.equals(req.user._id)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to delete this task'
-      });
+      if (req.user.role !== 'hod') {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to delete this task'
+        });
+      }
+
+      const sameBranch = task.branchId?.equals(req.user.branch);
+      if (!sameBranch) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to delete this task'
+        });
+      }
     }
 
     task.status = 'deleted';

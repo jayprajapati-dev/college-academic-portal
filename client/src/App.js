@@ -37,7 +37,7 @@ import TeacherMaterials from './pages/TeacherMaterials';
 import AdminMaterials from './pages/AdminMaterials';
 import PasswordSetup from './pages/PasswordSetup';
 import NoticeManagement from './pages/NoticeManagement';
-import AdminTaskManagement from './pages/admin/TaskManagement';
+import TaskManagement from './pages/TaskManagement';
 
 // Import HOD pages
 import AddTeacher from './pages/hod/AddTeacher';
@@ -90,6 +90,7 @@ function App() {
         <Route path="/teacher/profile" element={<TeacherProfile />} />
         <Route path="/teacher/materials" element={<TeacherMaterials />} />
         <Route path="/teacher/notices" element={<NoticeManagement />} />
+        <Route path="/teacher/tasks" element={<TaskManagement />} />
         <Route path="/hod/dashboard" element={<HODDashboard />} />
         <Route path="/hod/profile" element={<HODProfile />} />
         <Route path="/hod/add-teacher" element={<AddTeacher />} />
@@ -98,6 +99,7 @@ function App() {
         <Route path="/hod/reports" element={<BranchReports />} />
         <Route path="/hod/timetable" element={<HodTeacherTimetableManagement />} />
         <Route path="/hod/notices" element={<NoticeManagement />} />
+        <Route path="/hod/tasks" element={<TaskManagement />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/users" element={<UserManagement />} />
         <Route path="/admin/manage-users" element={<UserManagement />} />
@@ -111,7 +113,7 @@ function App() {
         <Route path="/admin/contacts" element={<ContactManagement />} />
         <Route path="/admin/timetable" element={<AdminTimetableManagement />} />
         <Route path="/admin/notices" element={<NoticeManagement />} />
-        <Route path="/admin/tasks" element={<AdminTaskManagement />} />
+        <Route path="/admin/tasks" element={<TaskManagement />} />
         <Route path="/admin/materials" element={<AdminMaterials />} />
         
         {/* Catch All */}

@@ -72,7 +72,7 @@ const taskSchema = new mongoose.Schema({
   }],
   status: {
     type: String,
-    enum: ['active', 'archived', 'deleted'],
+    enum: ['draft', 'active', 'archived', 'deleted'],
     default: 'active'
   },
   createdAt: {

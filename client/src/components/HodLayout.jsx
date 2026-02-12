@@ -11,6 +11,7 @@ const HodLayout = ({ title, children, userName = 'HOD', onLogout = null }) => {
     { label: 'Add Teacher', to: '/hod/add-teacher', icon: 'person_add' },
     { label: 'Manage Teachers', to: '/hod/manage-teachers', icon: 'group' },
     { label: 'Notices', to: '/hod/notices', icon: 'notifications' },
+    { label: 'Tasks', to: '/hod/tasks', icon: 'assignment' },
     { label: 'Materials', to: '/hod/materials', icon: 'menu_book' },
     { label: 'Reports', to: '/hod/reports', icon: 'insights' },
     { label: 'Timetable', to: '/hod/timetable', icon: 'calendar_today' }
