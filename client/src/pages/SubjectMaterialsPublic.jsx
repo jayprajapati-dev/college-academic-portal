@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { LandingFrame } from '../components';
+import useLandingAuth from '../hooks/useLandingAuth';
 
 const SubjectMaterialsPublic = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const initialSubject = location.state?.subject || null;
+  const { isLoggedIn, currentUser, userProfile, notifications } = useLandingAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [subject, setSubject] = useState(initialSubject);
@@ -118,22 +121,20 @@ const SubjectMaterialsPublic = () => {
   );
 
   return (
-    <div className="font-display bg-background-light dark:bg-background-dark text-[#111318] dark:text-white min-h-screen">
-      {/* Header - Same as Landing Page */}
-      <header className="fixed top-0 w-full z-50 glass-header">
-        <div className="max-w-[1280px] mx-auto px-6 h-20 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <div className="p-1.5 bg-primary rounded-lg text-white">
-              <svg className="size-6" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path>
-              </svg>
-            </div>
-            <h1 className="text-xl font-extrabold tracking-tight">SmartAcademics</h1>
-          </a>
-          <nav className="hidden md:flex items-center gap-8">
-            <a className="text-sm font-semibold hover:text-primary transition-colors" href="/about">About Us</a>
-            <a className="text-sm font-semibold hover:text-primary transition-colors" href="/contact">Contact Us</a>
-          </nav>
+    <LandingFrame
+      isLoggedIn={isLoggedIn}
+      currentUser={currentUser}
+      userProfile={userProfile}
+      notifications={notifications}
+    >
+      <main className="max-w-[1200px] mx-auto px-6 py-10 pt-28 space-y-8">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => navigate(`/subjects/${id}`)}
+            className="px-4 py-2 rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10"
+          >
+            Back to Subject Hub
+          </button>
           <button
             onClick={() => navigate('/')}
             className="px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90 transition-opacity"
@@ -141,9 +142,6 @@ const SubjectMaterialsPublic = () => {
             Go to Home
           </button>
         </div>
-      </header>
-
-      <main className="max-w-[1200px] mx-auto px-6 py-10 pt-28 space-y-8">
         {loading ? (
           <div className="text-center py-20">
             <p className="text-gray-500">Loading subject details...</p>
@@ -370,23 +368,7 @@ const SubjectMaterialsPublic = () => {
           </>
         )}
       </main>
-
-      {/* Footer - Same as Landing Page */}
-      <footer className="bg-white dark:bg-background-dark/50 border-t border-[#dcdee5] dark:border-white/10 py-8">
-        <div className="max-w-[1280px] mx-auto px-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              © 2026 SmartAcademics. All rights reserved.
-            </p>
-            <div className="flex items-center gap-6">
-              <a href="/privacy" className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary transition-colors">Privacy Policy</a>
-              <a href="/terms" className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary transition-colors">Terms of Service</a>
-              <a href="/contact" className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary transition-colors">Contact</a>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </LandingFrame>
   );
 };
 

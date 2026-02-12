@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { LandingFrame } from '../components';
+import useLandingAuth from '../hooks/useLandingAuth';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -16,89 +18,37 @@ const LandingPage = () => {
   const [loading, setLoading] = useState(true);
   const [selectedSemester, setSelectedSemester] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
   const [showMaterialsModal, setShowMaterialsModal] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState(null);
-  const [showMaterialsDetail, setShowMaterialsDetail] = useState(false);
-  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [userProfile, setUserProfile] = useState(null);
+  const { isLoggedIn, currentUser, userProfile, notifications } = useLandingAuth();
 
   const formatCount = (value) => new Intl.NumberFormat('en', { notation: 'compact' }).format(value || 0);
   const formatPercent = (value) => `${Math.min(100, Math.max(0, value || 0))}%`;
 
-  // Check login status and fetch profile
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
-    
-    if (token && user) {
-      setIsLoggedIn(true);
-      const parsedUser = JSON.parse(user);
-      setCurrentUser(parsedUser);
-      
-      // Fetch detailed profile for students
-      if (parsedUser.role === 'student') {
-        fetch('/api/profile/me', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            setUserProfile(data.data);
-            // Auto-select semester and branch from profile
-            if (data.data.semester?._id) {
-              setSelectedSemester(data.data.semester._id);
-            }
-            if (data.data.branch?._id) {
-              setSelectedBranch(data.data.branch._id);
-            }
-          }
-        })
-        .catch(err => console.error('Error fetching profile:', err));
-        
-        // Fetch notifications
-        fetch('/api/notifications', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            setNotifications(data.data || []);
-          }
-        })
-        .catch(err => console.error('Error fetching notifications:', err));
-      }
+    if (userProfile?.semester?._id) {
+      setSelectedSemester(userProfile.semester._id);
     }
-  }, []);
+    if (userProfile?.branch?._id) {
+      setSelectedBranch(userProfile.branch._id);
+    }
+  }, [userProfile]);
 
   // Handle View Materials button click
   const handleViewMaterials = (subject) => {
-    console.log('View Materials clicked for:', subject);
     setSelectedSubject(subject);
-    
+
     if (isLoggedIn) {
-      // If logged in, show materials detail view
-      setShowMaterialsDetail(true);
+      navigate(`/subjects/${subject._id}`);
     } else {
-      // If not logged in, show login encouragement modal
       setShowMaterialsModal(true);
     }
   };
 
-  const handleMaterialAction = (type) => {
-    console.log('Material action:', type, selectedSubject);
-  };
-
   const handleOpenMaterialsPage = () => {
     if (!selectedSubject?._id) return;
-    setShowMaterialsDetail(false);
     setShowMaterialsModal(false);
-    navigate(`/subjects/${selectedSubject._id}/materials`, {
-      state: { subject: selectedSubject }
-    });
+    navigate(`/subjects/${selectedSubject._id}`);
   };
 
   // Fetch data from API
@@ -139,185 +89,12 @@ const LandingPage = () => {
   );
 
   return (
-    <div className="font-display bg-background-light dark:bg-background-dark text-[#111318] dark:text-white transition-colors duration-300">
-    <header className="fixed top-0 w-full z-50 glass-header">
-      <div className="max-w-[1280px] mx-auto px-6 h-20 flex items-center justify-between">
-        <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <div className="p-1.5 bg-primary rounded-lg text-white">
-            <svg className="size-6" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-              <path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path>
-            </svg>
-          </div>
-          <h1 className="text-xl font-extrabold tracking-tight">SmartAcademics</h1>
-        </a>
-        <nav className="hidden md:flex items-center gap-8">
-          <a className="text-sm font-semibold hover:text-primary transition-colors" href="/about">About Us</a>
-          <a className="text-sm font-semibold hover:text-primary transition-colors" href="/contact">Contact Us</a>
-        </nav>
-        <div className="flex items-center gap-3">
-          {isLoggedIn ? (
-            <>
-              {currentUser?.role === 'student' && (
-                <>
-                  {/* Notifications Icon */}
-                  <div className="relative">
-                    <button
-                      onClick={() => {
-                        setShowNotifications(!showNotifications);
-                        setShowProfileDropdown(false);
-                      }}
-                      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-all relative"
-                    >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                      </svg>
-                      {notifications.length > 0 && (
-                        <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                      )}
-                    </button>
-                    
-                    {/* Notifications Dropdown */}
-                    {showNotifications && (
-                      <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50">
-                        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                          <h3 className="font-bold text-sm">Notifications</h3>
-                        </div>
-                        <div className="max-h-96 overflow-y-auto">
-                          {notifications.length === 0 ? (
-                            <div className="p-6 text-center text-gray-500">
-                              <svg className="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                              </svg>
-                              <p className="text-sm">No new notifications</p>
-                            </div>
-                          ) : (
-                            notifications.map((notif, index) => (
-                              <div key={index} className="p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors" onClick={() => {
-                                if (notif.link) navigate(notif.link);
-                                setShowNotifications(false);
-                              }}>
-                                <div className="flex items-start gap-3">
-                                  <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                                    <span className="material-symbols-outlined text-sm">notifications</span>
-                                  </div>
-                                  <div className="flex-1">
-                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{notif.title}</p>
-                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{notif.message}</p>
-                                    <p className="text-xs text-gray-400 mt-1">{notif.time || 'Just now'}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Profile Dropdown */}
-                  <div className="relative">
-                    <button
-                      onClick={() => {
-                        setShowProfileDropdown(!showProfileDropdown);
-                        setShowNotifications(false);
-                      }}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-all"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
-                        {currentUser?.name?.charAt(0).toUpperCase()}
-                      </div>
-                      <span className="hidden md:inline text-sm font-semibold">{currentUser?.name}</span>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                    
-                    {/* Profile Dropdown Menu */}
-                    {showProfileDropdown && (
-                      <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50">
-                        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                          <p className="font-bold text-sm">{currentUser?.name}</p>
-                          <p className="text-xs text-gray-500">{currentUser?.email}</p>
-                          {userProfile && (
-                            <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-                              <p>{userProfile.branch?.name}</p>
-                              <p>Semester {userProfile.semester?.semesterNumber}</p>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-2">
-                          <button
-                            onClick={() => {
-                              navigate('/student/profile');
-                              setShowProfileDropdown(false);
-                            }}
-                            className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                            <span className="text-sm font-semibold">Profile</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              localStorage.removeItem('token');
-                              localStorage.removeItem('user');
-                              window.location.href = '/login';
-                            }}
-                            className="w-full text-left px-4 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 transition-colors flex items-center gap-3"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                            </svg>
-                            <span className="text-sm font-semibold">Logout</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-              
-              {currentUser?.role !== 'student' && (
-                <>
-                  <span className="hidden md:inline text-sm font-semibold">{currentUser?.name}</span>
-                  <button
-                    onClick={() => {
-                      localStorage.removeItem('token');
-                      localStorage.removeItem('user');
-                      window.location.href = '/login';
-                    }}
-                    className="px-5 py-2 text-sm font-bold bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
-                  >
-                    Logout
-                  </button>
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <a
-                className="px-5 py-2 text-sm font-bold bg-[#f0f1f4] dark:bg-white/10 rounded-lg hover:bg-gray-200 transition-all"
-                href="/login"
-              >
-                Login
-              </a>
-              <a
-                className="px-5 py-2 text-sm font-bold bg-primary text-white rounded-lg shadow-lg shadow-primary/20 hover:scale-105 transition-all"
-                href="#academic-explorer"
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.getElementById('academic-explorer')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-              >
-                Get Started
-              </a>
-            </>
-          )}
-        </div>
-      </div>
-    </header>
-    <main className="pt-20 mesh-background min-h-screen">
+    <LandingFrame
+      isLoggedIn={isLoggedIn}
+      currentUser={currentUser}
+      userProfile={userProfile}
+      notifications={notifications}
+    >
       <section className="max-w-[1100px] mx-auto pt-24 pb-20 px-6 text-center">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-black mb-8 border border-primary/20 tracking-wider">
           <span className="relative flex h-2 w-2">
@@ -515,7 +292,7 @@ const LandingPage = () => {
                   onClick={() => handleViewMaterials(subject)}
                   className="text-primary text-sm font-bold flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
                 >
-                  View Materials <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                  Open Subject <span className="material-symbols-outlined text-sm">arrow_forward</span>
                 </button>
               </div>
             ))}
@@ -628,125 +405,7 @@ const LandingPage = () => {
         </div>
       )}
 
-      {/* Materials Detail Modal for Logged-In Users */}
-      {showMaterialsDetail && isLoggedIn && selectedSubject && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full border border-gray-200 dark:border-gray-700 overflow-hidden max-h-[80vh] overflow-y-auto">
-            {/* Header */}
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-primary to-orange-500 sticky top-0">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-lg bg-white/20 flex items-center justify-center text-white">
-                    <span className="material-symbols-outlined text-3xl">library_books</span>
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-bold text-white">{selectedSubject.name}</h3>
-                    <p className="text-white/90 text-sm mt-1">{selectedSubject.code}</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setShowMaterialsDetail(false)}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
-                >
-                  <span className="material-symbols-outlined">close</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-8 space-y-6">
-              {/* Subject Overview */}
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-xl border border-blue-200 dark:border-blue-800">
-                <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">info</span>
-                  Course Overview
-                </h4>
-                <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                  {selectedSubject.description || 'This subject covers fundamental concepts and practical applications in the field. Students will develop both theoretical knowledge and hands-on skills.'}
-                </p>
-              </div>
-
-              {/* Course Details */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
-                  <p className="text-xs font-semibold text-green-700 dark:text-green-400 uppercase tracking-wider mb-1">Course Type</p>
-                  <p className="text-lg font-bold text-green-900 dark:text-green-100 capitalize">{selectedSubject.type || 'Theory'}</p>
-                </div>
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
-                  <p className="text-xs font-semibold text-purple-700 dark:text-purple-400 uppercase tracking-wider mb-1">Credits</p>
-                  <p className="text-lg font-bold text-purple-900 dark:text-purple-100">{selectedSubject.credits || 3}</p>
-                </div>
-              </div>
-
-              {/* Available */}
-              <div>
-                <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary">folder_open</span>
-                  Available
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <button type="button" onClick={() => handleMaterialAction('notes')} className="p-4 bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-lg hover:border-primary dark:hover:border-primary hover:shadow-md transition-all cursor-pointer flex items-center gap-3 text-left">
-                    <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                      <span className="material-symbols-outlined">description</span>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-white text-sm">Lecture Notes</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">PDF Files</p>
-                    </div>
-                  </button>
-                  <button type="button" onClick={() => handleMaterialAction('videos')} className="p-4 bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-lg hover:border-primary dark:hover:border-primary hover:shadow-md transition-all cursor-pointer flex items-center gap-3 text-left">
-                    <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400 flex items-center justify-center">
-                      <span className="material-symbols-outlined">play_circle</span>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-white text-sm">Video Lectures</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">MP4 Videos</p>
-                    </div>
-                  </button>
-                  <button type="button" onClick={() => handleMaterialAction('assignments')} className="p-4 bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-lg hover:border-primary dark:hover:border-primary hover:shadow-md transition-all cursor-pointer flex items-center gap-3 text-left">
-                    <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-400 flex items-center justify-center">
-                      <span className="material-symbols-outlined">assignment</span>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-white text-sm">Assignments</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Problem Sets</p>
-                    </div>
-                  </button>
-                  <button type="button" onClick={() => handleMaterialAction('exams')} className="p-4 bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-lg hover:border-primary dark:hover:border-primary hover:shadow-md transition-all cursor-pointer flex items-center gap-3 text-left">
-                    <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 flex items-center justify-center">
-                      <span className="material-symbols-outlined">quiz</span>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-white text-sm">Exam Papers</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Past Papers</p>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-8 py-4 flex justify-end gap-3 sticky bottom-0">
-              <button
-                onClick={() => setShowMaterialsDetail(false)}
-                className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={handleOpenMaterialsPage}
-                className="px-6 py-2 bg-gradient-to-r from-primary to-orange-600 text-white rounded-lg font-bold hover:shadow-lg transition-all flex items-center gap-2"
-              >
-                <span className="material-symbols-outlined">open_in_new</span>
-                Click for More
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <section className="max-w-[1280px] mx-auto px-6 py-24 mb-12\">
+      <section className="max-w-[1280px] mx-auto px-6 py-24 mb-12">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           <div>
             <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-8">Institutional Analytics</h2>
@@ -843,59 +502,7 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
-    </main>
-    <footer className="bg-white dark:bg-slate-900 border-t border-[#dcdee5] dark:border-[#2d3244] py-12">
-      <div className="max-w-[1200px] mx-auto px-6 lg:px-10">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-8">
-          <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <div className="p-1 bg-primary rounded text-white">
-              <svg className="size-5" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                <path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path>
-              </svg>
-            </div>
-            <h2 className="text-lg font-bold tracking-tight">SmartAcademics</h2>
-          </a>
-          <div className="flex gap-8 text-sm text-[#636c88] dark:text-slate-400 font-medium">
-            <a className="hover:text-primary transition-colors" href="/privacy">Privacy Policy</a>
-            <a className="hover:text-primary transition-colors" href="/terms">Terms of Service</a>
-            <a className="hover:text-primary transition-colors" href="/disclaimer">Disclaimer</a>
-          </div>
-          <div className="flex gap-4">
-            <button 
-              onClick={() => {
-                if (navigator.share) {
-                  navigator.share({
-                    title: 'SmartAcademics Portal',
-                    text: 'Check out SmartAcademics - Elite Academic Resource Management Portal',
-                    url: window.location.origin
-                  }).catch(() => {});
-                } else {
-                  navigator.clipboard.writeText(window.location.origin);
-                  alert('Link copied to clipboard!');
-                }
-              }}
-              className="w-10 h-10 rounded-full border border-[#dcdee5] dark:border-[#2d3244] flex items-center justify-center hover:bg-primary hover:text-white transition-colors cursor-pointer"
-              title="Share this portal"
-            >
-              <span className="material-symbols-outlined text-xl">share</span>
-            </button>
-            <button 
-              onClick={() => {
-                window.open(window.location.origin, '_blank');
-              }}
-              className="w-10 h-10 rounded-full border border-[#dcdee5] dark:border-[#2d3244] flex items-center justify-center hover:bg-primary hover:text-white transition-colors cursor-pointer"
-              title="Open in new tab"
-            >
-              <span className="material-symbols-outlined text-xl">open_in_new</span>
-            </button>
-          </div>
-        </div>
-        <div className="mt-8 pt-8 border-t border-[#f0f1f4] dark:border-[#2d3244] text-center text-xs text-[#636c88] dark:text-slate-500">
-          © 2026 SmartAcademics. All rights reserved.
-        </div>
-      </div>
-    </footer>
-    </div>
+    </LandingFrame>
   );
 };
 

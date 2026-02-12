@@ -16,6 +16,7 @@ import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import DisclaimerPage from './pages/DisclaimerPage';
 import SubjectMaterialsPublic from './pages/SubjectMaterialsPublic';
+import SubjectHub from './pages/SubjectHub';
 import NoticeBoard from './pages/NoticeBoard';
 
 // Import dashboards
@@ -77,6 +78,7 @@ function App() {
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/disclaimer" element={<DisclaimerPage />} />
+        <Route path="/subjects/:id" element={<SubjectHub />} />
         <Route path="/subjects/:id/materials" element={<SubjectMaterialsPublic />} />
         <Route path="/notices" element={<NoticeBoard />} />
         
@@ -86,7 +88,7 @@ function App() {
         <Route path="/password-setup" element={<PasswordSetup />} />
         
         {/* Dashboards (Role-based) */}
-        <Route path="/student/dashboard" element={<StudentDashboard />} />
+        <Route path="/student/dashboard" element={<Navigate to="/" replace />} />
         <Route path="/student/subjects" element={<StudentSubjects />} />
         <Route path="/student/library" element={<StudentLibrary />} />
         <Route path="/student/attendance" element={<StudentAttendance />} />
