@@ -69,7 +69,7 @@ const notifyNoticeRecipients = async (notice, recipientIds) => {
 // CREATE NOTICE
 router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
-    const { title, content, priority, targetAudience, attachments } = req.body;
+    const { title, content, priority, targetAudience, attachments, status } = req.body;
 
     // Validation
     if (!title || !content) {
@@ -100,6 +100,8 @@ router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req
       url: att.url
     })) : [];
 
+    const noticeStatus = status === 'draft' ? 'draft' : 'published';
+
     // Create notice
     const notice = await Notice.create({
       title,
@@ -110,27 +112,30 @@ router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req
       createdBy: req.user._id,
       createdByRole: req.user.role,
       attachments: noticeAttachments,
-      status: 'published'
+      status: noticeStatus
     });
 
-    // Get eligible users and create recipient records
-    const eligibleUserIds = await getEligibleUserIds(targetAudience, targetBranch, req.user.role, req.user._id);
+    let eligibleUserIds = [];
+    if (noticeStatus === 'published') {
+      // Get eligible users and create recipient records
+      eligibleUserIds = await getEligibleUserIds(targetAudience, targetBranch, req.user.role, req.user._id);
 
-    if (eligibleUserIds.length > 0) {
-      notice.recipients = eligibleUserIds.map(userId => ({
-        userId,
-        notifiedAt: Date.now(),
-        isRead: false
-      }));
-      await notice.save();
+      if (eligibleUserIds.length > 0) {
+        notice.recipients = eligibleUserIds.map(userId => ({
+          userId,
+          notifiedAt: Date.now(),
+          isRead: false
+        }));
+        await notice.save();
 
-      // Send notifications
-      await notifyNoticeRecipients(notice, eligibleUserIds);
+        // Send notifications
+        await notifyNoticeRecipients(notice, eligibleUserIds);
+      }
     }
 
     res.status(201).json({
       success: true,
-      message: 'Notice published successfully',
+      message: noticeStatus === 'draft' ? 'Notice saved as draft' : 'Notice published successfully',
       data: {
         ...notice.toObject(),
         recipientCount: eligibleUserIds.length
@@ -196,7 +201,7 @@ router.get('/board', protect, async (req, res) => {
 // GET ADMIN NOTICES (For management dashboard)
 router.get('/admin', protect, authorize('admin', 'hod'), async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, status } = req.query;
 
     let query = { createdBy: req.user._id };
 
@@ -205,6 +210,10 @@ router.get('/admin', protect, authorize('admin', 'hod'), async (req, res) => {
       const usersInBranch = await User.find({ branch: req.user.branch }).select('_id');
       const userIds = usersInBranch.map(u => u._id);
       query = { createdBy: { $in: userIds } };
+    }
+
+    if (status && status !== 'all') {
+      query.status = status;
     }
 
     const notices = await Notice.find(query)
@@ -228,6 +237,80 @@ router.get('/admin', protect, authorize('admin', 'hod'), async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching notices'
+    });
+  }
+});
+
+// UPDATE NOTICE (edit or publish draft)
+router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+  try {
+    const { title, content, priority, targetAudience, attachments, status } = req.body;
+    const notice = await Notice.findById(req.params.id);
+
+    if (!notice) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notice not found'
+      });
+    }
+
+    if (!notice.createdBy.equals(req.user._id) && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this notice'
+      });
+    }
+
+    let targetBranch = notice.targetBranch || null;
+    if (targetAudience === 'Branch') {
+      if (req.user.role !== 'hod') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only HODs can send branch-specific notices'
+        });
+      }
+      targetBranch = req.user.branch;
+    } else if (req.user.role === 'hod' && targetAudience === 'Everyone') {
+      targetBranch = req.user.branch;
+    }
+
+    if (title) notice.title = title;
+    if (content) notice.content = content;
+    if (priority) notice.priority = priority;
+    if (targetAudience) notice.targetAudience = targetAudience;
+    notice.targetBranch = targetBranch;
+    if (attachments) {
+      notice.attachments = attachments.map(att => ({
+        name: att.name || 'Attachment',
+        url: att.url
+      }));
+    }
+
+    const nextStatus = status === 'published' ? 'published' : status === 'draft' ? 'draft' : notice.status;
+
+    if (notice.status === 'draft' && nextStatus === 'published') {
+      const eligibleUserIds = await getEligibleUserIds(notice.targetAudience, notice.targetBranch, req.user.role, req.user._id);
+      notice.recipients = eligibleUserIds.map(userId => ({
+        userId,
+        notifiedAt: Date.now(),
+        isRead: false
+      }));
+      await notifyNoticeRecipients(notice, eligibleUserIds);
+    }
+
+    notice.status = nextStatus;
+    await notice.save();
+
+    res.status(200).json({
+      success: true,
+      message: nextStatus === 'published' ? 'Notice published successfully' : 'Notice updated successfully',
+      data: notice
+    });
+  } catch (error) {
+    console.error('Update notice error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating notice'
     });
   }
 });

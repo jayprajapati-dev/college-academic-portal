@@ -20,6 +20,7 @@ const AdminNoticeManagement = () => {
     limit: 10,
     total: 0
   });
+  const [statusFilter, setStatusFilter] = useState('all');
   const [saving, setSaving] = useState(false);
 
   const handleLogout = () => {
@@ -35,7 +36,8 @@ const AdminNoticeManagement = () => {
       const token = localStorage.getItem('token');
       const params = {
         page: pagination.page,
-        limit: pagination.limit
+        limit: pagination.limit,
+        status: statusFilter
       };
 
       const res = await axios.get('/api/notices/admin', {
@@ -56,13 +58,13 @@ const AdminNoticeManagement = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit]);
+  }, [pagination.page, pagination.limit, statusFilter]);
 
   useEffect(() => {
     fetchNotices();
   }, [fetchNotices]);
 
-  const handleCreateNotice = async () => {
+  const handleCreateNotice = async (status = 'published') => {
     if (!formData.title || !formData.content) {
       alert('Please fill all required fields');
       return;
@@ -76,7 +78,8 @@ const AdminNoticeManagement = () => {
         content: formData.content,
         priority: formData.priority,
         targetAudience: formData.targetAudience,
-        attachments: formData.attachments
+        attachments: formData.attachments,
+        status
       };
 
       const res = await axios.post('/api/notices/create', data, {
@@ -87,7 +90,7 @@ const AdminNoticeManagement = () => {
       });
 
       if (res.data.success) {
-        alert('Notice published successfully');
+        alert(status === 'draft' ? 'Notice saved as draft' : 'Notice published successfully');
         setShowCreateModal(false);
         setFormData({
           title: '',
@@ -125,6 +128,23 @@ const AdminNoticeManagement = () => {
     }
   };
 
+  const handlePublishNotice = async (noticeId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.put(`/api/notices/${noticeId}`, { status: 'published' }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.data.success) {
+        alert('Notice published successfully');
+        fetchNotices();
+      }
+    } catch (error) {
+      console.error('Error publishing notice:', error);
+      alert('Error publishing notice');
+    }
+  };
+
   if (loading) {
     return (
       <AdminLayout title="Notice Management" onLogout={handleLogout}>
@@ -147,12 +167,23 @@ const AdminNoticeManagement = () => {
               Publish announcements and notices to the college
             </p>
           </div>
-          <Button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-red-600 hover:bg-red-700"
-          >
-            + Publish Notice
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="all">All</option>
+              <option value="published">Published</option>
+              <option value="draft">Draft</option>
+            </select>
+            <Button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              + Create Notice
+            </Button>
+          </div>
         </div>
 
         {/* Notices Table */}
@@ -168,6 +199,7 @@ const AdminNoticeManagement = () => {
                   <tr>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Title</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Priority</th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Status</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Audience</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Date</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Recipients</th>
@@ -189,6 +221,17 @@ const AdminNoticeManagement = () => {
                           {notice.priority}
                         </span>
                       </td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          notice.status === 'draft'
+                            ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
+                            : notice.status === 'archived'
+                            ? 'bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200'
+                            : 'bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200'
+                        }`}>
+                          {notice.status || 'published'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{notice.targetAudience}</td>
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                         {new Date(notice.createdAt).toLocaleDateString()}
@@ -197,12 +240,22 @@ const AdminNoticeManagement = () => {
                         {notice.recipients?.length || 0}
                       </td>
                       <td className="px-6 py-4 text-right text-sm">
-                        <button
-                          onClick={() => handleDeleteNotice(notice._id)}
-                          className="text-red-600 hover:text-red-800 font-medium"
-                        >
-                          Delete
-                        </button>
+                        <div className="flex items-center justify-end gap-3">
+                          {notice.status === 'draft' && (
+                            <button
+                              onClick={() => handlePublishNotice(notice._id)}
+                              className="text-emerald-600 hover:text-emerald-800 font-medium"
+                            >
+                              Publish
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteNotice(notice._id)}
+                            className="text-red-600 hover:text-red-800 font-medium"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -259,9 +312,9 @@ const AdminNoticeManagement = () => {
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
                       <option value="Everyone">Everyone</option>
-                      <option value="Students">Students Only</option>
-                      <option value="Teachers">Teachers Only</option>
-                      <option value="Staff">Staff Only</option>
+                      <option value="Students">Students</option>
+                      <option value="Teachers">Teachers</option>
+                      <option value="Staff">Staff</option>
                     </select>
                   </div>
                 </div>
@@ -326,7 +379,14 @@ const AdminNoticeManagement = () => {
                   Cancel
                 </Button>
                 <Button
-                  onClick={handleCreateNotice}
+                  onClick={() => handleCreateNotice('draft')}
+                  disabled={saving}
+                  className="bg-gray-800 hover:bg-gray-900"
+                >
+                  {saving ? 'Saving...' : 'Save Draft'}
+                </Button>
+                <Button
+                  onClick={() => handleCreateNotice('published')}
                   disabled={saving}
                   className="bg-red-600 hover:bg-red-700"
                 >
