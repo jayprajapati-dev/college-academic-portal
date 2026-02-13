@@ -26,7 +26,8 @@ const ROLE_DEFAULTS = {
     'attendance',
     'exams',
     'reports',
-    'timetable'
+    'timetable',
+    'users'
   ],
   teacher: [
     'dashboard',
@@ -36,7 +37,8 @@ const ROLE_DEFAULTS = {
     'notices',
     'attendance',
     'exams',
-    'profile'
+    'profile',
+    'users'
   ]
 };
 

@@ -13,12 +13,11 @@ const ROLE_NAV = {
     { key: 'tasks', label: 'Task/Assignment', to: '/admin/tasks', icon: 'assignment' },
     { key: 'attendance', label: 'Attendance', to: '/admin/attendance', icon: 'fact_check' },
     { key: 'exams', label: 'Exams', to: '/admin/exams', icon: 'quiz' },
-    { key: 'users', label: 'Users', to: '/admin/users', icon: 'group' },
+    { key: 'users', label: 'Manage Users', to: '/admin/users', icon: 'group' },
     { key: 'contacts', label: 'Contact Requests', to: '/admin/contacts', icon: 'contact_mail' }
   ],
   hod: [
     { key: 'dashboard', label: 'Dashboard', to: '/hod/dashboard', icon: 'space_dashboard' },
-    { key: 'profile', label: 'Profile', to: '/hod/profile', icon: 'account_circle' },
     { key: 'add-teacher', label: 'Add Teacher', to: '/hod/add-teacher', icon: 'person_add' },
     { key: 'manage-teachers', label: 'Manage Teachers', to: '/hod/manage-teachers', icon: 'group' },
     { key: 'notices', label: 'Notices', to: '/hod/notices', icon: 'notifications' },
@@ -28,7 +27,8 @@ const ROLE_NAV = {
     { key: 'attendance', label: 'Attendance', to: '/hod/attendance', icon: 'fact_check' },
     { key: 'exams', label: 'Exams', to: '/hod/exams', icon: 'quiz' },
     { key: 'reports', label: 'Reports', to: '/hod/reports', icon: 'insights' },
-    { key: 'timetable', label: 'Timetable', to: '/hod/timetable', icon: 'calendar_today' }
+    { key: 'timetable', label: 'Timetable', to: '/hod/timetable', icon: 'calendar_today' },
+    { key: 'users', label: 'Manage Users', to: '/hod/users', icon: 'group' }
   ],
   teacher: [
     { key: 'dashboard', label: 'Dashboard', to: '/teacher/dashboard', icon: 'space_dashboard' },
@@ -38,7 +38,7 @@ const ROLE_NAV = {
     { key: 'notices', label: 'Notices', to: '/teacher/notices', icon: 'notifications' },
     { key: 'attendance', label: 'Attendance', to: '/teacher/attendance', icon: 'fact_check' },
     { key: 'exams', label: 'Exams', to: '/teacher/exams', icon: 'quiz' },
-    { key: 'profile', label: 'Profile', to: '/teacher/profile', icon: 'account_circle' }
+    { key: 'users', label: 'Manage Users', to: '/teacher/users', icon: 'group' }
   ]
 };
 
@@ -60,7 +60,12 @@ const useRoleNav = (role) => {
           return;
         }
 
-        const res = await fetch('/api/permissions/me', {
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const isAdminMode = role === 'admin';
+        const canUseAdminMode = storedUser?.role === 'admin' || storedUser?.adminAccess === true;
+        const modeParam = isAdminMode && canUseAdminMode ? '?mode=admin' : '';
+
+        const res = await fetch(`/api/permissions/me${modeParam}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
@@ -72,7 +77,11 @@ const useRoleNav = (role) => {
 
         if (Object.prototype.hasOwnProperty.call(data, 'allowedModules')) {
           const allowed = Array.isArray(data.allowedModules) ? data.allowedModules : [];
-          const filtered = defaultItems.filter((item) => allowed.includes(item.key));
+          const allowedSet = new Set(allowed);
+          if (role === 'teacher' || role === 'hod') {
+            allowedSet.add('users');
+          }
+          const filtered = defaultItems.filter((item) => allowedSet.has(item.key));
           setNavItems(filtered);
         } else {
           setNavItems(defaultItems);

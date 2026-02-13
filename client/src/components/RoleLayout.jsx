@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 
 const RoleLayout = ({
   title,
@@ -15,7 +15,19 @@ const RoleLayout = ({
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-  const hasProfileMenu = profileLinks.length > 0;
+  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const role = storedUser?.role;
+  const location = useLocation();
+  const defaultProfileLinks = role ? [{ label: 'Profile', to: `/${role}/profile` }] : [];
+  const effectiveProfileLinks = profileLinks.length > 0 ? profileLinks : defaultProfileLinks;
+  const hasProfileMenu = effectiveProfileLinks.length > 0;
+  const showModeTabs = storedUser?.adminAccess === true && role && role !== 'admin';
+  const isAdminPath = location.pathname.startsWith('/admin');
+  const roleLabel = useMemo(() => {
+    if (role === 'hod') return 'HOD';
+    if (role === 'teacher') return 'Teacher';
+    return 'Role';
+  }, [role]);
 
   return (
     <div className="min-h-screen bg-[#F8F9FB] text-[#111318]">
@@ -27,7 +39,7 @@ const RoleLayout = ({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-[#E6E9EF] transform transition-transform duration-200 md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-[#E6E9EF] transform transition-transform duration-200 md:translate-x-0 flex flex-col ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -43,7 +55,7 @@ const RoleLayout = ({
           </div>
         </div>
 
-        <nav className="px-4 py-4 space-y-1">
+        <nav className="px-4 py-4 space-y-1 flex-1 overflow-y-auto">
           {navLoading ? (
             <div className="px-3 py-2 text-xs text-[#6B7280]">Loading menu...</div>
           ) : navItems.length === 0 ? (
@@ -80,6 +92,22 @@ const RoleLayout = ({
               <span className="material-symbols-outlined">menu</span>
             </button>
             <h1 className="text-lg font-bold">{title}</h1>
+            {showModeTabs && (
+              <div className="hidden sm:flex items-center bg-[#F1F5F9] rounded-full p-1 text-xs font-semibold">
+                <NavLink
+                  to="/admin/dashboard"
+                  className={`px-3 py-1 rounded-full transition ${isAdminPath ? 'bg-[#111318] text-white' : 'text-[#374151]'}`}
+                >
+                  Admin
+                </NavLink>
+                <NavLink
+                  to={`/${role}/dashboard`}
+                  className={`px-3 py-1 rounded-full transition ${!isAdminPath ? 'bg-[#111318] text-white' : 'text-[#374151]'}`}
+                >
+                  {roleLabel}
+                </NavLink>
+              </div>
+            )}
           </div>
 
           {topLinks.length > 0 && (
@@ -95,6 +123,13 @@ const RoleLayout = ({
           <div className="flex items-center gap-3 relative">
             <button
               onClick={() => hasProfileMenu && setShowProfileMenu((prev) => !prev)}
+              className="sm:hidden w-10 h-10 rounded-full bg-[#F1F5F9] flex items-center justify-center"
+              aria-label="Open profile menu"
+            >
+              <span className="material-symbols-outlined text-base">account_circle</span>
+            </button>
+            <button
+              onClick={() => hasProfileMenu && setShowProfileMenu((prev) => !prev)}
               className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F1F5F9] text-sm font-semibold"
             >
               <span className="material-symbols-outlined text-base">account_circle</span>
@@ -102,7 +137,7 @@ const RoleLayout = ({
             </button>
             {hasProfileMenu && showProfileMenu && (
               <div className="absolute right-0 top-12 w-48 bg-white border border-[#E6E9EF] rounded-xl shadow-lg overflow-hidden z-40">
-                {profileLinks.map((link) => (
+                {effectiveProfileLinks.map((link) => (
                   <NavLink
                     key={link.to}
                     to={link.to}

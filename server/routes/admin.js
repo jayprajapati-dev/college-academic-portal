@@ -274,24 +274,188 @@ router.post('/add-teacher', protect, authorize('admin', 'hod'), async (req, res)
   }
 });
 
-// @route   GET /api/admin/users
-// @desc    Get all users with pagination and filters
+// @route   POST /api/admin/add-admin
+// @desc    Create Admin with temp password
 // @access  Private/Admin
-router.get('/users', protect, authorize('admin'), async (req, res) => {
+router.post('/add-admin', protect, authorize('admin'), async (req, res) => {
   try {
-    const { page = 1, limit = 10, role, status, search } = req.query;
+    const { name, mobile, email } = req.body;
 
-    // Build query
-    const query = {};
-    if (role) query.role = role;
-    if (status) query.status = status;
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { mobile: { $regex: search, $options: 'i' } }
-      ];
+    if (!name || !mobile) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide name and mobile number'
+      });
     }
+
+    if (!/^[0-9]{10}$/.test(mobile)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid 10-digit mobile number'
+      });
+    }
+
+    const existingUser = await User.findOne({ mobile });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'User with this mobile number already exists'
+      });
+    }
+
+    const tempPassword = generateTempPassword();
+
+    const admin = await User.create({
+      name,
+      mobile,
+      email: email || `${mobile}@college.edu`,
+      role: 'admin',
+      adminAccess: true,
+      tempPassword: tempPassword,
+      password: 'temp',
+      status: 'active',
+      passwordSetupRequired: true,
+      addedBy: req.user._id,
+      addedByRole: req.user.role
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Admin created successfully. Share the temp password with the admin.',
+      data: {
+        id: admin._id,
+        name: admin.name,
+        mobile: admin.mobile,
+        email: admin.email,
+        role: admin.role,
+        tempPassword: tempPassword,
+        passwordSetupRequired: true,
+        status: admin.status,
+        setupInstructions: 'Admin should visit password-setup page and enter mobile + temp password'
+      }
+    });
+  } catch (error) {
+    console.error('Add admin error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error in adding admin'
+    });
+  }
+});
+
+// @route   GET /api/admin/users
+// @desc    Get users with pagination and filters
+// @access  Private/Admin/HOD/Teacher (scoped)
+router.get('/users', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+  try {
+    const { page = 1, limit = 10, role, status, search, scope } = req.query;
+    const isAdmin = req.user.role === 'admin' || req.user.adminAccess === true;
+    const useRoleScope = !isAdmin || (scope === 'role' && req.user.role !== 'admin');
+    const queryParts = [];
+
+    if (status && status !== 'all') {
+      queryParts.push({ status });
+    }
+
+    if (search) {
+      queryParts.push({
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+          { mobile: { $regex: search, $options: 'i' } }
+        ]
+      });
+    }
+
+    if (!useRoleScope) {
+      if (role && role !== 'all') {
+        if (role === 'admin') {
+          queryParts.push({ $or: [{ role: 'admin' }, { adminAccess: true }] });
+        } else {
+          queryParts.push({ role });
+        }
+      }
+    } else if (req.user.role === 'hod') {
+      const branchIds = [
+        ...(Array.isArray(req.user.branches) ? req.user.branches : []),
+        req.user.branch,
+        req.user.department
+      ].filter(Boolean);
+
+      if (branchIds.length === 0) {
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          total: 0,
+          totalPages: 0,
+          currentPage: Number(page),
+          data: []
+        });
+      }
+
+      if (role && !['teacher', 'student', 'all'].includes(role)) {
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          total: 0,
+          totalPages: 0,
+          currentPage: Number(page),
+          data: []
+        });
+      }
+
+      const teacherQuery = {
+        role: 'teacher',
+        $or: [
+          { branch: { $in: branchIds } },
+          { branches: { $in: branchIds } },
+          { department: { $in: branchIds } }
+        ]
+      };
+      const studentQuery = { role: 'student', branch: { $in: branchIds } };
+      const scopedRoleQuery = role === 'teacher'
+        ? teacherQuery
+        : role === 'student'
+          ? studentQuery
+          : { $or: [teacherQuery, studentQuery] };
+
+      queryParts.push(scopedRoleQuery);
+    } else if (req.user.role === 'teacher') {
+      if (role && !['student', 'all'].includes(role)) {
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          total: 0,
+          totalPages: 0,
+          currentPage: Number(page),
+          data: []
+        });
+      }
+
+      const assigned = Array.isArray(req.user.assignedSubjects) ? req.user.assignedSubjects : [];
+      if (assigned.length === 0) {
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          total: 0,
+          totalPages: 0,
+          currentPage: Number(page),
+          data: []
+        });
+      }
+
+      const subjectDocs = await Subject.find({ _id: { $in: assigned } }).select('branchId semesterId');
+      const branchIds = Array.from(new Set(subjectDocs.map((s) => s.branchId).filter(Boolean)));
+      const semesterIds = Array.from(new Set(subjectDocs.map((s) => s.semesterId).filter(Boolean)));
+
+      const studentQuery = { role: 'student' };
+      if (branchIds.length) studentQuery.branch = { $in: branchIds };
+      if (semesterIds.length) studentQuery.semester = { $in: semesterIds };
+
+      queryParts.push(studentQuery);
+    }
+
+    const query = queryParts.length ? { $and: queryParts } : {};
 
     // Execute query with pagination
     const users = await User.find(query)
@@ -442,6 +606,64 @@ router.put('/users/:id/role', protect, authorize('admin'), async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error in updating user role'
+    });
+  }
+});
+
+// @route   PUT /api/admin/users/:id/admin-access
+// @desc    Grant or revoke admin access for teacher/HOD
+// @access  Private/Admin
+router.put('/users/:id/admin-access', protect, authorize('admin'), async (req, res) => {
+  try {
+    const { adminAccess } = req.body;
+
+    if (typeof adminAccess !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'adminAccess must be a boolean'
+      });
+    }
+
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (user.role === 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin users already have admin access'
+      });
+    }
+
+    if (!['teacher', 'hod'].includes(user.role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin access can only be granted to teacher or HOD'
+      });
+    }
+
+    user.adminAccess = adminAccess;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: adminAccess ? 'Admin access granted' : 'Admin access revoked',
+      data: {
+        id: user._id,
+        role: user.role,
+        adminAccess: user.adminAccess
+      }
+    });
+  } catch (error) {
+    console.error('Update admin access error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error in updating admin access'
     });
   }
 });

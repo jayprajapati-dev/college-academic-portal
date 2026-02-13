@@ -31,6 +31,10 @@ const userSchema = new mongoose.Schema({
     default: 'student',
     required: true
   },
+  adminAccess: {
+    type: Boolean,
+    default: false
+  },
   branch: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Branch'

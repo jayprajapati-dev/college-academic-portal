@@ -139,7 +139,9 @@ router.get('/subjects/hod', protect, authorize('hod', 'admin'), async (req, res)
 
     const subjects = await Subject.find(query)
       .sort({ name: 1 })
-      .select('_id name code description semesterId branchId');
+      .populate('branchId', 'name code')
+      .populate('semesterId', 'semesterNumber academicYear')
+      .select('_id name code description semesterId branchId type credits marks isActive');
 
     res.json({
       success: true,
@@ -829,8 +831,8 @@ router.get('/subjects/:id', protect, authorize('admin'), async (req, res) => {
 
 // @route   POST /api/academic/subjects
 // @desc    Create new subject
-// @access  Private/Admin
-router.post('/subjects', protect, authorize('admin'), async (req, res) => {
+// @access  Private/Admin/HOD
+router.post('/subjects', protect, authorize('admin', 'hod'), async (req, res) => {
   try {
     const {
       name,
@@ -860,6 +862,22 @@ router.post('/subjects', protect, authorize('admin'), async (req, res) => {
         success: false,
         message: 'Subject code already exists'
       });
+    }
+
+    if (req.user.role === 'hod') {
+      const branchIds = [];
+      if (req.user.branch) branchIds.push(String(req.user.branch));
+      if (req.user.department) branchIds.push(String(req.user.department));
+      if (Array.isArray(req.user.branches) && req.user.branches.length > 0) {
+        branchIds.push(...req.user.branches.map((id) => String(id)));
+      }
+
+      if (branchIds.length === 0 || !branchIds.includes(String(branchId))) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to create subjects for this branch'
+        });
+      }
     }
 
     // Check if branch exists
@@ -936,8 +954,8 @@ router.post('/subjects', protect, authorize('admin'), async (req, res) => {
 
 // @route   PUT /api/academic/subjects/:id
 // @desc    Update subject
-// @access  Private/Admin
-router.put('/subjects/:id', protect, authorize('admin'), async (req, res) => {
+// @access  Private/Admin/HOD/Teacher
+router.put('/subjects/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
     const {
       name,
@@ -957,6 +975,42 @@ router.put('/subjects/:id', protect, authorize('admin'), async (req, res) => {
         success: false,
         message: 'Subject not found'
       });
+    }
+
+    const isAdmin = req.user.role === 'admin';
+
+    if (!isAdmin) {
+      const subjectId = String(subject._id);
+      const subjectBranchId = String(subject.branchId);
+
+      if (req.user.role === 'teacher') {
+        const assignedSubjects = Array.isArray(req.user.assignedSubjects)
+          ? req.user.assignedSubjects.map((id) => String(id))
+          : [];
+
+        if (assignedSubjects.length === 0 || !assignedSubjects.includes(subjectId)) {
+          return res.status(403).json({
+            success: false,
+            message: 'Not authorized to modify this subject'
+          });
+        }
+      }
+
+      if (req.user.role === 'hod') {
+        const branchIds = [];
+        if (req.user.branch) branchIds.push(String(req.user.branch));
+        if (req.user.department) branchIds.push(String(req.user.department));
+        if (Array.isArray(req.user.branches) && req.user.branches.length > 0) {
+          branchIds.push(...req.user.branches.map((id) => String(id)));
+        }
+
+        if (branchIds.length === 0 || !branchIds.includes(subjectBranchId)) {
+          return res.status(403).json({
+            success: false,
+            message: 'Not authorized to modify this subject'
+          });
+        }
+      }
     }
 
     // Check if new code exists (if changed)
@@ -1002,8 +1056,8 @@ router.put('/subjects/:id', protect, authorize('admin'), async (req, res) => {
 
 // @route   DELETE /api/academic/subjects/:id
 // @desc    Delete subject
-// @access  Private/Admin
-router.delete('/subjects/:id', protect, authorize('admin'), async (req, res) => {
+// @access  Private/Admin/HOD/Teacher
+router.delete('/subjects/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
     const subject = await Subject.findById(req.params.id);
 
@@ -1012,6 +1066,42 @@ router.delete('/subjects/:id', protect, authorize('admin'), async (req, res) => 
         success: false,
         message: 'Subject not found'
       });
+    }
+
+    const isAdmin = req.user.role === 'admin';
+
+    if (!isAdmin) {
+      const subjectId = String(subject._id);
+      const subjectBranchId = String(subject.branchId);
+
+      if (req.user.role === 'teacher') {
+        const assignedSubjects = Array.isArray(req.user.assignedSubjects)
+          ? req.user.assignedSubjects.map((id) => String(id))
+          : [];
+
+        if (assignedSubjects.length === 0 || !assignedSubjects.includes(subjectId)) {
+          return res.status(403).json({
+            success: false,
+            message: 'Not authorized to delete this subject'
+          });
+        }
+      }
+
+      if (req.user.role === 'hod') {
+        const branchIds = [];
+        if (req.user.branch) branchIds.push(String(req.user.branch));
+        if (req.user.department) branchIds.push(String(req.user.department));
+        if (Array.isArray(req.user.branches) && req.user.branches.length > 0) {
+          branchIds.push(...req.user.branches.map((id) => String(id)));
+        }
+
+        if (branchIds.length === 0 || !branchIds.includes(subjectBranchId)) {
+          return res.status(403).json({
+            success: false,
+            message: 'Not authorized to delete this subject'
+          });
+        }
+      }
     }
 
     await Subject.findByIdAndDelete(req.params.id);
@@ -1415,7 +1505,21 @@ router.delete('/subjects/:id/materials/:matId/link', protect, authorize('teacher
 // ======================
 router.get('/teacher/:teacherId/subjects', protect, async (req, res) => {
   try {
-    const teacher = await User.findById(req.params.teacherId).populate('assignedSubjects');
+    const isPrivileged = req.user.role === 'admin' || req.user.role === 'hod';
+    if (!isPrivileged && String(req.user._id) !== String(req.params.teacherId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to view these subjects'
+      });
+    }
+
+    const teacher = await User.findById(req.params.teacherId).populate({
+      path: 'assignedSubjects',
+      populate: [
+        { path: 'branchId', select: 'name code' },
+        { path: 'semesterId', select: 'semesterNumber academicYear' }
+      ]
+    });
     
     if (!teacher) {
       return res.status(404).json({ success: false, message: 'Teacher not found' });

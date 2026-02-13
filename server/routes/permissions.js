@@ -16,11 +16,22 @@ router.get('/me', protect, async (req, res) => {
     }
 
     const hasCustom = Array.isArray(user.permissions) && user.permissions.length > 0;
-    const allowedModules = hasCustom ? user.permissions : getRoleDefaults(user.role);
+    const wantsAdmin = req.query.mode === 'admin';
+    const isAdmin = user.role === 'admin' || user.adminAccess === true;
+    const baseRole = wantsAdmin && isAdmin ? 'admin' : user.role;
+    let allowedModules = wantsAdmin && isAdmin
+      ? getRoleDefaults('admin')
+      : (hasCustom ? user.permissions : getRoleDefaults(baseRole));
+
+    if (baseRole === 'hod' || baseRole === 'teacher') {
+      const moduleSet = new Set(Array.isArray(allowedModules) ? allowedModules : []);
+      moduleSet.add('users');
+      allowedModules = Array.from(moduleSet);
+    }
 
     return res.status(200).json({
       success: true,
-      role: user.role,
+      role: baseRole,
       allowedModules
     });
   } catch (error) {

@@ -154,6 +154,7 @@ router.post('/login', async (req, res) => {
         email: user.email,
         mobile: user.mobile,
         role: user.role,
+        adminAccess: user.adminAccess === true,
         status: user.status,
         passwordChangeRequired: user.passwordChangeRequired,
         branch: user.branch,

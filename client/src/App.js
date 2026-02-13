@@ -18,28 +18,26 @@ import DisclaimerPage from './pages/DisclaimerPage';
 import SubjectMaterialsPublic from './pages/SubjectMaterialsPublic';
 import SubjectHub from './pages/SubjectHub';
 import NoticeBoard from './pages/NoticeBoard';
+import RoleDashboard from './pages/role/RoleDashboard';
+import RoleMaterials from './pages/role/RoleMaterials';
+import RoleNotices from './pages/role/RoleNotices';
+import RoleTasks from './pages/role/RoleTasks';
+import RoleLibrary from './pages/role/RoleLibrary';
+import RoleTimetable from './pages/role/RoleTimetable';
+import RoleBranches from './pages/role/RoleBranches';
+import RoleSemesters from './pages/role/RoleSemesters';
+import RoleProfile from './pages/role/RoleProfile';
+import RoleManageTeachers from './pages/role/RoleManageTeachers';
 
 // Import dashboards
 import StudentDashboard from './pages/StudentDashboard';
 import StudentProfile from './pages/StudentProfile';
-import TeacherDashboard from './pages/TeacherDashboard';
-import TeacherProfile from './pages/TeacherProfile';
-import HODDashboard from './pages/HODDashboard';
-import HODProfile from './pages/HODProfile';
-import AdminDashboard from './pages/AdminDashboard';
 import UserManagement from './pages/UserManagement';
-import SemesterManagement from './pages/SemesterManagement';
-import BranchManagement from './pages/BranchManagement';
-import SubjectManagement from './pages/SubjectManagement';
 import SubjectMaterialsManagement from './pages/SubjectMaterialsManagement';
-import AcademicStructure from './pages/AcademicStructure';
+import RoleAcademicStructure from './pages/role/RoleAcademicStructure';
+import RoleSubjects from './pages/role/RoleSubjects';
 import ContactManagement from './pages/admin/ContactManagement';
-import TeacherMaterials from './pages/TeacherMaterials';
-import AdminMaterials from './pages/AdminMaterials';
 import PasswordSetup from './pages/PasswordSetup';
-import NoticeManagement from './pages/NoticeManagement';
-import TaskManagement from './pages/TaskManagement';
-import LibraryManagement from './pages/LibraryManagement';
 import AttendanceManagement from './pages/AttendanceManagement';
 import ExamManagement from './pages/ExamManagement';
 
@@ -47,12 +45,10 @@ import ExamManagement from './pages/ExamManagement';
 import AddTeacher from './pages/hod/AddTeacher';
 import ManageTeachers from './pages/hod/ManageTeachers';
 import BranchReports from './pages/hod/BranchReports';
-import HodTeacherTimetableManagement from './pages/hod/TimetableManagement';
 
 // Import Admin pages
 import AddTeacherAdmin from './pages/admin/AddTeacher';
 import AddHODAdmin from './pages/admin/AddHOD';
-import AdminTimetableManagement from './pages/admin/TimetableManagement';
 
 // Import Student pages
 import StudentTimetableView from './pages/student/TimetableView';
@@ -97,44 +93,52 @@ function App() {
         <Route path="/student/timetable" element={<StudentTimetableView />} />
         <Route path="/subjects/:subjectId/tasks" element={<StudentTaskView />} />
         <Route path="/student/tasks/:taskId" element={<StudentTaskDetail />} />
-        <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
-        <Route path="/teacher/profile" element={<TeacherProfile />} />
-        <Route path="/teacher/materials" element={<TeacherMaterials />} />
-        <Route path="/teacher/notices" element={<NoticeManagement />} />
-        <Route path="/teacher/tasks" element={<TaskManagement />} />
-        <Route path="/teacher/library" element={<LibraryManagement />} />
+        <Route path="/teacher/dashboard" element={<RoleDashboard />} />
+        <Route path="/teacher/profile" element={<RoleProfile />} />
+        <Route path="/teacher/materials" element={<RoleMaterials />} />
+        <Route path="/teacher/notices" element={<RoleNotices />} />
+        <Route path="/teacher/tasks" element={<RoleTasks />} />
+        <Route path="/teacher/library" element={<RoleLibrary />} />
         <Route path="/teacher/attendance" element={<AttendanceManagement />} />
         <Route path="/teacher/exams" element={<ExamManagement />} />
-        <Route path="/hod/dashboard" element={<HODDashboard />} />
-        <Route path="/hod/profile" element={<HODProfile />} />
+        <Route path="/hod/dashboard" element={<RoleDashboard />} />
+        <Route path="/hod/profile" element={<RoleProfile />} />
         <Route path="/hod/add-teacher" element={<AddTeacher />} />
-        <Route path="/hod/manage-teachers" element={<ManageTeachers />} />
-        <Route path="/hod/materials" element={<TeacherMaterials />} />
+        <Route path="/hod/manage-teachers" element={<RoleManageTeachers />} />
+        <Route path="/hod/materials" element={<RoleMaterials />} />
         <Route path="/hod/reports" element={<BranchReports />} />
-        <Route path="/hod/timetable" element={<HodTeacherTimetableManagement />} />
-        <Route path="/hod/notices" element={<NoticeManagement />} />
-        <Route path="/hod/tasks" element={<TaskManagement />} />
-        <Route path="/hod/library" element={<LibraryManagement />} />
+        <Route path="/hod/timetable" element={<RoleTimetable />} />
+        <Route path="/hod/notices" element={<RoleNotices />} />
+        <Route path="/hod/tasks" element={<RoleTasks />} />
+        <Route path="/hod/library" element={<RoleLibrary />} />
         <Route path="/hod/attendance" element={<AttendanceManagement />} />
         <Route path="/hod/exams" element={<ExamManagement />} />
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/dashboard" element={<RoleDashboard />} />
+        <Route path="/admin/profile" element={<RoleProfile />} />
         <Route path="/admin/users" element={<UserManagement />} />
         <Route path="/admin/manage-users" element={<UserManagement />} />
+        <Route path="/hod/users" element={<UserManagement />} />
+        <Route path="/teacher/users" element={<UserManagement />} />
         <Route path="/admin/add-teacher" element={<AddTeacherAdmin />} />
         <Route path="/admin/add-hod" element={<AddHODAdmin />} />
-        <Route path="/admin/semesters" element={<SemesterManagement />} />
-        <Route path="/admin/branches" element={<BranchManagement />} />
-        <Route path="/admin/subjects" element={<SubjectManagement />} />
+        <Route path="/admin/semesters" element={<RoleSemesters />} />
+        <Route path="/admin/branches" element={<RoleBranches />} />
+        <Route path="/admin/subjects" element={<RoleSubjects />} />
         <Route path="/admin/subjects/:id/materials" element={<SubjectMaterialsManagement />} />
-        <Route path="/admin/academic-structure" element={<AcademicStructure />} />
+        <Route path="/admin/academic-structure" element={<RoleAcademicStructure />} />
         <Route path="/admin/contacts" element={<ContactManagement />} />
-        <Route path="/admin/timetable" element={<AdminTimetableManagement />} />
-        <Route path="/admin/notices" element={<NoticeManagement />} />
-        <Route path="/admin/tasks" element={<TaskManagement />} />
-        <Route path="/admin/materials" element={<AdminMaterials />} />
-        <Route path="/admin/library" element={<LibraryManagement />} />
+        <Route path="/admin/timetable" element={<RoleTimetable />} />
+        <Route path="/admin/notices" element={<RoleNotices />} />
+        <Route path="/admin/tasks" element={<RoleTasks />} />
+        <Route path="/admin/materials" element={<RoleMaterials />} />
+        <Route path="/admin/library" element={<RoleLibrary />} />
         <Route path="/admin/attendance" element={<AttendanceManagement />} />
         <Route path="/admin/exams" element={<ExamManagement />} />
+        <Route path="/hod/subjects" element={<RoleSubjects />} />
+        <Route path="/teacher/subjects" element={<RoleSubjects />} />
+        <Route path="/hod/academic-structure" element={<RoleAcademicStructure />} />
+        <Route path="/teacher/academic-structure" element={<RoleAcademicStructure />} />
+        <Route path="/teacher/timetable" element={<RoleTimetable />} />
         
         {/* Catch All */}
         <Route path="*" element={<Navigate to="/" replace />} />

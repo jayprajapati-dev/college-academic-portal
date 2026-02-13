@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import AdminLayout from '../components/AdminLayout';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { RoleLayout } from '../components';
+import useRoleNav from '../hooks/useRoleNav';
 
 const UserManagement = () => {
   const navigate = useNavigate();
@@ -17,12 +18,28 @@ const UserManagement = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
   const [newRole, setNewRole] = useState('');
   const [permissionsMap, setPermissionsMap] = useState({});
   const [selectedPermissions, setSelectedPermissions] = useState([]);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [currentUser, setCurrentUser] = useState(null);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminTab, setAdminTab] = useState('new');
+  const [adminForm, setAdminForm] = useState({ name: '', mobile: '', email: '' });
+  const [adminSearch, setAdminSearch] = useState('');
+  const [adminCandidateId, setAdminCandidateId] = useState('');
+
+  const location = useLocation();
+  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const [currentUser, setCurrentUser] = useState(storedUser);
+  const role = currentUser?.role || 'teacher';
+  const hasAdminAccess = currentUser?.role === 'admin' || currentUser?.adminAccess === true;
+  const isAdminMode = location.pathname.startsWith('/admin');
+  const navRole = isAdminMode ? 'admin' : role;
+  const { navItems, loading: navLoading } = useRoleNav(navRole);
+  const panelLabel = isAdminMode ? 'Admin Panel' : role === 'hod' ? 'HOD Panel' : 'Teacher Panel';
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -31,14 +48,11 @@ const UserManagement = () => {
   };
 
   useEffect(() => {
-    // Get current user info
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
     setCurrentUser(user);
-    fetchUsers();
-    fetchPermissionModules();
   }, []);
 
-  const fetchPermissionModules = async () => {
+  const fetchPermissionModules = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('/api/admin/permissions/modules', {
@@ -51,22 +65,20 @@ const UserManagement = () => {
     } catch (error) {
       console.error('Error fetching permissions:', error);
     }
-  };
+  }, []);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/users?page=1&limit=100', {
+      const scope = isAdminMode ? 'admin' : 'role';
+      const response = await fetch(`/api/admin/users?page=1&limit=100&scope=${scope}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
-      
-      console.log('Users API Response:', data); // Debug log
-      
+
       if (data.success && data.data) {
         setUsers(data.data);
       } else if (response.ok && Array.isArray(data)) {
-        // Handle if API returns array directly
         setUsers(data);
       }
     } catch (error) {
@@ -75,7 +87,19 @@ const UserManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdminMode]);
+
+  useEffect(() => {
+    if (isAdminMode && !hasAdminAccess) {
+      navigate(`/${role}/dashboard`);
+      return;
+    }
+
+    fetchUsers();
+    if (hasAdminAccess && isAdminMode) {
+      fetchPermissionModules();
+    }
+  }, [fetchPermissionModules, fetchUsers, hasAdminAccess, isAdminMode, navigate, role]);
 
   const filterUsers = useCallback(() => {
     let filtered = users;
@@ -91,7 +115,11 @@ const UserManagement = () => {
 
     // Role filter
     if (roleFilter !== 'all') {
-      filtered = filtered.filter(u => u.role === roleFilter);
+      if (roleFilter === 'admin') {
+        filtered = filtered.filter(u => u.role === 'admin' || u.adminAccess === true);
+      } else {
+        filtered = filtered.filter(u => u.role === roleFilter);
+      }
     }
 
     // Status filter
@@ -133,6 +161,104 @@ const UserManagement = () => {
       console.error('Error updating role:', error);
       setErrorMessage('Error changing user role');
     }
+  };
+
+  const handleStatusChange = async (user, status) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/admin/user/${user._id}/status`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setUsers(users.map((u) => (u._id === user._id ? { ...u, status } : u)));
+        setSuccessMessage(`User ${status === 'active' ? 'unblocked' : 'blocked'} successfully!`);
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setErrorMessage(data.message || 'Failed to update user status');
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      setErrorMessage('Error updating user status');
+    }
+  };
+
+  const handleAdminAccessToggle = async (user, adminAccess) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/admin/users/${user._id}/admin-access`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ adminAccess })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setUsers(users.map((u) => (u._id === user._id ? { ...u, adminAccess } : u)));
+        setSuccessMessage(adminAccess ? 'Admin access granted' : 'Admin access revoked');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setErrorMessage(data.message || 'Failed to update admin access');
+      }
+    } catch (error) {
+      console.error('Error updating admin access:', error);
+      setErrorMessage('Error updating admin access');
+    }
+  };
+
+  const handleCreateAdmin = async () => {
+    try {
+      if (!adminForm.name || !adminForm.mobile) {
+        setErrorMessage('Please provide name and mobile number');
+        return;
+      }
+
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/admin/add-admin', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(adminForm)
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setShowAdminModal(false);
+        setAdminForm({ name: '', mobile: '', email: '' });
+        fetchUsers();
+        setSuccessMessage('Admin created successfully. Share the temp password.');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setErrorMessage(data.message || 'Failed to create admin');
+      }
+    } catch (error) {
+      console.error('Error creating admin:', error);
+      setErrorMessage('Error creating admin');
+    }
+  };
+
+  const handlePromoteAdmin = async () => {
+    const user = users.find((u) => u._id === adminCandidateId);
+    if (!user) {
+      setErrorMessage('Please select a user');
+      return;
+    }
+
+    await handleAdminAccessToggle(user, true);
+    setShowAdminModal(false);
+    setAdminCandidateId('');
+    setAdminSearch('');
   };
 
   const handlePermissionsSave = async () => {
@@ -212,6 +338,81 @@ const UserManagement = () => {
     return colors[status] || colors.pending;
   };
 
+  const getRoleLabel = (user) => {
+    if (user.role === 'teacher' && user.adminAccess) return 'Teacher (Admin)';
+    if (user.role === 'hod' && user.adminAccess) return 'HOD (Admin)';
+    return user.role?.toUpperCase() || 'USER';
+  };
+
+  const roleOptions = useMemo(() => {
+    if (isAdminMode) {
+      return [
+        { value: 'all', label: 'All Roles' },
+        { value: 'admin', label: 'Admin' },
+        { value: 'hod', label: 'HOD' },
+        { value: 'teacher', label: 'Teacher' },
+        { value: 'student', label: 'Student' }
+      ];
+    }
+
+    if (role === 'hod') {
+      return [
+        { value: 'all', label: 'All Roles' },
+        { value: 'teacher', label: 'Teacher' },
+        { value: 'student', label: 'Student' }
+      ];
+    }
+
+    return [
+      { value: 'all', label: 'All Roles' },
+      { value: 'student', label: 'Student' }
+    ];
+  }, [isAdminMode, role]);
+
+  const canEditRole = (user) => isAdminMode && user.role !== 'student';
+  const canToggleStudentBlock = (user) => isAdminMode && user.role === 'student';
+  const canEditPermissions = (user) => isAdminMode && ['admin', 'hod', 'teacher'].includes(user.role);
+  const canToggleAdminAccess = (user) => isAdminMode && ['teacher', 'hod'].includes(user.role);
+
+  const adminCandidates = useMemo(() => {
+    const term = adminSearch.trim().toLowerCase();
+    return users.filter((u) => ['teacher', 'hod'].includes(u.role)).filter((u) => {
+      if (!term) return true;
+      return (
+        u.name?.toLowerCase().includes(term) ||
+        u.email?.toLowerCase().includes(term) ||
+        u.mobile?.includes(term)
+      );
+    });
+  }, [adminSearch, users]);
+
+  const handleViewUser = async (user) => {
+    setSelectedUser(user);
+    setShowDetailModal(true);
+    setDetailError('');
+
+    if (!isAdminMode) return;
+
+    try {
+      setDetailLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/admin/user/${user._id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (response.ok && data?.success) {
+        setSelectedUser(data.data);
+      } else {
+        setDetailError(data?.message || 'Failed to load user details');
+      }
+    } catch (error) {
+      console.error('Error fetching user details:', error);
+      setDetailError('Failed to load user details');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
@@ -230,16 +431,30 @@ const UserManagement = () => {
 
   if (loading) {
     return (
-      <AdminLayout title="User Management" onLogout={handleLogout}>
+      <RoleLayout
+        title="User Management"
+        userName={currentUser?.name || 'User'}
+        onLogout={handleLogout}
+        navItems={navItems}
+        navLoading={navLoading}
+        panelLabel={panelLabel}
+      >
         <div className="min-h-[60vh] flex items-center justify-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary"></div>
         </div>
-      </AdminLayout>
+      </RoleLayout>
     );
   }
 
   return (
-    <AdminLayout title="User Management" onLogout={handleLogout}>
+    <RoleLayout
+      title="User Management"
+      userName={currentUser?.name || 'User'}
+      onLogout={handleLogout}
+      navItems={navItems}
+      navLoading={navLoading}
+      panelLabel={panelLabel}
+    >
       <div className="space-y-6">
         {/* Success/Error Messages */}
         {successMessage && (
@@ -281,7 +496,13 @@ const UserManagement = () => {
           </div>
           <div>
             <h1 className="text-3xl font-black text-gray-900 dark:text-white">User Management</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Manage system users, roles, and access levels</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              {isAdminMode
+                ? 'Manage system users, roles, and access levels'
+                : role === 'hod'
+                  ? 'Manage branch teachers and students'
+                  : 'View assigned students'}
+            </p>
           </div>
         </div>
 
@@ -306,11 +527,9 @@ const UserManagement = () => {
               onChange={(e) => setRoleFilter(e.target.value)}
               className="h-11 px-4 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[140px]"
             >
-              <option value="all">All Roles</option>
-              <option value="admin">Admin</option>
-              <option value="hod">HOD</option>
-              <option value="teacher">Teacher</option>
-              <option value="student">Student</option>
+              {roleOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
 
             {/* Status Filter */}
@@ -327,7 +546,7 @@ const UserManagement = () => {
 
             {/* Add User Buttons (Role-Based) */}
             <div className="flex gap-3 ml-auto">
-              {currentUser?.role === 'admin' && (
+              {isAdminMode && (
                 <>
                   <button
                     onClick={() => navigate('/admin/add-hod')}
@@ -343,9 +562,16 @@ const UserManagement = () => {
                     <span className="material-symbols-outlined text-xl">school</span>
                     Add Teacher
                   </button>
+                  <button
+                    onClick={() => setShowAdminModal(true)}
+                    className="bg-gradient-to-r from-slate-900 to-slate-700 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-slate-500/20 hover:opacity-90 transition-all h-11"
+                  >
+                    <span className="material-symbols-outlined text-xl">admin_panel_settings</span>
+                    Add Admin
+                  </button>
                 </>
               )}
-              {currentUser?.role === 'hod' && (
+              {role === 'hod' && !isAdminMode && (
                 <button
                   onClick={() => navigate('/hod/add-teacher')}
                   className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-blue-500/20 hover:opacity-90 transition-all h-11"
@@ -436,9 +662,16 @@ const UserManagement = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${getRoleColor(user.role)} shadow-sm`}>
-                          {user.role?.toUpperCase()}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${getRoleColor(user.role)} shadow-sm`}>
+                            {getRoleLabel(user)}
+                          </span>
+                          {user.adminAccess && ['teacher', 'hod'].includes(user.role) && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-900 text-white">
+                              ADMIN
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm space-y-1">
@@ -461,11 +694,8 @@ const UserManagement = () => {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-1">
-                          <button 
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setShowDetailModal(true);
-                            }}
+                          <button
+                            onClick={() => handleViewUser(user)}
                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
                             title="View Details"
                           >
@@ -474,20 +704,33 @@ const UserManagement = () => {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                             </svg>
                           </button>
-                          <button
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setNewRole(user.role);
-                              setShowRoleModal(true);
-                            }}
-                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                            title="Change Role"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </button>
-                          {['admin', 'hod', 'teacher'].includes(user.role) && (
+                          {canEditRole(user) && (
+                            <button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setNewRole(user.role);
+                                setShowRoleModal(true);
+                              }}
+                              className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                              title="Change Role"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </button>
+                          )}
+                          {canToggleStudentBlock(user) && (
+                            <button
+                              onClick={() => handleStatusChange(user, user.status === 'disabled' ? 'active' : 'disabled')}
+                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                              title={user.status === 'disabled' ? 'Unblock Student' : 'Block Student'}
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-12.728 12.728m12.728 0L5.636 5.636M12 3v4m0 10v4" />
+                              </svg>
+                            </button>
+                          )}
+                          {canEditPermissions(user) && (
                             <button
                               onClick={() => handleOpenPermissions(user)}
                               className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
@@ -498,18 +741,31 @@ const UserManagement = () => {
                               </svg>
                             </button>
                           )}
-                          <button 
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setShowDeleteModal(true);
-                            }}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete User"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
+                          {canToggleAdminAccess(user) && (
+                            <button
+                              onClick={() => handleAdminAccessToggle(user, !user.adminAccess)}
+                              className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                              title={user.adminAccess ? 'Revoke Admin Access' : 'Grant Admin Access'}
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.657 0 3-1.343 3-3V6a3 3 0 10-6 0v2c0 1.657 1.343 3 3 3zm0 0v3m0 4h.01M4 21h16a1 1 0 001-1v-2a7 7 0 10-14 0v2a1 1 0 001 1z" />
+                              </svg>
+                            </button>
+                          )}
+                          {isAdminMode && (
+                            <button 
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setShowDeleteModal(true);
+                              }}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete User"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -555,12 +811,19 @@ const UserManagement = () => {
 
       {/* View User Details Modal */}
       {showDetailModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-200 dark:border-gray-700">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-500 to-cyan-500">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-white">User Details</h3>
-                <button onClick={() => setShowDetailModal(false)} className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="p-5 sm:p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-600 to-cyan-500">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-blue-100">User Overview</p>
+                  <h3 className="text-xl sm:text-2xl font-bold text-white">Profile Details</h3>
+                </div>
+                <button
+                  onClick={() => setShowDetailModal(false)}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
+                  aria-label="Close"
+                >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -568,85 +831,92 @@ const UserManagement = () => {
               </div>
             </div>
 
-            <div className="p-6 space-y-4">
-              {/* Avatar */}
-              <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-400 to-orange-400 flex items-center justify-center text-white font-bold text-2xl shadow-lg">
-                  {selectedUser.name.charAt(0).toUpperCase()}
+            <div className="p-5 sm:p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              {detailLoading && (
+                <div className="flex items-center justify-center py-6">
+                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-200 border-t-blue-600" />
                 </div>
-              </div>
-
-              {/* Info Grid */}
-              <div className="space-y-3">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-xs text-gray-500 font-semibold uppercase">Full Name</p>
-                  <p className="text-gray-900 font-semibold">{selectedUser.name}</p>
+              )}
+              {!detailLoading && detailError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+                  {detailError}
                 </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-xs text-gray-500 font-semibold uppercase">Email</p>
-                  <p className="text-gray-900 font-semibold break-all">{selectedUser.email}</p>
-                </div>
-
-                {['admin', 'hod', 'teacher'].includes(selectedUser.role) && (
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-xs text-gray-500 font-semibold uppercase">Permissions</p>
-                    <p className="text-gray-900 font-semibold text-sm">
-                      {Array.isArray(selectedUser.permissions) && selectedUser.permissions.length > 0
-                        ? selectedUser.permissions.join(', ')
-                        : 'Default role permissions'}
-                    </p>
-                  </div>
-                )}
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-xs text-gray-500 font-semibold uppercase">Mobile</p>
-                  <p className="text-gray-900 font-semibold">{selectedUser.mobile || 'N/A'}</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-xs text-gray-500 font-semibold uppercase">Role</p>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold mt-1 ${getRoleColor(selectedUser.role)}`}>
-                      {selectedUser.role?.toUpperCase()}
-                    </span>
+              )}
+              {!detailLoading && !detailError && (
+                <>
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-400 to-orange-400 flex items-center justify-center text-white font-bold text-2xl shadow-lg">
+                      {selectedUser.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="text-center sm:text-left">
+                      <p className="text-lg font-bold text-gray-900">{selectedUser.name}</p>
+                      <p className="text-sm text-gray-500 break-all">{selectedUser.email}</p>
+                      <div className="mt-2 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${getRoleColor(selectedUser.role)}`}>
+                          {getRoleLabel(selectedUser)}
+                        </span>
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(selectedUser.status)}`}>
+                          {selectedUser.status?.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-xs text-gray-500 font-semibold uppercase">Status</p>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold mt-1 ${getStatusColor(selectedUser.status)}`}>
-                      {selectedUser.status?.toUpperCase()}
-                    </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                      <p className="text-xs text-gray-500 font-semibold uppercase">Mobile</p>
+                      <p className="text-gray-900 font-semibold">{selectedUser.mobile || 'N/A'}</p>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                      <p className="text-xs text-gray-500 font-semibold uppercase">Joined</p>
+                      <p className="text-gray-900 font-semibold">{new Date(selectedUser.createdAt).toLocaleString()}</p>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 sm:col-span-2">
+                      <p className="text-xs text-gray-500 font-semibold uppercase">User ID</p>
+                      <p className="text-gray-900 font-mono text-sm break-all">{selectedUser._id}</p>
+                    </div>
+                    {['admin', 'hod', 'teacher'].includes(selectedUser.role) && (
+                      <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 sm:col-span-2">
+                        <p className="text-xs text-gray-500 font-semibold uppercase">Permissions</p>
+                        <p className="text-gray-900 font-semibold text-sm">
+                          {Array.isArray(selectedUser.permissions) && selectedUser.permissions.length > 0
+                            ? selectedUser.permissions.join(', ')
+                            : 'Default role permissions'}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-xs text-gray-500 font-semibold uppercase">User ID</p>
-                  <p className="text-gray-900 font-mono text-sm break-all">{selectedUser._id}</p>
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-xs text-gray-500 font-semibold uppercase">Joined Date</p>
-                  <p className="text-gray-900 font-semibold">{new Date(selectedUser.createdAt).toLocaleString()}</p>
-                </div>
-              </div>
+                </>
+              )}
             </div>
 
-            <div className="bg-gray-50 border-t border-gray-200 px-6 py-4">
+            <div className="bg-gray-50 border-t border-gray-200 px-5 sm:px-6 py-4 flex flex-col sm:flex-row gap-3 sm:justify-end">
               <button
                 onClick={() => setShowDetailModal(false)}
-                className="w-full px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors font-semibold"
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-100"
               >
-                Close
+                Cancel
               </button>
+              {isAdminMode && selectedUser && (
+                <button
+                  onClick={() => {
+                    setShowDetailModal(false);
+                    setSelectedUser(selectedUser);
+                    setShowPermissionsModal(true);
+                  }}
+                  className="px-4 py-2 rounded-lg bg-[#111318] text-white font-semibold hover:opacity-90"
+                >
+                  Edit Permissions
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {/* Edit Permissions Modal */}
-      {showPermissionsModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      {showPermissionsModal && selectedUser && isAdminMode && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-200 dark:border-gray-700">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-emerald-500 to-teal-500">
               <div className="flex items-center justify-between">
@@ -717,8 +987,8 @@ const UserManagement = () => {
       )}
 
       {/* Role Change Modal */}
-      {showRoleModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      {showRoleModal && selectedUser && isAdminMode && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-gray-700">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-500 to-pink-500">
               <h3 className="text-xl font-bold text-white">Change User Role</h3>
@@ -739,7 +1009,6 @@ const UserManagement = () => {
                   onChange={(e) => setNewRole(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                 >
-                  <option value="admin">Admin - Full System Access</option>
                   <option value="hod">HOD - Department Management</option>
                   <option value="teacher">Teacher - Teaching Access</option>
                   <option value="student">Student - Student Portal</option>
@@ -762,7 +1031,13 @@ const UserManagement = () => {
                 Cancel
               </button>
               <button
-                onClick={() => handleRoleChange(selectedUser, newRole)}
+                onClick={() => {
+                  if (newRole === 'admin') {
+                    setErrorMessage('Use Admin Access to grant admin privileges.');
+                    return;
+                  }
+                  handleRoleChange(selectedUser, newRole);
+                }}
                 className="px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold"
               >
                 Apply Changes
@@ -773,8 +1048,8 @@ const UserManagement = () => {
       )}
 
       {/* Delete User Modal */}
-      {showDeleteModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      {showDeleteModal && selectedUser && isAdminMode && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-gray-700">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-red-500 to-orange-500">
               <div className="flex items-center justify-between">
@@ -821,7 +1096,137 @@ const UserManagement = () => {
         </div>
       )}
 
-    </AdminLayout>
+      {/* Add Admin Modal */}
+      {showAdminModal && isAdminMode && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-200 dark:border-gray-700">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-slate-900 to-slate-700">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-white">Add Admin</h3>
+                <button
+                  onClick={() => setShowAdminModal(false)}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-sm text-white/90 mt-1">Create new admin or promote existing HOD/Teacher.</p>
+            </div>
+
+            <div className="p-6">
+              <div className="flex gap-2 mb-6">
+                <button
+                  onClick={() => setAdminTab('new')}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold ${adminTab === 'new' ? 'bg-[#111318] text-white' : 'bg-gray-100 text-gray-700'}`}
+                >
+                  New Admin
+                </button>
+                <button
+                  onClick={() => setAdminTab('existing')}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold ${adminTab === 'existing' ? 'bg-[#111318] text-white' : 'bg-gray-100 text-gray-700'}`}
+                >
+                  Promote Existing
+                </button>
+              </div>
+
+              {adminTab === 'new' ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
+                    <input
+                      value={adminForm.name}
+                      onChange={(e) => setAdminForm((prev) => ({ ...prev, name: e.target.value }))}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      placeholder="Enter admin name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Mobile *</label>
+                    <input
+                      value={adminForm.mobile}
+                      onChange={(e) => setAdminForm((prev) => ({ ...prev, mobile: e.target.value }))}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      placeholder="10-digit mobile"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Email (optional)</label>
+                    <input
+                      value={adminForm.email}
+                      onChange={(e) => setAdminForm((prev) => ({ ...prev, email: e.target.value }))}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      placeholder="email@domain.com"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Search HOD/Teacher</label>
+                    <input
+                      value={adminSearch}
+                      onChange={(e) => setAdminSearch(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      placeholder="Search by name, email, or mobile"
+                    />
+                  </div>
+                  <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-lg">
+                    {adminCandidates.length === 0 ? (
+                      <p className="p-4 text-sm text-gray-500">No matching users</p>
+                    ) : (
+                      adminCandidates.map((u) => (
+                        <label
+                          key={u._id}
+                          className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 text-sm"
+                        >
+                          <input
+                            type="radio"
+                            name="adminCandidate"
+                            checked={adminCandidateId === u._id}
+                            onChange={() => setAdminCandidateId(u._id)}
+                          />
+                          <div>
+                            <p className="font-semibold text-gray-900">{u.name}</p>
+                            <p className="text-xs text-gray-500">{u.email || '—'} • {u.role?.toUpperCase()}</p>
+                          </div>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+              <button
+                onClick={() => setShowAdminModal(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              {adminTab === 'new' ? (
+                <button
+                  onClick={handleCreateAdmin}
+                  className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:opacity-90"
+                >
+                  Create Admin
+                </button>
+              ) : (
+                <button
+                  onClick={handlePromoteAdmin}
+                  className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:opacity-90"
+                >
+                  Promote
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+    </RoleLayout>
   );
 };
 

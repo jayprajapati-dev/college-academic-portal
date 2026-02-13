@@ -13,6 +13,7 @@ const AdminLayout = ({ title, children, userName = 'Admin', onLogout = null }) =
       navItems={navItems}
       navLoading={loading}
       panelLabel="Admin Panel"
+      profileLinks={[{ label: 'Profile', to: '/admin/profile' }]}
     >
       {children}
     </RoleLayout>
