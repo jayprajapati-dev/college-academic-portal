@@ -104,7 +104,7 @@ const useRoleNav = (role) => {
     return () => {
       isMounted = false;
     };
-  }, [defaultItems]);
+  }, [defaultItems, role]);
 
   return { navItems, loading };
 };
