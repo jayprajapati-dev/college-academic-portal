@@ -20,31 +20,48 @@ const AttendanceManagement = () => {
   const [records, setRecords] = useState({});
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [sessionDate, setSessionDate] = useState(new Date().toISOString().slice(0, 10));
-  const [sessionName, setSessionName] = useState('Regular');
+  const [sessionName, setSessionName] = useState('Lecture');
   const [existingSessionId, setExistingSessionId] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/login');
-  };
+  }, [navigate]);
+
+  const handleAuthError = useCallback((error) => {
+    if (error?.response?.status === 401) {
+      handleLogout();
+      return true;
+    }
+    return false;
+  }, [handleLogout]);
 
   const fetchProfile = useCallback(async () => {
-    const token = localStorage.getItem('token');
-    const res = await axios.get('/api/profile/me', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (res.data?.success) {
-      return res.data.data;
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return null;
+      const res = await axios.get('/api/profile/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data?.success) {
+        return res.data.data;
+      }
+      return null;
+    } catch (error) {
+      if (!handleAuthError(error)) {
+        console.error('Profile error:', error);
+      }
+      return null;
     }
-    return null;
-  }, []);
+  }, [handleAuthError]);
 
   const fetchSubjects = useCallback(async (teacherSubjects = []) => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) return;
       const endpoint = role === 'hod' ? '/api/academic/subjects/hod' : '/api/academic/subjects';
       const res = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` }
@@ -59,14 +76,17 @@ const AttendanceManagement = () => {
         setSubjects(subjectList);
       }
     } catch (error) {
-      console.error('Error fetching subjects:', error);
+      if (!handleAuthError(error)) {
+        console.error('Error fetching subjects:', error);
+      }
     }
-  }, [role]);
+  }, [handleAuthError, role]);
 
   const fetchStudents = useCallback(async (subjectId) => {
     try {
       if (!subjectId) return;
       const token = localStorage.getItem('token');
+      if (!token) return;
       const res = await axios.get('/api/attendance/students', {
         headers: { Authorization: `Bearer ${token}` },
         params: { subjectId }
@@ -76,14 +96,17 @@ const AttendanceManagement = () => {
         setStudents(res.data.data || []);
       }
     } catch (error) {
-      console.error('Error fetching students:', error);
+      if (!handleAuthError(error)) {
+        console.error('Error fetching students:', error);
+      }
     }
-  }, []);
+  }, [handleAuthError]);
 
   const fetchExistingSession = useCallback(async () => {
     if (!selectedSubjectId || !sessionDate || !sessionName) return;
     try {
       const token = localStorage.getItem('token');
+      if (!token) return;
       const res = await axios.get('/api/attendance/sessions', {
         headers: { Authorization: `Bearer ${token}` },
         params: {
@@ -107,13 +130,16 @@ const AttendanceManagement = () => {
         setExistingSessionId(null);
       }
     } catch (error) {
-      console.error('Error fetching attendance session:', error);
+      if (!handleAuthError(error)) {
+        console.error('Error fetching attendance session:', error);
+      }
     }
-  }, [selectedSubjectId, sessionDate, sessionName]);
+  }, [handleAuthError, selectedSubjectId, sessionDate, sessionName]);
 
   const fetchSessions = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) return;
       const params = {
         page: pagination.page,
         limit: pagination.limit
@@ -135,9 +161,11 @@ const AttendanceManagement = () => {
         }));
       }
     } catch (error) {
-      console.error('Error fetching sessions:', error);
+      if (!handleAuthError(error)) {
+        console.error('Error fetching sessions:', error);
+      }
     }
-  }, [pagination.page, pagination.limit, selectedSubjectId]);
+  }, [handleAuthError, pagination.page, pagination.limit, selectedSubjectId]);
 
   useEffect(() => {
     if (!role) {
@@ -148,6 +176,10 @@ const AttendanceManagement = () => {
     const init = async () => {
       setLoading(true);
       const profileData = await fetchProfile();
+      if (!profileData) {
+        setLoading(false);
+        return;
+      }
       await fetchSubjects(profileData?.assignedSubjects || []);
       setLoading(false);
     };
@@ -230,14 +262,33 @@ const AttendanceManagement = () => {
   };
 
   const handleLoadSession = (session) => {
+    const nextSession = session.session === 'Lab' || session.session === 'Lab/Tutorial'
+      ? 'Lab/Tutorial'
+      : 'Lecture';
     setSelectedSubjectId(session.subjectId?._id || session.subjectId);
     setSessionDate(session.dateKey || new Date(session.date).toISOString().slice(0, 10));
-    setSessionName(session.session || 'Regular');
+    setSessionName(nextSession);
   };
 
   const handlePageChange = (page) => {
     if (page < 1 || page > pagination.pages) return;
     setPagination((prev) => ({ ...prev, page }));
+  };
+
+  const getStatusClass = (value, current) => {
+    if (value === 'present') {
+      return current === value
+        ? 'bg-emerald-600 text-white'
+        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100';
+    }
+    if (value === 'absent') {
+      return current === value
+        ? 'bg-red-600 text-white'
+        : 'bg-red-50 text-red-700 hover:bg-red-100';
+    }
+    return current === value
+      ? 'bg-amber-600 text-white'
+      : 'bg-amber-50 text-amber-700 hover:bg-amber-100';
   };
 
   if (loading) {
@@ -301,10 +352,8 @@ const AttendanceManagement = () => {
                 onChange={(e) => setSessionName(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white"
               >
-                <option value="Regular">Regular</option>
-                <option value="Morning">Morning</option>
-                <option value="Evening">Evening</option>
-                <option value="Lab">Lab</option>
+                <option value="Lecture">Lecture</option>
+                <option value="Lab/Tutorial">Lab/Tutorial</option>
               </select>
             </div>
           </div>
@@ -334,15 +383,18 @@ const AttendanceManagement = () => {
                         <td className="px-4 py-3 text-sm text-gray-900 font-medium">{student.name}</td>
                         <td className="px-4 py-3 text-sm text-gray-600">{student.enrollmentNumber || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm">
-                          <select
-                            value={records[student._id] || 'present'}
-                            onChange={(e) => handleStatusChange(student._id, e.target.value)}
-                            className="px-3 py-2 border border-gray-300 rounded-lg bg-white"
-                          >
-                            <option value="present">Present</option>
-                            <option value="absent">Absent</option>
-                            <option value="late">Late</option>
-                          </select>
+                          <div className="inline-flex items-center gap-2">
+                            {['present', 'absent', 'late'].map((value) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => handleStatusChange(student._id, value)}
+                                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${getStatusClass(value, records[student._id] || 'present')}`}
+                              >
+                                {value === 'present' ? 'Present' : value === 'absent' ? 'Absent' : 'Late'}
+                              </button>
+                            ))}
+                          </div>
                         </td>
                       </tr>
                     ))}
