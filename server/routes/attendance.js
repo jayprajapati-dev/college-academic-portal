@@ -122,7 +122,7 @@ router.get('/students', protect, authorize('admin', 'hod', 'teacher'), async (re
 // CREATE/UPDATE attendance session
 router.post('/sessions', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
-    const { subjectId, date, session = 'Regular', records = [] } = req.body;
+    const { subjectId, date, session = 'Lecture', records = [] } = req.body;
 
     if (!subjectId) {
       return res.status(400).json({ success: false, message: 'Subject is required' });

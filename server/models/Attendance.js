@@ -47,7 +47,7 @@ const attendanceSchema = new mongoose.Schema({
   },
   session: {
     type: String,
-    default: 'Regular'
+    default: 'Lecture'
   },
   records: [attendanceRecordSchema],
   summary: {

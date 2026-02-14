@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AdminLayout, Button, Card, HodLayout, Input, LoadingSpinner, Pagination, TeacherLayout } from '../components';
 import axios from 'axios';
@@ -24,6 +24,7 @@ const AttendanceManagement = () => {
   const [existingSessionId, setExistingSessionId] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
+  const formRef = useRef(null);
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem('token');
@@ -268,6 +269,9 @@ const AttendanceManagement = () => {
     setSelectedSubjectId(session.subjectId?._id || session.subjectId);
     setSessionDate(session.dateKey || new Date(session.date).toISOString().slice(0, 10));
     setSessionName(nextSession);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
   };
 
   const handlePageChange = (page) => {
@@ -320,6 +324,7 @@ const AttendanceManagement = () => {
         </div>
 
         <Card>
+          <div ref={formRef} />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Subject *</label>
@@ -447,7 +452,7 @@ const AttendanceManagement = () => {
                           onClick={() => handleLoadSession(session)}
                           className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-200"
                         >
-                          Load
+                          View
                         </button>
                       </td>
                     </tr>
