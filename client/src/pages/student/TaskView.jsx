@@ -19,6 +19,13 @@ const StudentTaskView = () => {
     total: 0
   });
 
+  const formatStatus = (value) => {
+    if (!value) return 'Pending';
+    const normalized = value.toLowerCase();
+    if (normalized === 'in-progress') return 'In Progress';
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -108,10 +115,10 @@ const StudentTaskView = () => {
             className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           >
             <option value="">All Status</option>
-            <option value="Pending">Pending</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Submitted">Submitted</option>
-            <option value="Completed">Completed</option>
+            <option value="pending">Pending</option>
+            <option value="in-progress">In Progress</option>
+            <option value="submitted">Submitted</option>
+            <option value="completed">Completed</option>
           </select>
         </div>
 
@@ -167,16 +174,16 @@ const StudentTaskView = () => {
                   <div className="flex flex-col items-end gap-3">
                     <Badge
                       variant={
-                        task.status === 'Completed'
+                        task.status === 'completed'
                           ? 'green'
-                          : task.status === 'Submitted'
+                          : task.status === 'submitted'
                           ? 'blue'
-                          : task.status === 'In Progress'
+                          : task.status === 'in-progress'
                           ? 'yellow'
                           : 'red'
                       }
                     >
-                      {task.status}
+                      {formatStatus(task.status)}
                     </Badge>
                     <Button
                       onClick={(e) => {

@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
+const { startTaskReminderScheduler } = require('./utils/taskReminders');
 
 const app = express();
 
@@ -72,6 +73,7 @@ const startServer = async () => {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    startTaskReminderScheduler();
   });
 };
 

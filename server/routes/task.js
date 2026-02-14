@@ -8,17 +8,48 @@ const { protect, authorize } = require('../middleware/auth');
 
 // Links-based attachments only (Google Drive, Dropbox, etc.)
 
-// Helper function to send notifications to task recipients
-const notifyTaskRecipients = async (task, action = 'created') => {
-  try {
-    // Find all students in this subject
-    const subject = await Subject.findById(task.subjectId);
-    if (!subject || !subject.assignedStudents) return;
+const hasAssignedSubject = (user, subjectId) => {
+  const assigned = Array.isArray(user.assignedSubjects) ? user.assignedSubjects : [];
+  return assigned.some((id) => String(id) === String(subjectId));
+};
 
-    const students = subject.assignedStudents || [];
-    
-    const notifications = students.map(studentId => ({
-      userId: studentId,
+const getSubjectStudents = async (subject) => {
+  const branchId = subject?.branchId?._id || subject?.branchId;
+  const semesterId = subject?.semesterId?._id || subject?.semesterId;
+  if (!branchId || !semesterId) return [];
+  return User.find({
+    role: 'student',
+    status: 'active',
+    branch: branchId,
+    semester: semesterId
+  }).select('_id name email enrollmentNumber');
+};
+
+const getSubjectTeacherIds = async (subjectId) => {
+  const teachers = await User.find({
+    role: { $in: ['teacher', 'hod'] },
+    status: 'active',
+    assignedSubjects: subjectId
+  }).select('_id');
+  return teachers.map((t) => t._id);
+};
+
+const buildRecipientsFromSubject = async (subject) => {
+  const students = await getSubjectStudents(subject);
+  return students.map((student) => ({
+    studentId: student._id,
+    status: 'pending'
+  }));
+};
+
+const notifyTaskRecipients = async (task) => {
+  try {
+    const subject = await Subject.findById(task.subjectId).select('name');
+    if (!subject) return;
+
+    const students = await getSubjectStudents(task);
+    const notifications = students.map((student) => ({
+      userId: student._id,
       type: task.category,
       title: `New ${task.category} in ${subject.name}`,
       message: task.title,
@@ -37,8 +68,31 @@ const notifyTaskRecipients = async (task, action = 'created') => {
   }
 };
 
-// CREATE TASK (Admin, HOD, Teacher)
-router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+const notifyTaskTeachers = async (task, title, message) => {
+  try {
+    const teacherIds = await getSubjectTeacherIds(task.subjectId);
+    const notifications = teacherIds.map((teacherId) => ({
+      userId: teacherId,
+      type: task.category,
+      title,
+      message,
+      relatedId: task._id,
+      relatedType: 'Task',
+      subjectId: task.subjectId,
+      isNotice: false,
+      actionUrl: `/teacher/tasks/${task._id}/submissions`
+    }));
+
+    if (notifications.length > 0) {
+      await Notification.insertMany(notifications);
+    }
+  } catch (error) {
+    console.error('Error sending teacher task notifications:', error);
+  }
+};
+
+// CREATE TASK (Teacher or HOD assigned to subject)
+router.post('/create', protect, authorize('hod', 'teacher'), async (req, res) => {
   try {
     const { title, description, category, subjectId, dueDate, attachments, status } = req.body;
 
@@ -59,25 +113,12 @@ router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req
       });
     }
 
-    // Authorization check
-    if (req.user.role === 'teacher') {
-      // Teacher can only create tasks for their assigned subjects
-      const isAssigned = req.user.assignedSubjects && req.user.assignedSubjects.includes(subjectId);
-      if (!isAssigned) {
-        return res.status(403).json({
-          success: false,
-          message: 'You can only create tasks for your assigned subjects'
-        });
-      }
-    } else if (req.user.role === 'hod') {
-      // HOD can only create for subjects in their branch
-      const isInBranch = subject.branchId.equals(req.user.branch);
-      if (!isInBranch) {
-        return res.status(403).json({
-          success: false,
-          message: 'You can only create tasks for subjects in your branch'
-        });
-      }
+    // Authorization check: only subject teachers can create
+    if (!hasAssignedSubject(req.user, subjectId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only create tasks for your assigned subjects'
+      });
     }
 
     // Process attachments (links only - validate URL format)
@@ -87,6 +128,8 @@ router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req
     })) : [];
 
     const taskStatus = status === 'draft' ? 'draft' : 'active';
+
+    const recipients = taskStatus === 'active' ? await buildRecipientsFromSubject(subject) : [];
 
     // Create task
     const task = await Task.create({
@@ -100,7 +143,8 @@ router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req
       attachments: taskAttachments,
       createdBy: req.user._id,
       createdByRole: req.user.role,
-      status: taskStatus
+      status: taskStatus,
+      recipients
     });
 
     if (taskStatus === 'active') {
@@ -149,12 +193,16 @@ router.get('/subject/:subjectId', protect, async (req, res) => {
 
     // If student, get their status on each task
     if (req.user.role === 'student') {
+      const normalizedStatus = status ? String(status).toLowerCase() : '';
       const tasksWithStatus = tasks.map(task => {
         const recipient = task.recipients && task.recipients.find(r => r.studentId?.equals(req.user._id));
         return {
           ...task.toObject(),
           status: recipient?.status || 'pending'
         };
+      }).filter((task) => {
+        if (!normalizedStatus) return true;
+        return String(task.status).toLowerCase() === normalizedStatus;
       });
       return res.status(200).json({
         success: true,
@@ -232,7 +280,7 @@ router.get('/hod', protect, authorize('hod'), async (req, res) => {
 });
 
 
-router.get('/all', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+router.get('/all', protect, authorize('hod', 'teacher'), async (req, res) => {
   try {
     const { page = 1, limit = 10, category, branchId, semesterId, status } = req.query;
 
@@ -248,15 +296,8 @@ router.get('/all', protect, authorize('admin', 'hod', 'teacher'), async (req, re
     if (branchId) query.branchId = branchId;
     if (semesterId) query.semesterId = semesterId;
 
-    // For HOD, only show tasks from their branch
-    if (req.user.role === 'hod') {
-      query.branchId = req.user.branch;
-    }
-
-    // For teacher, only show their own tasks
-    if (req.user.role === 'teacher') {
-      query.createdBy = req.user._id;
-    }
+    // Only show tasks created by the current subject teacher
+    query.createdBy = req.user._id;
 
     const tasks = await Task.find(query)
       .populate('createdBy', 'name email role')
@@ -302,6 +343,18 @@ router.get('/:id', protect, async (req, res) => {
       });
     }
 
+    if (req.user.role === 'student') {
+      const recipient = task.recipients?.find((r) => r.studentId?.equals(req.user._id));
+      return res.status(200).json({
+        success: true,
+        data: {
+          ...task.toObject(),
+          studentStatus: recipient?.status || 'pending',
+          submittedAt: recipient?.submittedAt || null
+        }
+      });
+    }
+
     res.status(200).json({
       success: true,
       data: task
@@ -311,6 +364,184 @@ router.get('/:id', protect, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching task'
+    });
+  }
+});
+
+// GET TASK SUBMISSIONS (Teacher/HOD)
+router.get('/:id/submissions', protect, authorize('teacher', 'hod'), async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id)
+      .populate('subjectId', 'name code')
+      .populate('branchId', 'name code')
+      .populate('semesterId', 'semesterNumber');
+
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        message: 'Task not found'
+      });
+    }
+
+    const isOwner = task.createdBy.equals(req.user._id);
+    const isSubjectTeacher = hasAssignedSubject(req.user, task.subjectId);
+    if (!isOwner && !isSubjectTeacher) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to view submissions'
+      });
+    }
+
+    const branchId = task.branchId?._id || task.branchId;
+    const semesterId = task.semesterId?._id || task.semesterId;
+    const students = await User.find({
+      role: 'student',
+      status: 'active',
+      branch: branchId,
+      semester: semesterId
+    }).select('_id name email enrollmentNumber');
+
+    const recipientMap = new Map(
+      (task.recipients || []).map((recipient) => [String(recipient.studentId), recipient])
+    );
+
+    const submissions = students.map((student) => {
+      const recipient = recipientMap.get(String(student._id));
+      return {
+        student,
+        status: recipient?.status || 'pending',
+        submittedAt: recipient?.submittedAt || null
+      };
+    });
+
+    const counts = submissions.reduce((acc, entry) => {
+      acc[entry.status] = (acc[entry.status] || 0) + 1;
+      return acc;
+    }, {});
+
+    res.status(200).json({
+      success: true,
+      data: {
+        task,
+        submissions,
+        counts
+      }
+    });
+  } catch (error) {
+    console.error('Get task submissions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching submissions'
+    });
+  }
+});
+
+// STUDENT SUBMIT TASK
+router.post('/:id/submit', protect, authorize('student'), async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id);
+
+    if (!task || task.status !== 'active') {
+      return res.status(404).json({
+        success: false,
+        message: 'Active task not found'
+      });
+    }
+
+    const branchId = task.branchId?._id || task.branchId;
+    const semesterId = task.semesterId?._id || task.semesterId;
+    const isEligible = String(req.user.branch) === String(branchId)
+      && String(req.user.semester) === String(semesterId);
+    if (!isEligible) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not assigned to this task'
+      });
+    }
+
+    const existing = task.recipients?.find((recipient) => recipient.studentId?.equals(req.user._id));
+    if (existing) {
+      existing.status = 'submitted';
+      existing.submittedAt = Date.now();
+    } else {
+      task.recipients = [...(task.recipients || []), {
+        studentId: req.user._id,
+        status: 'submitted',
+        submittedAt: Date.now()
+      }];
+    }
+
+    await task.save();
+
+    await notifyTaskTeachers(
+      task,
+      'New submission received',
+      `${req.user.name} submitted ${task.title}`
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Submission recorded'
+    });
+  } catch (error) {
+    console.error('Submit task error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error submitting task'
+    });
+  }
+});
+
+// UPDATE STUDENT STATUS (Teacher/HOD)
+router.put('/:taskId/recipients/:studentId/status', protect, authorize('teacher', 'hod'), async (req, res) => {
+  try {
+    const { status } = req.body;
+    const allowed = ['pending', 'in-progress', 'submitted', 'completed'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status'
+      });
+    }
+
+    const task = await Task.findById(req.params.taskId);
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        message: 'Task not found'
+      });
+    }
+
+    const isOwner = task.createdBy.equals(req.user._id);
+    const isSubjectTeacher = hasAssignedSubject(req.user, task.subjectId);
+    if (!isOwner && !isSubjectTeacher) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update submissions'
+      });
+    }
+
+    const recipient = (task.recipients || []).find((r) => String(r.studentId) === String(req.params.studentId));
+    if (recipient) {
+      recipient.status = status;
+    } else {
+      task.recipients = [...(task.recipients || []), {
+        studentId: req.params.studentId,
+        status
+      }];
+    }
+
+    await task.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Submission status updated'
+    });
+  } catch (error) {
+    console.error('Update submission status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating submission'
     });
   }
 });
@@ -329,21 +560,20 @@ router.put('/:id', protect, async (req, res) => {
     }
 
     // Authorization check
-    if (req.user.role !== 'admin' && !task.createdBy.equals(req.user._id)) {
-      if (req.user.role !== 'hod') {
-        return res.status(403).json({
-          success: false,
-          message: 'Not authorized to update this task'
-        });
-      }
+    if (req.user.role === 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admins cannot manage tasks'
+      });
+    }
 
-      const sameBranch = task.branchId?.equals(req.user.branch);
-      if (!sameBranch) {
-        return res.status(403).json({
-          success: false,
-          message: 'Not authorized to update this task'
-        });
-      }
+    const isOwner = task.createdBy.equals(req.user._id);
+    const isSubjectTeacher = hasAssignedSubject(req.user, task.subjectId);
+    if (!isOwner && !isSubjectTeacher) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this task'
+      });
     }
 
     // Update fields
@@ -363,7 +593,10 @@ router.put('/:id', protect, async (req, res) => {
     const nextStatus = status === 'active' ? 'active' : status === 'draft' ? 'draft' : task.status;
 
     if (task.status === 'draft' && nextStatus === 'active') {
-      await notifyTaskRecipients(task, 'created');
+      if (!task.recipients || task.recipients.length === 0) {
+        task.recipients = await buildRecipientsFromSubject(task);
+      }
+      await notifyTaskRecipients(task);
     }
 
     task.status = nextStatus;
@@ -398,21 +631,20 @@ router.delete('/:id', protect, async (req, res) => {
     }
 
     // Authorization check
-    if (req.user.role !== 'admin' && !task.createdBy.equals(req.user._id)) {
-      if (req.user.role !== 'hod') {
-        return res.status(403).json({
-          success: false,
-          message: 'Not authorized to delete this task'
-        });
-      }
+    if (req.user.role === 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admins cannot manage tasks'
+      });
+    }
 
-      const sameBranch = task.branchId?.equals(req.user.branch);
-      if (!sameBranch) {
-        return res.status(403).json({
-          success: false,
-          message: 'Not authorized to delete this task'
-        });
-      }
+    const isOwner = task.createdBy.equals(req.user._id);
+    const isSubjectTeacher = hasAssignedSubject(req.user, task.subjectId);
+    if (!isOwner && !isSubjectTeacher) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to delete this task'
+      });
     }
 
     task.status = 'deleted';

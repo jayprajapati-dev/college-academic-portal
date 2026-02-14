@@ -268,11 +268,6 @@ const RoleDashboard = () => {
             <p className="text-lg font-bold mt-2">Library</p>
             <p className="text-sm text-[#6B7280]">Curate learning assets</p>
           </button>
-          <button onClick={() => navigate('/admin/tasks')} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#6B7280]">Workflows</p>
-            <p className="text-lg font-bold mt-2">Tasks</p>
-            <p className="text-sm text-[#6B7280]">Assignments & drafts</p>
-          </button>
         </div>
       </Card>
     </div>
@@ -330,11 +325,13 @@ const RoleDashboard = () => {
             <p className="text-lg font-bold mt-2">Timetable</p>
             <p className="text-sm text-[#6B7280]">Weekly routine</p>
           </button>
-          <button onClick={() => navigate('/hod/tasks')} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#6B7280]">Tasks</p>
-            <p className="text-lg font-bold mt-2">Assignments</p>
-            <p className="text-sm text-[#6B7280]">Track deliverables</p>
-          </button>
+          {user?.assignedSubjects?.length > 0 && (
+            <button onClick={() => navigate('/hod/tasks')} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
+              <p className="text-xs uppercase tracking-[0.2em] text-[#6B7280]">Tasks</p>
+              <p className="text-lg font-bold mt-2">Assignments</p>
+              <p className="text-sm text-[#6B7280]">Track deliverables</p>
+            </button>
+          )}
           <button onClick={() => navigate('/hod/library')} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
             <p className="text-xs uppercase tracking-[0.2em] text-[#6B7280]">Library</p>
             <p className="text-lg font-bold mt-2">Reading Room</p>

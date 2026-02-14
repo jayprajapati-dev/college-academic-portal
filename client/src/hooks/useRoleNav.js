@@ -10,7 +10,6 @@ const ROLE_NAV = {
     { key: 'library', label: 'Library', to: '/admin/library', icon: 'library_books' },
     { key: 'timetable', label: 'Timetable', to: '/admin/timetable', icon: 'calendar_today' },
     { key: 'notices', label: 'Notice Board', to: '/admin/notices', icon: 'notifications' },
-    { key: 'tasks', label: 'Task/Assignment', to: '/admin/tasks', icon: 'assignment' },
     { key: 'attendance', label: 'Attendance', to: '/admin/attendance', icon: 'fact_check' },
     { key: 'exams', label: 'Exams', to: '/admin/exams', icon: 'quiz' },
     { key: 'users', label: 'Manage Users', to: '/admin/users', icon: 'group' },
@@ -80,6 +79,10 @@ const useRoleNav = (role) => {
           const allowedSet = new Set(allowed);
           if (role === 'teacher' || role === 'hod') {
             allowedSet.add('users');
+          }
+          const hasTeachingSubjects = Array.isArray(storedUser?.assignedSubjects) && storedUser.assignedSubjects.length > 0;
+          if (role === 'hod' && hasTeachingSubjects) {
+            allowedSet.add('tasks');
           }
           const filtered = defaultItems.filter((item) => allowedSet.has(item.key));
           setNavItems(filtered);

@@ -10,8 +10,9 @@ const RoleTasks = () => {
   const [user, setUser] = useState(storedUser);
   const [role, setRole] = useState(storedUser?.role || 'teacher');
   const { navItems, loading: navLoading } = useRoleNav(role);
-  const isAdmin = role === 'admin';
-  const isHod = role === 'hod';
+  const isTeacher = role === 'teacher';
+  const isHodTeacher = role === 'hod' && (user?.assignedSubjects || []).length > 0;
+  const canManageTasks = isTeacher || isHodTeacher;
 
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,11 +27,9 @@ const RoleTasks = () => {
   });
   const [filters, setFilters] = useState({
     category: '',
-    branchId: '',
     semesterId: ''
   });
   const [subjects, setSubjects] = useState([]);
-  const [branches, setBranches] = useState([]);
   const [semesters, setSemesters] = useState([]);
   const [formData, setFormData] = useState({
     title: '',
@@ -42,8 +41,8 @@ const RoleTasks = () => {
   });
 
   const token = localStorage.getItem('token');
-  const tasksEndpoint = isHod ? '/api/tasks/hod' : '/api/tasks/all';
-  const panelLabel = isAdmin ? 'Admin Panel' : isHod ? 'HOD Panel' : 'Teacher Panel';
+  const tasksEndpoint = '/api/tasks/all';
+  const panelLabel = role === 'admin' ? 'Admin Panel' : role === 'hod' ? 'HOD Panel' : 'Teacher Panel';
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -81,6 +80,7 @@ const RoleTasks = () => {
 
       setUser(profileData.data);
       setRole(profileData.data.role);
+      localStorage.setItem('user', JSON.stringify(profileData.data));
     } catch (error) {
       console.error('Profile error:', error);
       navigate('/login');
@@ -93,15 +93,8 @@ const RoleTasks = () => {
         axios.get('/api/academic/semesters', { headers: { Authorization: `Bearer ${token}` } })
       ];
 
-      if (isHod) {
-        requests.push(axios.get('/api/academic/subjects/hod', { headers: { Authorization: `Bearer ${token}` } }));
-      } else if (role === 'teacher') {
-        if (!user?._id) return;
-        requests.push(axios.get(`/api/academic/teacher/${user._id}/subjects`, { headers: { Authorization: `Bearer ${token}` } }));
-      } else {
-        requests.push(axios.get('/api/academic/subjects', { headers: { Authorization: `Bearer ${token}` } }));
-        requests.push(axios.get('/api/academic/branches', { headers: { Authorization: `Bearer ${token}` } }));
-      }
+      if (!user?._id) return;
+      requests.push(axios.get(`/api/academic/teacher/${user._id}/subjects`, { headers: { Authorization: `Bearer ${token}` } }));
 
       const results = await Promise.all(requests);
       const semestersRes = results[0];
@@ -109,20 +102,13 @@ const RoleTasks = () => {
 
       if (semestersRes.data.success) setSemesters(semestersRes.data.data || []);
 
-      if (isHod) {
-        if (subjectsRes?.data?.success) setSubjects(subjectsRes.data.data || []);
-      } else if (role === 'teacher') {
-        if (subjectsRes?.data?.success) setSubjects(subjectsRes.data.subjects || []);
-      } else {
-        if (subjectsRes?.data?.success) setSubjects(subjectsRes.data.data || []);
-        if (results[2]?.data?.success) setBranches(results[2].data.data || []);
-      }
+      if (subjectsRes?.data?.success) setSubjects(subjectsRes.data.subjects || []);
     } catch (error) {
       if (!handleAuthError(error)) {
         console.error('Error fetching metadata:', error);
       }
     }
-  }, [handleAuthError, isHod, role, token, user]);
+  }, [handleAuthError, token, user]);
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -134,7 +120,6 @@ const RoleTasks = () => {
       };
 
       if (filters.category) params.category = filters.category;
-      if (filters.branchId && isAdmin) params.branchId = filters.branchId;
       if (filters.semesterId) params.semesterId = filters.semesterId;
 
       const res = await axios.get(tasksEndpoint, {
@@ -157,7 +142,7 @@ const RoleTasks = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters, handleAuthError, isAdmin, pagination.limit, pagination.page, statusFilter, tasksEndpoint, token]);
+  }, [filters, handleAuthError, pagination.limit, pagination.page, statusFilter, tasksEndpoint, token]);
 
   useEffect(() => {
     if (!token) {
@@ -170,8 +155,12 @@ const RoleTasks = () => {
 
   useEffect(() => {
     if (!role) return;
+    if (!canManageTasks) {
+      navigate(`/${role}/dashboard`);
+      return;
+    }
     fetchMetadata();
-  }, [fetchMetadata, role]);
+  }, [canManageTasks, fetchMetadata, navigate, role]);
 
   useEffect(() => {
     if (!role) return;
@@ -300,9 +289,29 @@ const RoleTasks = () => {
         navItems={navItems}
         navLoading={navLoading}
         panelLabel={panelLabel}
-        profileLinks={isAdmin ? [] : [{ label: 'Profile', to: `/${role}/profile` }]}
+        profileLinks={role === 'admin' ? [] : [{ label: 'Profile', to: `/${role}/profile` }]}
       >
         <LoadingSpinner />
+      </RoleLayout>
+    );
+  }
+
+  if (!canManageTasks) {
+    return (
+      <RoleLayout
+        title="Task Management"
+        userName={user?.name || 'User'}
+        onLogout={handleLogout}
+        navItems={navItems}
+        navLoading={navLoading}
+        panelLabel={panelLabel}
+        profileLinks={role === 'admin' ? [] : [{ label: 'Profile', to: `/${role}/profile` }]}
+      >
+        <Card>
+          <div className="text-center py-12 text-gray-600">
+            Tasks are available only to subject teachers.
+          </div>
+        </Card>
       </RoleLayout>
     );
   }
@@ -315,7 +324,7 @@ const RoleTasks = () => {
       navItems={navItems}
       navLoading={navLoading}
       panelLabel={panelLabel}
-      profileLinks={isAdmin ? [] : [{ label: 'Profile', to: `/${role}/profile` }]}
+      profileLinks={role === 'admin' ? [] : [{ label: 'Profile', to: `/${role}/profile` }]}
     >
       <div className="space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -355,19 +364,6 @@ const RoleTasks = () => {
             <option value="Assignment">Assignment</option>
             <option value="Custom">Custom</option>
           </select>
-
-          {isAdmin && (
-            <select
-              value={filters.branchId}
-              onChange={(e) => setFilters((prev) => ({ ...prev, branchId: e.target.value }))}
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            >
-              <option value="">All Branches</option>
-              {branches.map((b) => (
-                <option key={b._id} value={b._id}>{b.name}</option>
-              ))}
-            </select>
-          )}
 
           <select
             value={filters.semesterId}
@@ -428,6 +424,12 @@ const RoleTasks = () => {
                       <td className="px-6 py-4 text-right text-sm">
                         <div className="flex items-center justify-end gap-3">
                           <button
+                            onClick={() => navigate(`/teacher/tasks/${task._id}/submissions`)}
+                            className="text-slate-700 hover:text-slate-900 font-medium"
+                          >
+                            Submissions
+                          </button>
+                          <button
                             onClick={() => openEditModal(task)}
                             className="text-blue-600 hover:text-blue-800 font-medium"
                           >
@@ -458,7 +460,7 @@ const RoleTasks = () => {
         </Card>
 
         {showModal && (
-          <Modal onClose={() => setShowModal(false)}>
+          <Modal isOpen={showModal} onClose={() => setShowModal(false)}>
             <div className="w-full max-w-2xl">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
                 {editingTask ? 'Edit Task' : 'Create Task'}

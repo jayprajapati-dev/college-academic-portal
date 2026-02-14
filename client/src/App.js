@@ -58,6 +58,7 @@ import StudentTaskDetail from './pages/student/TaskDetail';
 import StudentLibrary from './pages/student/StudentLibrary';
 import StudentAttendance from './pages/student/StudentAttendance';
 import StudentExams from './pages/student/StudentExams';
+import TaskSubmissions from './pages/teacher/TaskSubmissions';
 
 function App() {
   return (
@@ -98,6 +99,7 @@ function App() {
         <Route path="/teacher/materials" element={<RoleMaterials />} />
         <Route path="/teacher/notices" element={<RoleNotices />} />
         <Route path="/teacher/tasks" element={<RoleTasks />} />
+        <Route path="/teacher/tasks/:taskId/submissions" element={<TaskSubmissions />} />
         <Route path="/teacher/library" element={<RoleLibrary />} />
         <Route path="/teacher/attendance" element={<AttendanceManagement />} />
         <Route path="/teacher/exams" element={<ExamManagement />} />
@@ -129,7 +131,7 @@ function App() {
         <Route path="/admin/contacts" element={<ContactManagement />} />
         <Route path="/admin/timetable" element={<RoleTimetable />} />
         <Route path="/admin/notices" element={<RoleNotices />} />
-        <Route path="/admin/tasks" element={<RoleTasks />} />
+        <Route path="/admin/tasks" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/admin/materials" element={<RoleMaterials />} />
         <Route path="/admin/library" element={<RoleLibrary />} />
         <Route path="/admin/attendance" element={<AttendanceManagement />} />

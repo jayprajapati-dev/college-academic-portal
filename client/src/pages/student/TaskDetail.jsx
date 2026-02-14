@@ -8,6 +8,7 @@ const StudentTaskDetail = () => {
   const { taskId } = useParams();
   const [task, setTask] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -36,6 +37,30 @@ const StudentTaskDetail = () => {
 
     fetchTask();
   }, [taskId]);
+
+  const handleSubmitTask = async () => {
+    try {
+      setSubmitting(true);
+      const token = localStorage.getItem('token');
+      const res = await axios.post(`/api/tasks/${taskId}/submit`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.data?.success) {
+        const updated = await axios.get(`/api/tasks/${taskId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (updated.data?.success) {
+          setTask(updated.data.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error submitting task:', error);
+      alert(error.response?.data?.message || 'Failed to submit task');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -82,9 +107,32 @@ const StudentTaskDetail = () => {
               )}
               {task.createdBy?.name && <span>By: {task.createdBy.name}</span>}
               {task.category && <span>Category: {task.category}</span>}
+              {task.studentStatus && (
+                <span className="capitalize">Status: {task.studentStatus}</span>
+              )}
             </div>
           </div>
         </Card>
+
+        {task.studentStatus !== 'submitted' && task.studentStatus !== 'completed' && (
+          <Card>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700">Submission</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Tap submit to mark this task as completed.
+                </p>
+              </div>
+              <Button
+                onClick={handleSubmitTask}
+                disabled={submitting}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                {submitting ? 'Submitting...' : 'Mark as Submitted'}
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {task.attachments && task.attachments.length > 0 && (
           <Card>

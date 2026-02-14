@@ -70,6 +70,11 @@ const taskSchema = new mongoose.Schema({
       url: String
     }
   }],
+  reminders: {
+    before3: { type: Date, default: null },
+    before1: { type: Date, default: null },
+    overdue: { type: Date, default: null }
+  },
   status: {
     type: String,
     enum: ['draft', 'active', 'archived', 'deleted'],
