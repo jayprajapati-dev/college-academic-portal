@@ -17,7 +17,6 @@ const ROLE_NAV = {
   ],
   hod: [
     { key: 'dashboard', label: 'Dashboard', to: '/hod/dashboard', icon: 'space_dashboard' },
-    { key: 'add-teacher', label: 'Add Teacher', to: '/hod/add-teacher', icon: 'person_add' },
     { key: 'manage-teachers', label: 'Manage Teachers', to: '/hod/manage-teachers', icon: 'group' },
     { key: 'notices', label: 'Notices', to: '/hod/notices', icon: 'notifications' },
     { key: 'tasks', label: 'Tasks', to: '/hod/tasks', icon: 'assignment' },
