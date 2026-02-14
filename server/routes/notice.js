@@ -4,20 +4,72 @@ const Notice = require('../models/Notice');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const Branch = require('../models/Branch');
+const Subject = require('../models/Subject');
 const { protect, authorize } = require('../middleware/auth');
 
 // Links-based attachments only (Google Drive, Dropbox, etc.)
 
 // Helper function to get eligible users based on audience
-const getEligibleUserIds = async (targetAudience, targetBranch, createdByRole, createdById) => {
+const getEligibleUserIds = async (targetAudience, targetRoles, targetBranch, createdByRole, branchIds = [], semesterIds = []) => {
   try {
     let query = { status: 'active' };
 
+    const roleList = Array.isArray(targetRoles) ? targetRoles.filter(Boolean) : [];
+    const normalizedRoles = roleList.filter((role) => ['admin', 'hod', 'teacher', 'student'].includes(role));
+    const useRoleList = normalizedRoles.length > 0;
+
+    if (useRoleList) {
+      const orQueries = [];
+      const branchScope = Array.isArray(branchIds) ? branchIds.filter(Boolean) : [];
+      const semesterScope = Array.isArray(semesterIds) ? semesterIds.filter(Boolean) : [];
+
+      if (normalizedRoles.includes('student')) {
+        const studentQuery = { role: 'student' };
+        if (branchScope.length) studentQuery.branch = { $in: branchScope };
+        if (semesterScope.length) studentQuery.semester = { $in: semesterScope };
+        orQueries.push(studentQuery);
+      }
+
+      if (normalizedRoles.includes('teacher')) {
+        const teacherQuery = { role: 'teacher' };
+        if (branchScope.length) {
+          teacherQuery.$or = [
+            { branch: { $in: branchScope } },
+            { branches: { $in: branchScope } },
+            { department: { $in: branchScope } }
+          ];
+        }
+        orQueries.push(teacherQuery);
+      }
+
+      if (normalizedRoles.includes('hod')) {
+        const hodQuery = { role: 'hod' };
+        if (branchScope.length) {
+          hodQuery.$or = [
+            { branch: { $in: branchScope } },
+            { branches: { $in: branchScope } },
+            { department: { $in: branchScope } }
+          ];
+        }
+        orQueries.push(hodQuery);
+      }
+
+      if (normalizedRoles.includes('admin')) {
+        orQueries.push({ role: 'admin' });
+      }
+
+      if (orQueries.length === 0) return [];
+
+      const users = await User.find({ ...query, $or: orQueries }).select('_id');
+      return users.map((u) => u._id);
+    }
+
     if (targetAudience === 'Everyone') {
-      // All active users
       const users = await User.find(query).select('_id');
       return users.map(u => u._id);
-    } else if (targetAudience === 'Students') {
+    }
+
+    if (targetAudience === 'Students') {
       query.role = 'student';
       const users = await User.find(query).select('_id');
       return users.map(u => u._id);
@@ -30,7 +82,6 @@ const getEligibleUserIds = async (targetAudience, targetBranch, createdByRole, c
       const users = await User.find(query).select('_id');
       return users.map(u => u._id);
     } else if (targetAudience === 'Branch' && targetBranch) {
-      // All users in a specific branch
       query.branch = targetBranch;
       const users = await User.find(query).select('_id');
       return users.map(u => u._id);
@@ -69,7 +120,7 @@ const notifyNoticeRecipients = async (notice, recipientIds) => {
 // CREATE NOTICE
 router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
-    const { title, content, priority, targetAudience, attachments, status } = req.body;
+    const { title, content, priority, targetAudience, targetRoles, attachments, status } = req.body;
 
     // Validation
     if (!title || !content) {
@@ -81,6 +132,30 @@ router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req
 
     // Validate audience and permissions
     let targetBranch = null;
+    let branchIds = [];
+    let semesterIds = [];
+    const normalizedRoles = Array.isArray(targetRoles) ? targetRoles.filter((role) => ['admin', 'hod', 'teacher', 'student'].includes(role)) : [];
+    const shouldSendAll = targetAudience === 'Everyone' || normalizedRoles.length >= 3;
+
+    if (!shouldSendAll && normalizedRoles.length === 0 && targetAudience === 'Selected') {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select at least one recipient group'
+      });
+    }
+
+    if (req.user.role === 'hod') {
+      branchIds = [req.user.branch, ...(req.user.branches || []), req.user.department].filter(Boolean);
+    }
+
+    if (req.user.role === 'teacher') {
+      const assigned = Array.isArray(req.user.assignedSubjects) ? req.user.assignedSubjects : [];
+      if (assigned.length > 0) {
+        const subjectDocs = await Subject.find({ _id: { $in: assigned } }).select('branchId semesterId');
+        branchIds = Array.from(new Set(subjectDocs.map((s) => s.branchId).filter(Boolean)));
+        semesterIds = Array.from(new Set(subjectDocs.map((s) => s.semesterId).filter(Boolean)));
+      }
+    }
     if (targetAudience === 'Branch') {
       if (req.user.role !== 'hod') {
         return res.status(403).json({
@@ -89,7 +164,7 @@ router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req
         });
       }
       targetBranch = req.user.branch;
-    } else if (req.user.role === 'hod' && targetAudience === 'Everyone') {
+    } else if (req.user.role === 'hod' && (targetAudience === 'Everyone' || shouldSendAll)) {
       // HOD sending to everyone defaults to their branch
       targetBranch = req.user.branch;
     }
@@ -107,7 +182,8 @@ router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req
       title,
       content,
       priority: priority || 'Normal',
-      targetAudience,
+      targetAudience: shouldSendAll ? 'Everyone' : targetAudience || 'Selected',
+      targetRoles: normalizedRoles,
       targetBranch,
       createdBy: req.user._id,
       createdByRole: req.user.role,
@@ -118,7 +194,7 @@ router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req
     let eligibleUserIds = [];
     if (noticeStatus === 'published') {
       // Get eligible users and create recipient records
-      eligibleUserIds = await getEligibleUserIds(targetAudience, targetBranch, req.user.role, req.user._id);
+      eligibleUserIds = await getEligibleUserIds(targetAudience, normalizedRoles, targetBranch, req.user.role, branchIds, semesterIds);
 
       if (eligibleUserIds.length > 0) {
         notice.recipients = eligibleUserIds.map(userId => ({
@@ -279,7 +355,7 @@ router.get('/teacher', protect, authorize('teacher'), async (req, res) => {
 // UPDATE NOTICE (edit or publish draft)
 router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
-    const { title, content, priority, targetAudience, attachments, status } = req.body;
+    const { title, content, priority, targetAudience, targetRoles, attachments, status } = req.body;
     const notice = await Notice.findById(req.params.id);
 
     if (!notice) {
@@ -308,6 +384,23 @@ router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, re
     }
 
     let targetBranch = notice.targetBranch || null;
+    let branchIds = [];
+    let semesterIds = [];
+    const normalizedRoles = Array.isArray(targetRoles) ? targetRoles.filter((role) => ['admin', 'hod', 'teacher', 'student'].includes(role)) : [];
+    const shouldSendAll = targetAudience === 'Everyone' || normalizedRoles.length >= 3;
+
+    if (req.user.role === 'hod') {
+      branchIds = [req.user.branch, ...(req.user.branches || []), req.user.department].filter(Boolean);
+    }
+
+    if (req.user.role === 'teacher') {
+      const assigned = Array.isArray(req.user.assignedSubjects) ? req.user.assignedSubjects : [];
+      if (assigned.length > 0) {
+        const subjectDocs = await Subject.find({ _id: { $in: assigned } }).select('branchId semesterId');
+        branchIds = Array.from(new Set(subjectDocs.map((s) => s.branchId).filter(Boolean)));
+        semesterIds = Array.from(new Set(subjectDocs.map((s) => s.semesterId).filter(Boolean)));
+      }
+    }
     if (targetAudience === 'Branch') {
       if (req.user.role !== 'hod') {
         return res.status(403).json({
@@ -316,14 +409,19 @@ router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, re
         });
       }
       targetBranch = req.user.branch;
-    } else if (req.user.role === 'hod' && targetAudience === 'Everyone') {
+    } else if (req.user.role === 'hod' && (targetAudience === 'Everyone' || shouldSendAll)) {
       targetBranch = req.user.branch;
     }
 
     if (title) notice.title = title;
     if (content) notice.content = content;
     if (priority) notice.priority = priority;
-    if (targetAudience) notice.targetAudience = targetAudience;
+    if (targetAudience || normalizedRoles.length > 0) {
+      notice.targetAudience = shouldSendAll ? 'Everyone' : targetAudience || 'Selected';
+    }
+    if (normalizedRoles.length > 0) {
+      notice.targetRoles = normalizedRoles;
+    }
     notice.targetBranch = targetBranch;
     if (attachments) {
       notice.attachments = attachments.map(att => ({
@@ -335,7 +433,8 @@ router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, re
     const nextStatus = status === 'published' ? 'published' : status === 'draft' ? 'draft' : notice.status;
 
     if (notice.status === 'draft' && nextStatus === 'published') {
-      const eligibleUserIds = await getEligibleUserIds(notice.targetAudience, notice.targetBranch, req.user.role, req.user._id);
+      const rolesForSend = Array.isArray(notice.targetRoles) ? notice.targetRoles : [];
+      const eligibleUserIds = await getEligibleUserIds(notice.targetAudience, rolesForSend, notice.targetBranch, req.user.role, branchIds, semesterIds);
       notice.recipients = eligibleUserIds.map(userId => ({
         userId,
         notifiedAt: Date.now(),

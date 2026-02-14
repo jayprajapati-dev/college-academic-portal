@@ -17,9 +17,13 @@ const noticeSchema = new mongoose.Schema({
   },
   targetAudience: {
     type: String,
-    enum: ['Everyone', 'Students', 'Teachers', 'Staff', 'Branch', 'Semester'],
+    enum: ['Everyone', 'Students', 'Teachers', 'Staff', 'Branch', 'Semester', 'Selected'],
     default: 'Everyone'
   },
+  targetRoles: [{
+    type: String,
+    enum: ['admin', 'hod', 'teacher', 'student']
+  }],
   // Branch-specific notices (for HODs)
   targetBranch: {
     type: mongoose.Schema.Types.ObjectId,

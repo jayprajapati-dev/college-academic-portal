@@ -27,6 +27,7 @@ const RoleNotices = () => {
     content: '',
     priority: 'Normal',
     targetAudience: 'Everyone',
+    targetRoles: [],
     attachments: []
   });
 
@@ -103,12 +104,23 @@ const RoleNotices = () => {
     fetchNotices();
   }, [role, fetchNotices]);
 
+  const audienceOptions = useMemo(() => {
+    return [
+      { value: 'hod', label: 'HODs' },
+      { value: 'teacher', label: 'Teachers' },
+      { value: 'student', label: 'Students' }
+    ];
+  }, []);
+
+  const allAudienceValues = useMemo(() => audienceOptions.map((option) => option.value), [audienceOptions]);
+
   const resetForm = () => {
     setFormData({
       title: '',
       content: '',
       priority: 'Normal',
       targetAudience: 'Everyone',
+      targetRoles: allAudienceValues,
       attachments: []
     });
     setEditingNotice(null);
@@ -120,12 +132,25 @@ const RoleNotices = () => {
   };
 
   const openEditModal = (notice) => {
+    const rolesFromNotice = Array.isArray(notice.targetRoles) && notice.targetRoles.length > 0
+      ? notice.targetRoles
+      : notice.targetAudience === 'Everyone'
+        ? allAudienceValues
+        : notice.targetAudience === 'Students'
+          ? ['student']
+          : notice.targetAudience === 'Teachers'
+            ? ['teacher']
+            : notice.targetAudience === 'Staff'
+              ? ['hod']
+              : [];
+
     setEditingNotice(notice);
     setFormData({
       title: notice.title || '',
       content: notice.content || '',
       priority: notice.priority || 'Normal',
       targetAudience: notice.targetAudience || 'Everyone',
+      targetRoles: rolesFromNotice,
       attachments: notice.attachments || []
     });
     setShowModal(true);
@@ -137,6 +162,11 @@ const RoleNotices = () => {
       return;
     }
 
+    if (!formData.targetRoles || formData.targetRoles.length === 0) {
+      alert('Please select at least one recipient group');
+      return;
+    }
+
     try {
       setSaving(true);
       const token = localStorage.getItem('token');
@@ -144,7 +174,8 @@ const RoleNotices = () => {
         title: formData.title,
         content: formData.content,
         priority: formData.priority,
-        targetAudience: formData.targetAudience,
+        targetAudience: formData.targetRoles.length === allAudienceValues.length ? 'Everyone' : 'Selected',
+        targetRoles: formData.targetRoles,
         attachments: formData.attachments,
         status
       };
@@ -318,7 +349,15 @@ const RoleNotices = () => {
                           {notice.status || 'published'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{notice.targetAudience}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                        {Array.isArray(notice.targetRoles) && notice.targetRoles.length > 0
+                          ? notice.targetRoles.length === allAudienceValues.length
+                            ? 'All'
+                            : notice.targetRoles
+                              .map((roleKey) => audienceOptions.find((option) => option.value === roleKey)?.label || roleKey)
+                              .join(', ')
+                          : notice.targetAudience}
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                         {new Date(notice.createdAt).toLocaleDateString()}
                       </td>
@@ -381,7 +420,7 @@ const RoleNotices = () => {
       </div>
 
       {showModal && (
-        <Modal onClose={() => setShowModal(false)}>
+        <Modal isOpen={showModal} onClose={() => setShowModal(false)}>
           <div className="space-y-4">
             <h2 className="text-xl font-bold">{editingNotice ? 'Edit Notice' : 'Create Notice'}</h2>
             <div>
@@ -415,17 +454,49 @@ const RoleNotices = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium">Target Audience</label>
-                <select
-                  value={formData.targetAudience}
-                  onChange={(e) => setFormData(prev => ({ ...prev, targetAudience: e.target.value }))}
-                  className="w-full px-4 py-2 border rounded-lg"
-                >
-                  <option value="Everyone">Everyone</option>
-                  <option value="Students">Students</option>
-                  <option value="Teachers">Teachers</option>
-                  <option value="HODs">HODs</option>
-                </select>
+                <label className="block text-sm font-medium">Send To</label>
+                <div className="border rounded-lg p-3 space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={formData.targetRoles.length === allAudienceValues.length}
+                      onChange={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          targetRoles:
+                            prev.targetRoles.length === allAudienceValues.length ? [] : allAudienceValues
+                        }))
+                      }
+                    />
+                    All
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {audienceOptions.map((option) => (
+                      <label key={option.value} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={formData.targetRoles.includes(option.value)}
+                          onChange={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              targetRoles: prev.targetRoles.includes(option.value)
+                                ? prev.targetRoles.filter((item) => item !== option.value)
+                                : [...prev.targetRoles, option.value]
+                            }))
+                          }
+                        />
+                        {option.label}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {role === 'admin'
+                      ? 'Admin notices go to selected roles across the system.'
+                      : role === 'hod'
+                        ? 'HOD notices go to selected roles within your branch.'
+                        : 'Teacher notices go to selected roles within your assigned branch/semester.'}
+                  </p>
+                </div>
               </div>
             </div>
             <div className="flex flex-wrap gap-3">
