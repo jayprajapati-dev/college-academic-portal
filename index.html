@@ -1,457 +1,268 @@
 <!DOCTYPE html>
-<html lang="en">
+<html class="light" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart College Academic Portal</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>Overview - Smart College Academic Portal</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#1a355b",
+            "background-light": "#f6f7f8",
+            "background-dark": "#13181f"
+          },
+          fontFamily: {
+            "display": ["Manrope", "sans-serif"]
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          }
         }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }
-
-        header {
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 1rem 0;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        nav {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 2rem;
-        }
-
-        nav h1 {
-            font-size: 1.8rem;
-            font-weight: bold;
-        }
-
-        nav a {
-            color: white;
-            text-decoration: none;
-            margin: 0 1.5rem;
-            transition: color 0.3s;
-        }
-
-        nav a:hover {
-            color: #667eea;
-        }
-
-        .hero {
-            max-width: 1200px;
-            margin: 3rem auto;
-            padding: 0 2rem;
-            text-align: center;
-            color: white;
-        }
-
-        .hero h2 {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-
-        .hero p {
-            font-size: 1.2rem;
-            margin-bottom: 2rem;
-            opacity: 0.95;
-        }
-
-        .cta-buttons {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            margin: 2rem 0;
-        }
-
-        .btn {
-            padding: 0.75rem 2rem;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.3s;
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .btn-primary {
-            background: #667eea;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #5568d3;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-secondary {
-            background: white;
-            color: #667eea;
-            border: 2px solid white;
-        }
-
-        .btn-secondary:hover {
-            background: transparent;
-            color: white;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 3rem auto;
-            padding: 0 2rem;
-        }
-
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 2rem;
-            margin-bottom: 3rem;
-        }
-
-        .feature-card {
-            background: white;
-            padding: 2rem;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-
-        .feature-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-        }
-
-        .feature-card h3 {
-            color: #667eea;
-            margin-bottom: 1rem;
-            font-size: 1.5rem;
-        }
-
-        .feature-card p {
-            color: #666;
-            line-height: 1.8;
-        }
-
-        .modules {
-            background: white;
-            padding: 3rem;
-            border-radius: 10px;
-            margin-bottom: 3rem;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        .modules h3 {
-            color: #667eea;
-            margin-bottom: 2rem;
-            font-size: 2rem;
-            text-align: center;
-        }
-
-        .modules-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-        }
-
-        .module-item {
-            background: #f8f9fa;
-            padding: 1.5rem;
-            border-left: 4px solid #667eea;
-            border-radius: 5px;
-            transition: all 0.3s;
-        }
-
-        .module-item:hover {
-            background: #667eea;
-            color: white;
-            border-left-color: #764ba2;
-        }
-
-        .module-item h4 {
-            margin-bottom: 0.5rem;
-        }
-
-        .tech-stack {
-            background: white;
-            padding: 3rem;
-            border-radius: 10px;
-            margin-bottom: 3rem;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        .tech-stack h3 {
-            color: #667eea;
-            margin-bottom: 2rem;
-            font-size: 2rem;
-            text-align: center;
-        }
-
-        .tech-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 1rem;
-            text-align: center;
-        }
-
-        .tech-item {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1.5rem;
-            border-radius: 8px;
-            font-weight: bold;
-        }
-
-        .user-roles {
-            background: white;
-            padding: 3rem;
-            border-radius: 10px;
-            margin-bottom: 3rem;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        .user-roles h3 {
-            color: #667eea;
-            margin-bottom: 2rem;
-            font-size: 2rem;
-            text-align: center;
-        }
-
-        .roles-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-        }
-
-        .role-section {
-            background: #f8f9fa;
-            padding: 2rem;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-        }
-
-        .role-section h4 {
-            color: #667eea;
-            margin-bottom: 1rem;
-            font-size: 1.5rem;
-        }
-
-        .role-section ul {
-            list-style: none;
-            padding: 0;
-        }
-
-        .role-section li {
-            padding: 0.5rem 0;
-            padding-left: 1.5rem;
-            position: relative;
-        }
-
-        .role-section li:before {
-            content: "✓";
-            position: absolute;
-            left: 0;
-            color: #667eea;
-            font-weight: bold;
-        }
-
-        footer {
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            text-align: center;
-            padding: 2rem;
-            margin-top: 3rem;
-        }
-
-        footer p {
-            margin: 0.5rem 0;
-        }
-
-        @media (max-width: 768px) {
-            .hero h2 {
-                font-size: 2rem;
-            }
-
-            nav {
-                flex-direction: column;
-                gap: 1rem;
-            }
-
-            nav a {
-                margin: 0.5rem 0;
-            }
-
-            .roles-container {
-                grid-template-columns: 1fr;
-            }
-
-            .cta-buttons {
-                flex-direction: column;
-                align-items: center;
-            }
-        }
-    </style>
+      }
+    };
+  </script>
+  <style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    body {
+      font-family: 'Manrope', sans-serif;
+    }
+  </style>
 </head>
-<body>
-    <!-- Navigation -->
-    <header>
-        <nav>
-            <h1>🎓 Smart College Portal</h1>
-            <div>
-                <a href="#features">Features</a>
-                <a href="#modules">Modules</a>
-                <a href="#tech">Tech Stack</a>
-                <a href="#roles">Roles</a>
-            </div>
-        </nav>
-    </header>
-
-    <!-- Hero Section -->
-    <section class="hero">
-        <h2>Smart College Academic Portal</h2>
-        <p>Centralized platform for managing semester-wise and branch-wise subject details, assignments, and academic resources</p>
-        <div class="cta-buttons">
-            <button class="btn btn-primary">Get Started</button>
-            <button class="btn btn-secondary">Learn More</button>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display transition-colors duration-300">
+  <nav class="sticky top-0 z-50 w-full bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary text-3xl">school</span>
+          <span class="text-xl font-bold text-primary dark:text-white tracking-tight">Smart College</span>
         </div>
+        <div class="hidden md:flex items-center space-x-8">
+          <a class="text-primary font-bold border-b-2 border-primary py-1 text-sm" href="index.html">Overview</a>
+          <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="site/system-flow.html">System Flow</a>
+          <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="site/modules.html">Modules</a>
+          <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="site/architecture.html">Architecture</a>
+          <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="site/demo-flow.html">Demo Flow</a>
+        </div>
+        <div>
+          <button class="bg-primary text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-opacity-90 transition-all shadow-lg shadow-primary/20">Open Portal</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <section class="relative py-20 overflow-hidden">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold mb-6 uppercase tracking-widest">
+          <span class="material-symbols-outlined text-sm">verified</span> Academic Management System
+        </div>
+        <h1 class="text-5xl md:text-6xl font-extrabold text-primary dark:text-white mb-6 tracking-tight leading-tight">
+          Smart College <br class="hidden md:block" /> Academic Portal
+        </h1>
+        <p class="text-lg md:text-xl text-slate-600 dark:text-slate-400 max-w-3xl mx-auto mb-10 font-medium">
+          A centralized digital ecosystem bridging the gap between Students, Teachers, HODs, and Administrators for a seamless educational experience.
+        </p>
+        <div class="flex flex-col sm:flex-row justify-center gap-4">
+          <a class="bg-primary text-white px-8 py-4 rounded-xl font-bold text-lg hover:scale-105 transition-transform flex items-center justify-center gap-2 shadow-xl shadow-primary/30" href="site/system-flow.html">
+            View System Flow <span class="material-symbols-outlined">arrow_forward</span>
+          </a>
+          <a class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-8 py-4 rounded-xl font-bold text-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-all" href="docs/04-Overview.md">
+            Project Details
+          </a>
+        </div>
+      </div>
+      <div class="absolute -z-10 top-0 left-1/2 -translate-x-1/2 w-full h-full opacity-10 pointer-events-none">
+        <div class="absolute top-10 left-1/4 w-72 h-72 bg-primary rounded-full blur-3xl"></div>
+        <div class="absolute bottom-10 right-1/4 w-96 h-96 bg-primary rounded-full blur-3xl"></div>
+      </div>
     </section>
 
-    <!-- Main Content -->
-    <div class="container">
-        <!-- Features Section -->
-        <section id="features">
-            <div class="features">
-                <div class="feature-card">
-                    <h3>📚 Subject Details</h3>
-                    <p>Access complete subject information including name, code, marks distribution, and exam types for each semester and branch.</p>
-                </div>
-                <div class="feature-card">
-                    <h3>📋 Assignments & Notices</h3>
-                    <p>View assignments and notices posted by teachers with deadlines, visible only to related students of that semester and branch.</p>
-                </div>
-                <div class="feature-card">
-                    <h3>📥 Download Resources</h3>
-                    <p>Download study materials, PDFs, and notes directly from the portal organized by subject and semester.</p>
-                </div>
-                <div class="feature-card">
-                    <h3>🔐 Secure Login</h3>
-                    <p>Role-based authentication for both students and admin (teachers) with secure password management.</p>
-                </div>
-                <div class="feature-card">
-                    <h3>👨‍🏫 Admin Control</h3>
-                    <p>Teachers can easily manage and update academic data including semesters, branches, subjects, and assignments.</p>
-                </div>
-                <div class="feature-card">
-                    <h3>📱 Responsive Design</h3>
-                    <p>Access the portal seamlessly on desktop, tablet, and mobile devices for convenience.</p>
-                </div>
+    <section class="py-12 bg-white dark:bg-slate-900/50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div class="p-6 rounded-2xl bg-background-light dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex flex-col items-center text-center group hover:border-primary transition-colors">
+            <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-4 group-hover:bg-primary group-hover:text-white transition-all">
+              <span class="material-symbols-outlined">group</span>
             </div>
-        </section>
+            <h3 class="text-2xl font-bold text-primary dark:text-white mb-1">4 User Roles</h3>
+            <p class="text-sm text-slate-500 font-medium uppercase tracking-tighter">Tailored Access Controls</p>
+          </div>
+          <div class="p-6 rounded-2xl bg-background-light dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex flex-col items-center text-center group hover:border-primary transition-colors">
+            <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-4 group-hover:bg-primary group-hover:text-white transition-all">
+              <span class="material-symbols-outlined">extension</span>
+            </div>
+            <h3 class="text-2xl font-bold text-primary dark:text-white mb-1">9 Core Modules</h3>
+            <p class="text-sm text-slate-500 font-medium uppercase tracking-tighter">End-to-End Solutions</p>
+          </div>
+          <div class="p-6 rounded-2xl bg-background-light dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex flex-col items-center text-center group hover:border-primary transition-colors">
+            <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-4 group-hover:bg-primary group-hover:text-white transition-all">
+              <span class="material-symbols-outlined">security</span>
+            </div>
+            <h3 class="text-2xl font-bold text-primary dark:text-white mb-1">Secure RBAC</h3>
+            <p class="text-sm text-slate-500 font-medium uppercase tracking-tighter">Role-Based Security</p>
+          </div>
+          <div class="p-6 rounded-2xl bg-background-light dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex flex-col items-center text-center group hover:border-primary transition-colors">
+            <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-4 group-hover:bg-primary group-hover:text-white transition-all">
+              <span class="material-symbols-outlined">devices</span>
+            </div>
+            <h3 class="text-2xl font-bold text-primary dark:text-white mb-1">Web Ready</h3>
+            <p class="text-sm text-slate-500 font-medium uppercase tracking-tighter">Responsive Interface</p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-        <!-- Modules Section -->
-        <section id="modules" class="modules">
-            <h3>Core Modules</h3>
-            <div class="modules-grid">
-                <div class="module-item">
-                    <h4>1. Authentication</h4>
-                    <p>Login & registration system</p>
-                </div>
-                <div class="module-item">
-                    <h4>2. Semester Management</h4>
-                    <p>Manage college semesters</p>
-                </div>
-                <div class="module-item">
-                    <h4>3. Branch Management</h4>
-                    <p>Manage branches per semester</p>
-                </div>
-                <div class="module-item">
-                    <h4>4. Subject Management</h4>
-                    <p>Add, edit, remove subjects</p>
-                </div>
-                <div class="module-item">
-                    <h4>5. Subject Details</h4>
-                    <p>Marks, exam types, materials</p>
-                </div>
-                <div class="module-item">
-                    <h4>6. Notices & Assignments</h4>
-                    <p>Post notices with deadlines</p>
-                </div>
-                <div class="module-item">
-                    <h4>7. Download Center</h4>
-                    <p>Resource & material storage</p>
-                </div>
-                <div class="module-item">
-                    <h4>8. Student View</h4>
-                    <p>Student-specific dashboard</p>
-                </div>
+    <section class="py-20 bg-background-light dark:bg-background-dark">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid lg:grid-cols-2 gap-12 items-center">
+          <div class="space-y-8">
+            <div>
+              <h2 class="text-3xl font-extrabold text-primary dark:text-white mb-4">The Challenge</h2>
+              <p class="text-slate-600 dark:text-slate-400">Traditional academic institutions often struggle with fragmented processes and manual overhead.</p>
             </div>
-        </section>
+            <div class="space-y-4">
+              <div class="flex gap-4 p-4 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20">
+                <span class="material-symbols-outlined text-red-600">error</span>
+                <div>
+                  <h4 class="font-bold text-slate-900 dark:text-slate-100">Scattered Data</h4>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">Academic records spread across physical files and isolated spreadsheets.</p>
+                </div>
+              </div>
+              <div class="flex gap-4 p-4 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20">
+                <span class="material-symbols-outlined text-red-600">notifications_off</span>
+                <div>
+                  <h4 class="font-bold text-slate-900 dark:text-slate-100">Inefficient Communication</h4>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">Manual paper notices lead to delays and loss of critical information.</p>
+                </div>
+              </div>
+              <div class="flex gap-4 p-4 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20">
+                <span class="material-symbols-outlined text-red-600">lan</span>
+                <div>
+                  <h4 class="font-bold text-slate-900 dark:text-slate-100">Information Silos</h4>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">No real-time synchronization between departments and students.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="space-y-8">
+            <div>
+              <h2 class="text-3xl font-extrabold text-primary dark:text-white mb-4">Our Solution</h2>
+              <p class="text-slate-600 dark:text-slate-400">The Smart College Portal provides a unified digital backbone for the entire campus.</p>
+            </div>
+            <div class="space-y-4">
+              <div class="flex gap-4 p-4 rounded-xl bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20">
+                <span class="material-symbols-outlined text-green-600">check_circle</span>
+                <div>
+                  <h4 class="font-bold text-slate-900 dark:text-slate-100">Unified Platform</h4>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">Single source of truth for all academic and administrative data.</p>
+                </div>
+              </div>
+              <div class="flex gap-4 p-4 rounded-xl bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20">
+                <span class="material-symbols-outlined text-green-600">dashboard_customize</span>
+                <div>
+                  <h4 class="font-bold text-slate-900 dark:text-slate-100">Role-Based Dashboards</h4>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">Personalized workflows for different levels of authority.</p>
+                </div>
+              </div>
+              <div class="flex gap-4 p-4 rounded-xl bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20">
+                <span class="material-symbols-outlined text-green-600">hub</span>
+                <div>
+                  <h4 class="font-bold text-slate-900 dark:text-slate-100">Academic Hub</h4>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">Centralized subject-wise resource and performance tracking.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-        <!-- Tech Stack Section -->
-        <section id="tech" class="tech-stack">
-            <h3>Technology Stack</h3>
-            <div class="tech-grid">
-                <div class="tech-item">React JS<br><small>Frontend</small></div>
-                <div class="tech-item">Node JS<br><small>Runtime</small></div>
-                <div class="tech-item">Express<br><small>Backend Framework</small></div>
-                <div class="tech-item">MongoDB<br><small>Database</small></div>
-            </div>
-        </section>
+    <section class="py-20 bg-primary text-white">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-16">
+          <h2 class="text-3xl md:text-4xl font-extrabold mb-4">Hierarchical Ecosystem</h2>
+          <p class="text-blue-100/70 max-w-2xl mx-auto">Customized experiences built for the specific needs of every stakeholder.</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div class="bg-white/10 backdrop-blur-sm p-8 rounded-2xl border border-white/10 hover:bg-white/20 transition-all flex flex-col">
+            <span class="material-symbols-outlined text-4xl mb-4 text-blue-300">admin_panel_settings</span>
+            <h3 class="text-xl font-bold mb-2">Admin</h3>
+            <p class="text-sm text-blue-100/80 mb-6 flex-grow">Full system oversight, managing users, infrastructure settings, and institutional security.</p>
+            <div class="text-xs font-bold bg-white/10 px-3 py-1 rounded-full w-fit">Full Control</div>
+          </div>
+          <div class="bg-white/10 backdrop-blur-sm p-8 rounded-2xl border border-white/10 hover:bg-white/20 transition-all flex flex-col">
+            <span class="material-symbols-outlined text-4xl mb-4 text-blue-300">corporate_fare</span>
+            <h3 class="text-xl font-bold mb-2">HOD</h3>
+            <p class="text-sm text-blue-100/80 mb-6 flex-grow">Departmental management, branch monitoring, faculty assignments, and performance analysis.</p>
+            <div class="text-xs font-bold bg-white/10 px-3 py-1 rounded-full w-fit">Branch Control</div>
+          </div>
+          <div class="bg-white/10 backdrop-blur-sm p-8 rounded-2xl border border-white/10 hover:bg-white/20 transition-all flex flex-col">
+            <span class="material-symbols-outlined text-4xl mb-4 text-blue-300">person_book</span>
+            <h3 class="text-xl font-bold mb-2">Teacher</h3>
+            <p class="text-sm text-blue-100/80 mb-6 flex-grow">Course delivery, attendance tracking, marks entry, and uploading learning resources.</p>
+            <div class="text-xs font-bold bg-white/10 px-3 py-1 rounded-full w-fit">Academic Content</div>
+          </div>
+          <div class="bg-white/10 backdrop-blur-sm p-8 rounded-2xl border border-white/10 hover:bg-white/20 transition-all flex flex-col">
+            <span class="material-symbols-outlined text-4xl mb-4 text-blue-300">face</span>
+            <h3 class="text-xl font-bold mb-2">Student</h3>
+            <p class="text-sm text-blue-100/80 mb-6 flex-grow">Accessing study materials, tracking attendance, viewing exam results, and progress reports.</p>
+            <div class="text-xs font-bold bg-white/10 px-3 py-1 rounded-full w-fit">Learning Access</div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-        <!-- User Roles Section -->
-        <section id="roles" class="user-roles">
-            <h3>User Roles & Responsibilities</h3>
-            <div class="roles-container">
-                <div class="role-section">
-                    <h4>👨‍🏫 Admin (Teacher)</h4>
-                    <ul>
-                        <li>Login & manage account</li>
-                        <li>Manage semesters & branches</li>
-                        <li>Add/edit/remove subjects</li>
-                        <li>Upload subject details</li>
-                        <li>Post notices & assignments</li>
-                        <li>Upload study materials</li>
-                        <li>Upload marks & exam info</li>
-                    </ul>
-                </div>
-                <div class="role-section">
-                    <h4>👨‍🎓 Student</h4>
-                    <ul>
-                        <li>Login with credentials</li>
-                        <li>View semester structure</li>
-                        <li>View branch details</li>
-                        <li>View assigned subjects</li>
-                        <li>Check assignment deadlines</li>
-                        <li>Download study materials</li>
-                        <li>View relevant notices only</li>
-                    </ul>
-                </div>
-            </div>
-        </section>
+    <section class="py-20 text-center">
+      <div class="max-w-4xl mx-auto px-4">
+        <h2 class="text-3xl font-extrabold text-primary dark:text-white mb-6 tracking-tight">Ready to see the workflow in action?</h2>
+        <a class="inline-flex items-center gap-3 bg-primary text-white px-10 py-5 rounded-2xl font-bold text-xl hover:shadow-2xl hover:shadow-primary/40 transition-all group" href="site/system-flow.html">
+          View System Flow
+          <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">trending_flat</span>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid md:grid-cols-3 gap-8 items-start">
+        <div class="space-y-4">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-2xl">school</span>
+            <span class="text-lg font-bold text-primary dark:text-white">Smart College Portal</span>
+          </div>
+          <p class="text-sm text-slate-500 max-w-xs">
+            Final Year Diploma Project<br />
+            Academic Year 2025-2026
+          </p>
+        </div>
+        <div class="flex flex-col gap-2">
+          <h4 class="font-bold text-slate-900 dark:text-white mb-2">Links</h4>
+          <a class="text-sm text-slate-500 hover:text-primary transition-colors" href="docs/01-Submission-Checklist.md">Documentation</a>
+          <a class="text-sm text-slate-500 hover:text-primary transition-colors" href="docs/03-Project-Status.md">Project Status</a>
+          <a class="text-sm text-slate-500 hover:text-primary transition-colors" href="docs/02-Demo-Guide.md">Demo Guide</a>
+        </div>
+        <div class="flex flex-col gap-4 items-start md:items-end">
+          <a class="flex items-center gap-2 text-slate-900 dark:text-white font-bold hover:text-primary transition-colors" href="https://github.com" target="_blank">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+            GitHub Repository
+          </a>
+          <div class="text-xs text-slate-400">(c) 2026 Smart College Portal. Designed for Excellence.</div>
+        </div>
+      </div>
     </div>
-
-    <!-- Footer -->
-    <footer>
-        <p>&copy; 2026 Smart College Academic Portal | Diploma IT Project</p>
-        <p>Phase 1: Planning ✓ | Phase 2: Development 🔄 | Phase 3: Testing | Phase 4: Deployment</p>
-        <p>📚 Repository: <a href="#" style="color: #667eea;">GitHub</a> | 📖 Documentation in /docs</p>
-    </footer>
+  </footer>
 </body>
 </html>

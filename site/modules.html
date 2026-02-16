@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>Modules - Smart College Academic Portal</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#1a355b",
+            "background-light": "#f6f7f8",
+            "background-dark": "#13181f"
+          },
+          fontFamily: {
+            "display": ["Manrope", "sans-serif"]
+          },
+          borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"}
+        }
+      }
+    };
+  </script>
+  <style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .module-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 25px -5px rgba(26, 53, 91, 0.1), 0 8px 10px -6px rgba(26, 53, 91, 0.1);
+    }
+  </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-gray-900 dark:text-gray-100 transition-colors duration-300">
+  <nav class="sticky top-0 z-50 w-full bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary text-3xl">school</span>
+          <span class="text-xl font-bold text-primary dark:text-white tracking-tight">Smart College</span>
+        </div>
+        <div class="hidden md:flex items-center space-x-8">
+          <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="../index.html">Overview</a>
+          <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="system-flow.html">System Flow</a>
+          <a class="text-primary font-bold border-b-2 border-primary py-1 text-sm" href="modules.html">Modules</a>
+          <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="architecture.html">Architecture</a>
+          <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="demo-flow.html">Demo Flow</a>
+        </div>
+        <div>
+          <button class="bg-primary text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-opacity-90 transition-all shadow-lg shadow-primary/20">Documentation</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="flex-1">
+    <section class="mx-auto max-w-7xl px-6 py-12 lg:py-16">
+      <div class="max-w-3xl">
+        <h2 class="text-4xl font-extrabold tracking-tight text-primary dark:text-white sm:text-5xl">System Modules</h2>
+        <p class="mt-4 text-lg leading-relaxed text-gray-600 dark:text-gray-400">A technical directory of the core functional modules facilitating academic administration with defined access protocols and system-wide integration.</p>
+      </div>
+    </section>
+
+    <section class="mx-auto max-w-7xl px-6 pb-24">
+      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="module-card group relative overflow-hidden rounded-xl bg-white dark:bg-gray-900 p-8 border border-gray-100 dark:border-gray-800 transition-all duration-300">
+          <div class="mb-5 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary/100">
+            <span class="material-symbols-outlined text-3xl">shield_person</span>
+          </div>
+          <h3 class="mb-3 text-xl font-bold text-primary dark:text-white">Authentication and Roles</h3>
+          <p class="text-sm leading-relaxed text-gray-600 dark:text-gray-400">Role-based access for Admin, HOD, Teacher, and Student with secure sessions and permissions.</p>
+        </div>
+
+        <div class="module-card group relative overflow-hidden rounded-xl bg-white dark:bg-gray-900 p-8 border border-gray-100 dark:border-gray-800 transition-all duration-300">
+          <div class="mb-5 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary/100">
+            <span class="material-symbols-outlined text-3xl">group</span>
+          </div>
+          <h3 class="mb-3 text-xl font-bold text-primary dark:text-white">User Management</h3>
+          <p class="text-sm leading-relaxed text-gray-600 dark:text-gray-400">Centralized management for users, roles, and status across the institution.</p>
+        </div>
+
+        <div class="module-card group relative overflow-hidden rounded-xl bg-white dark:bg-gray-900 p-8 border border-gray-100 dark:border-gray-800 transition-all duration-300">
+          <div class="mb-5 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary/100">
+            <span class="material-symbols-outlined text-3xl">account_tree</span>
+          </div>
+          <h3 class="mb-3 text-xl font-bold text-primary dark:text-white">Academic Structure</h3>
+          <p class="text-sm leading-relaxed text-gray-600 dark:text-gray-400">Branch, semester, and subject hierarchy for structured academic data.</p>
+        </div>
+
+        <div class="module-card group relative overflow-hidden rounded-xl bg-white dark:bg-gray-900 p-8 border border-gray-100 dark:border-gray-800 transition-all duration-300">
+          <div class="mb-5 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary/100">
+            <span class="material-symbols-outlined text-3xl">grade</span>
+          </div>
+          <h3 class="mb-3 text-xl font-bold text-primary dark:text-white">Subjects and Marks</h3>
+          <p class="text-sm leading-relaxed text-gray-600 dark:text-gray-400">Exam type and marks breakdown, subject materials, and detail view.</p>
+        </div>
+
+        <div class="module-card group relative overflow-hidden rounded-xl bg-white dark:bg-gray-900 p-8 border border-gray-100 dark:border-gray-800 transition-all duration-300">
+          <div class="mb-5 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary/100">
+            <span class="material-symbols-outlined text-3xl">assignment</span>
+          </div>
+          <h3 class="mb-3 text-xl font-bold text-primary dark:text-white">Tasks and Submissions</h3>
+          <p class="text-sm leading-relaxed text-gray-600 dark:text-gray-400">Task creation, student submissions, and status tracking with deadlines.</p>
+        </div>
+
+        <div class="module-card group relative overflow-hidden rounded-xl bg-white dark:bg-gray-900 p-8 border border-gray-100 dark:border-gray-800 transition-all duration-300">
+          <div class="mb-5 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary/100">
+            <span class="material-symbols-outlined text-3xl">campaign</span>
+          </div>
+          <h3 class="mb-3 text-xl font-bold text-primary dark:text-white">Notices</h3>
+          <p class="text-sm leading-relaxed text-gray-600 dark:text-gray-400">Role-targeted announcements and notice board updates.</p>
+        </div>
+
+        <div class="module-card group relative overflow-hidden rounded-xl bg-white dark:bg-gray-900 p-8 border border-gray-100 dark:border-gray-800 transition-all duration-300">
+          <div class="mb-5 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary/100">
+            <span class="material-symbols-outlined text-3xl">how_to_reg</span>
+          </div>
+          <h3 class="mb-3 text-xl font-bold text-primary dark:text-white">Attendance</h3>
+          <p class="text-sm leading-relaxed text-gray-600 dark:text-gray-400">Attendance marking, summaries, and student view.</p>
+        </div>
+
+        <div class="module-card group relative overflow-hidden rounded-xl bg-white dark:bg-gray-900 p-8 border border-gray-100 dark:border-gray-800 transition-all duration-300">
+          <div class="mb-5 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary/100">
+            <span class="material-symbols-outlined text-3xl">calendar_today</span>
+          </div>
+          <h3 class="mb-3 text-xl font-bold text-primary dark:text-white">Timetable</h3>
+          <p class="text-sm leading-relaxed text-gray-600 dark:text-gray-400">Weekly schedule view for classes and subject sessions.</p>
+        </div>
+
+        <div class="module-card group relative overflow-hidden rounded-xl bg-white dark:bg-gray-900 p-8 border border-gray-100 dark:border-gray-800 transition-all duration-300">
+          <div class="mb-5 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary/100">
+            <span class="material-symbols-outlined text-3xl">local_library</span>
+          </div>
+          <h3 class="mb-3 text-xl font-bold text-primary dark:text-white">Library and Materials</h3>
+          <p class="text-sm leading-relaxed text-gray-600 dark:text-gray-400">Subject-wise books, notes, and learning resources.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid md:grid-cols-3 gap-8 items-start">
+        <div class="space-y-4">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-2xl">school</span>
+            <span class="text-lg font-bold text-primary dark:text-white">Smart College Portal</span>
+          </div>
+          <p class="text-sm text-slate-500 max-w-xs">Final Year Diploma Project<br />Academic Year 2025-2026</p>
+        </div>
+        <div class="flex flex-col gap-2">
+          <h4 class="font-bold text-slate-900 dark:text-white mb-2">Links</h4>
+          <a class="text-sm text-slate-500 hover:text-primary transition-colors" href="../docs/01-Submission-Checklist.md">Documentation</a>
+          <a class="text-sm text-slate-500 hover:text-primary transition-colors" href="../docs/03-Project-Status.md">Project Status</a>
+          <a class="text-sm text-slate-500 hover:text-primary transition-colors" href="../docs/02-Demo-Guide.md">Demo Guide</a>
+        </div>
+        <div class="flex flex-col gap-4 items-start md:items-end">
+          <a class="flex items-center gap-2 text-slate-900 dark:text-white font-bold hover:text-primary transition-colors" href="https://github.com" target="_blank">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+            GitHub Repository
+          </a>
+          <div class="text-xs text-slate-400">(c) 2026 Smart College Portal. Designed for Excellence.</div>
+        </div>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

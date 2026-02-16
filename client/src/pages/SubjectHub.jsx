@@ -180,6 +180,82 @@ const SubjectHub = () => {
                 <button onClick={() => handleJump('library')} className="px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-sm font-semibold hover:border-primary/40">Library</button>
                 <button onClick={() => handleJump('projects')} className="px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-sm font-semibold hover:border-primary/40">Projects</button>
               </div>
+
+              {/* Exam Type & Marks Section */}
+              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Exam Type Card */}
+                <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10 border border-blue-200 dark:border-blue-800">
+                  <h3 className="text-sm font-bold text-blue-900 dark:text-blue-300 uppercase tracking-wider mb-2">Exam Type</h3>
+                  <p className="text-2xl font-black text-blue-700 dark:text-blue-200 capitalize">
+                    {subject?.type === 'theory+practical' ? 'Theory + Practical' : subject?.type || 'Theory'}
+                  </p>
+                </div>
+
+                {/* Total Marks Card */}
+                <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-900/10 border border-emerald-200 dark:border-emerald-800">
+                  <h3 className="text-sm font-bold text-emerald-900 dark:text-emerald-300 uppercase tracking-wider mb-2">Total Marks</h3>
+                  <p className="text-2xl font-black text-emerald-700 dark:text-emerald-200">
+                    {subject?.marks?.totalMarks || 0}
+                  </p>
+                </div>
+              </div>
+
+              {/* Detailed Marks Breakdown */}
+              {(subject?.marks?.theory?.total > 0 || subject?.marks?.practical?.total > 0) && (
+                <div className="mt-8 p-6 rounded-2xl bg-gray-50 dark:bg-white/5 border border-[#dcdee5] dark:border-white/10">
+                  <h3 className="text-lg font-bold mb-6">Marks Breakdown</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Theory Marks */}
+                    {subject?.marks?.theory?.total > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="font-bold text-primary">Theory</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between items-center p-2 bg-white dark:bg-white/10 rounded-lg">
+                            <span className="text-gray-600 dark:text-gray-400">Internal</span>
+                            <span className="font-bold">{subject.marks.theory.internal || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-2 bg-white dark:bg-white/10 rounded-lg">
+                            <span className="text-gray-600 dark:text-gray-400">External</span>
+                            <span className="font-bold">{subject.marks.theory.external || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-2 bg-primary/10 rounded-lg">
+                            <span className="text-gray-900 dark:text-white font-bold">Total</span>
+                            <span className="font-black text-primary">{subject.marks.theory.total || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Practical Marks */}
+                    {subject?.marks?.practical?.total > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="font-bold text-primary">Practical</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between items-center p-2 bg-white dark:bg-white/10 rounded-lg">
+                            <span className="text-gray-600 dark:text-gray-400">Internal</span>
+                            <span className="font-bold">{subject.marks.practical.internal || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-2 bg-white dark:bg-white/10 rounded-lg">
+                            <span className="text-gray-600 dark:text-gray-400">External</span>
+                            <span className="font-bold">{subject.marks.practical.external || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center p-2 bg-primary/10 rounded-lg">
+                            <span className="text-gray-900 dark:text-white font-bold">Total</span>
+                            <span className="font-black text-primary">{subject.marks.practical.total || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {subject?.marks?.passingMarks > 0 && (
+                    <div className="mt-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                      <p className="text-sm text-amber-800 dark:text-amber-200">
+                        <span className="font-bold">Passing Marks:</span> {subject.marks.passingMarks}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
 
             <section id="materials" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-3xl p-8 shadow-sm">

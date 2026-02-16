@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Demo Flow - Smart College Academic Portal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1a355b",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#13181f",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .flow-connector {
+            position: relative;
+        }
+        .flow-connector::after {
+            content: '';
+            position: absolute;
+            background-color: #1a355b;
+            opacity: 0.2;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-primary dark:text-slate-200">
+<!-- Top Navigation -->
+<div class="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<nav class="sticky top-0 z-50 w-full bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-16">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-3xl">school</span>
+                <span class="text-xl font-bold text-primary dark:text-white tracking-tight">Smart College</span>
+            </div>
+            <div class="hidden md:flex items-center space-x-8">
+                <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="../index.html">Overview</a>
+                <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="system-flow.html">System Flow</a>
+                <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="modules.html">Modules</a>
+                <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="architecture.html">Architecture</a>
+                <a class="text-primary font-bold border-b-2 border-primary py-1 text-sm" href="demo-flow.html">Demo Flow</a>
+            </div>
+            <div>
+                <button class="bg-primary text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-opacity-90 transition-all shadow-lg shadow-primary/20">Open Portal</button>
+            </div>
+        </div>
+    </div>
+</nav>
+<main class="flex-1 flex flex-col items-center px-4 md:px-20 lg:px-40 py-10 gap-16">
+<!-- Page Header -->
+<div class="w-full max-w-5xl text-center">
+<h1 class="text-4xl font-extrabold tracking-tight text-primary dark:text-white mb-4">Logical System Architecture</h1>
+<p class="text-lg text-primary/60 dark:text-slate-400 max-w-2xl mx-auto">Visualizing the end-to-end user journeys, data validation checkpoints, and module interactions within the portal.</p>
+</div>
+<!-- 1. Overall System Flow -->
+<section class="w-full max-w-5xl"><div class="flex items-center gap-3 mb-8"><span class="material-symbols-outlined text-primary text-3xl">security</span><h2 class="text-2xl font-bold">Authentication &amp; Role Onboarding Flow</h2></div><div class="bg-white dark:bg-slate-900 p-10 rounded-xl border border-primary/10 shadow-sm overflow-x-auto"><div class="flex flex-col gap-12 min-w-[900px]"><div class="flex items-center gap-6 justify-center"><div class="flex flex-col items-center gap-2"><div class="px-6 py-3 bg-primary/5 border border-primary/20 rounded-lg font-bold text-sm">Student Registration</div><span class="text-[10px] uppercase font-bold text-primary/40">Self-Service</span></div><span class="material-symbols-outlined text-primary/30">arrow_forward</span><div class="px-6 py-3 bg-primary text-white rounded-lg shadow-sm font-bold text-sm">Direct Login</div><span class="material-symbols-outlined text-primary/30">arrow_forward</span><div class="px-6 py-3 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg font-bold text-sm">Student Dashboard</div></div><div class="flex items-center gap-6 justify-center border-t border-primary/5 pt-10"><div class="flex flex-col items-center gap-2"><div class="px-6 py-3 bg-primary/5 border border-primary/20 rounded-lg font-bold text-sm">Admin / HOD / Teacher Account</div><span class="text-[10px] uppercase font-bold text-primary/40">Created Internally</span></div><span class="material-symbols-outlined text-primary/30">arrow_forward</span><div class="px-6 py-3 bg-primary text-white rounded-lg font-bold text-sm">Temp Password Login</div><span class="material-symbols-outlined text-primary/30">arrow_forward</span><div class="w-24 h-24 bg-amber-500 text-white flex items-center justify-center rotate-45 rounded-lg shadow-md"><span class="-rotate-45 font-bold text-[10px] text-center">First Login?</span></div><div class="flex flex-col gap-4 ml-4"><div class="flex items-center gap-4"><span class="text-xs font-bold text-emerald-600">YES</span><span class="material-symbols-outlined text-primary/30">arrow_forward</span><div class="px-6 py-3 bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg font-bold text-sm">Set New Password</div></div><div class="flex items-center gap-4"><span class="text-xs font-bold text-rose-600">NO</span><span class="material-symbols-outlined text-primary/30">arrow_forward</span><div class="px-6 py-3 bg-primary/10 text-primary border border-primary/20 rounded-lg font-bold text-sm">Role-Based Dashboard</div></div></div></div><div class="flex flex-wrap justify-center gap-4 pt-6"><span class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-bold border border-slate-200">Admin Dashboard</span><span class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-bold border border-slate-200">HOD (Branch Based)</span><span class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-bold border border-slate-200">Teacher (Subject Based)</span><span class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-bold border border-slate-200">Student Dashboard</span></div><p class="text-center text-xs italic text-primary/60 mt-4">* Students self-register, whereas Admin, HOD, and Teachers are created internally with temporary credentials.</p></div></div></section>
+<!-- 2. Authentication Flow -->
+<section class="w-full max-w-5xl"><div class="flex items-center gap-3 mb-8"><span class="material-symbols-outlined text-primary text-3xl">menu_book</span><h2 class="text-2xl font-bold">Academic Subject Flow (Branch &amp; Semester Based)</h2></div><div class="bg-white dark:bg-slate-900 p-10 rounded-xl border border-primary/10 shadow-sm overflow-x-auto"><div class="flex flex-col gap-10 min-w-[900px]"><div class="flex items-center gap-6 justify-center"><div class="flex flex-col items-center gap-1"><div class="px-5 py-3 bg-white dark:bg-slate-800 border border-primary/20 rounded shadow-sm text-sm font-bold">Select Branch</div></div><span class="material-symbols-outlined text-primary/30">arrow_forward</span><div class="flex flex-col items-center gap-1"><div class="px-5 py-3 bg-white dark:bg-slate-800 border border-primary/20 rounded shadow-sm text-sm font-bold">Select Semester</div></div><span class="material-symbols-outlined text-primary/30">arrow_forward</span><div class="flex flex-col items-center gap-1"><div class="px-5 py-3 bg-white dark:bg-slate-800 border border-primary/20 rounded shadow-sm text-sm font-bold">Select Subject</div></div><span class="material-symbols-outlined text-primary/30">arrow_forward</span><div class="flex flex-col items-center gap-2 bg-primary/5 p-4 rounded-lg border border-primary/10"><div class="px-6 py-3 bg-primary text-white rounded shadow-sm font-bold text-sm">Load Subject Workspace</div><div class="grid grid-cols-2 gap-2 mt-2"><span class="text-[9px] px-2 py-1 bg-white/50 dark:bg-slate-700/50 rounded">Subject Info</span><span class="text-[9px] px-2 py-1 bg-white/50 dark:bg-slate-700/50 rounded">Marks Config</span><span class="text-[9px] px-2 py-1 bg-white/50 dark:bg-slate-700/50 rounded">Study Materials</span><span class="text-[9px] px-2 py-1 bg-white/50 dark:bg-slate-700/50 rounded">Library</span><span class="text-[9px] px-2 py-1 bg-white/50 dark:bg-slate-700/50 rounded">Projects</span><span class="text-[9px] px-2 py-1 bg-white/50 dark:bg-slate-700/50 rounded">Tasks &amp; Notices</span></div></div></div><div class="grid grid-cols-3 gap-6 bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg border border-primary/5"><div class="space-y-2"><h4 class="text-xs font-extrabold uppercase text-primary/50">Admin</h4><ul class="text-[11px] list-disc list-inside space-y-1 opacity-70"><li>Adds Branches/Semesters</li><li>Assigns HODs</li></ul></div><div class="space-y-2"><h4 class="text-xs font-extrabold uppercase text-primary/50">HOD</h4><ul class="text-[11px] list-disc list-inside space-y-1 opacity-70"><li>Adds Subjects</li><li>Assigns Teachers</li></ul></div><div class="space-y-2"><h4 class="text-xs font-extrabold uppercase text-primary/50">Teacher</h4><ul class="text-[11px] list-disc list-inside space-y-1 opacity-70"><li>Adds Subject Details</li><li>Uploads Materials</li><li>Configures Internal Marks</li></ul></div></div><div class="flex flex-col gap-2"><p class="text-center text-xs font-bold text-primary/70">All subject visibility and actions are dynamically controlled by Branch, Semester, and Role permissions.</p><p class="text-center text-xs italic text-primary/50">* Marks entry and calculation are handled inside each subject based on exam configuration.</p></div></div></div></section><section class="w-full max-w-5xl grid md:grid-cols-2 gap-12"><div class="flex flex-col gap-6"><div class="flex items-center gap-3 mb-6"><span class="material-symbols-outlined text-primary">library_books</span><h2 class="text-xl font-bold">Library &amp; Learning Resources Flow</h2></div><div class="flex flex-col gap-4 items-center"><div class="w-full p-3 bg-white dark:bg-slate-900 border border-primary/10 rounded shadow-sm text-center"><div class="font-bold text-sm">Teacher / HOD Adds Library Resource</div><div class="text-[10px] uppercase text-primary/40 font-bold">Management</div></div><span class="material-symbols-outlined text-primary/20">arrow_downward</span><div class="w-full p-3 bg-white dark:bg-slate-900 border border-primary/10 rounded shadow-sm text-center"><div class="font-bold text-sm">Resource Linked to Subject</div><div class="text-[10px] uppercase text-primary/40 font-bold">Configuration</div></div><span class="material-symbols-outlined text-primary/20">arrow_downward</span><div class="w-full p-3 bg-white dark:bg-slate-900 border border-primary/10 rounded shadow-sm text-center"><div class="font-bold text-sm">Stored in Central Library</div><div class="text-[10px] uppercase text-primary/40 font-bold">System Repository</div></div><span class="material-symbols-outlined text-primary/20">arrow_downward</span><div class="w-full p-3 bg-primary text-white rounded shadow-sm text-center"><div class="font-bold text-sm">Students View Subject-wise Resources</div><div class="text-[10px] uppercase text-white/60 font-bold">Student Portal</div></div></div><div class="mt-4"><div class="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg border border-primary/5 mb-2"><h4 class="text-xs font-bold uppercase text-primary/60 mb-2">Resource Fields</h4><div class="flex flex-wrap gap-2"><span class="text-[10px] bg-white px-2 py-1 rounded border">Book/Resource Name</span><span class="text-[10px] bg-white px-2 py-1 rounded border">Author</span><span class="text-[10px] bg-white px-2 py-1 rounded border">Image/URL</span><span class="text-[10px] bg-white px-2 py-1 rounded border">Custom Label</span></div></div><p class="text-[10px] italic text-primary/50 text-center">Library resources are curated by Teachers and HODs and are visible subject-wise to students.</p></div></div><div class="flex flex-col gap-6"><div class="flex items-center gap-3 mb-6"><span class="material-symbols-outlined text-primary">account_tree</span><h2 class="text-xl font-bold">Academic Project Flow</h2></div><div class="flex flex-col gap-4 items-center"><div class="w-full p-3 bg-white dark:bg-slate-900 border border-primary/10 rounded shadow-sm text-center"><div class="font-bold text-sm">Teacher / HOD Adds Project</div><div class="text-[10px] uppercase text-primary/40 font-bold">Management</div></div><span class="material-symbols-outlined text-primary/20">arrow_downward</span><div class="w-full p-3 bg-white dark:bg-slate-900 border border-primary/10 rounded shadow-sm text-center"><div class="font-bold text-sm">Project Linked to Subject</div><div class="text-[10px] uppercase text-primary/40 font-bold">Hierarchy Check</div></div><span class="material-symbols-outlined text-primary/20">arrow_downward</span><div class="w-full p-3 bg-white dark:bg-slate-900 border border-primary/10 rounded shadow-sm text-center"><div class="font-bold text-sm">Project Description &amp; Guidelines Added</div><div class="text-[10px] uppercase text-primary/40 font-bold">Teacher</div></div><span class="material-symbols-outlined text-primary/20">arrow_downward</span><div class="w-full p-3 bg-primary text-white rounded shadow-sm text-center"><div class="font-bold text-sm">Students View Project List (Read-Only)</div><div class="text-[10px] uppercase text-white/60 font-bold">Student Portal</div></div></div><div class="mt-4"><div class="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg border border-primary/5 mb-2"><h4 class="text-xs font-bold uppercase text-primary/60 mb-2">Project Fields</h4><div class="flex flex-wrap gap-2"><span class="text-[10px] bg-white px-2 py-1 rounded border">Project Name</span><span class="text-[10px] bg-white px-2 py-1 rounded border">Description</span><span class="text-[10px] bg-white px-2 py-1 rounded border">Optional Notes</span><span class="text-[10px] bg-white px-2 py-1 rounded border">Custom Label</span></div></div><p class="text-[10px] italic text-primary/50 text-center">Projects are informational and guidance-based. Submission and evaluation are handled offline.</p></div></div></section>
+<!-- 3. Subject Hub Flow -->
+<!-- 4. Task Submission & Attendance Flows -->
+<section class="w-full max-w-5xl grid md:grid-cols-2 gap-12 mt-8">
+<!-- Task Flow -->
+<div class="flex flex-col gap-6"><div class="flex items-center gap-3 mb-6"><span class="material-symbols-outlined text-primary">assignment</span><h2 class="text-xl font-bold">Assignment / Task Tracking Flow (Offline / Status-Based)</h2></div><div class="flex flex-col gap-4 items-center"><div class="w-full p-3 bg-white dark:bg-slate-900 border border-primary/10 rounded shadow-sm text-center"><div class="font-bold text-sm">Teacher Creates Task</div><div class="text-[10px] uppercase text-primary/40 font-bold">Subject Based</div></div><span class="material-symbols-outlined text-primary/20">arrow_downward</span><div class="w-20 h-20 bg-primary/10 border border-primary/20 flex items-center justify-center rotate-45 rounded"><span class="-rotate-45 font-bold text-[10px] text-center">Optional Deadline Set</span></div><span class="material-symbols-outlined text-primary/20">arrow_downward</span><div class="w-full p-3 bg-white dark:bg-slate-900 border border-primary/10 rounded shadow-sm text-center"><div class="font-bold text-sm">System Generates Enrolled Student List</div><div class="text-[10px] uppercase text-primary/40 font-bold">System</div></div><span class="material-symbols-outlined text-primary/20">arrow_downward</span><div class="w-full p-3 bg-white dark:bg-slate-900 border border-primary/10 rounded shadow-sm text-center"><div class="font-bold text-sm">Teacher Reviews Student Work</div><div class="text-[10px] uppercase text-primary/40 font-bold">Offline / In-Class</div></div><span class="material-symbols-outlined text-primary/20">arrow_downward</span><div class="w-full p-3 bg-white dark:bg-slate-900 border border-primary/10 rounded shadow-sm text-center"><div class="font-bold text-sm">Teacher Marks Status</div><div class="text-[10px] uppercase text-primary/40 font-bold">Completed / Not Completed</div></div><span class="material-symbols-outlined text-primary/20">arrow_downward</span><div class="w-full p-3 bg-primary text-white rounded shadow-sm text-center"><div class="font-bold text-sm">System Updates Student Academic Record</div><div class="text-[10px] uppercase text-white/60 font-bold">System</div></div></div><div class="mt-6 space-y-4"><div class="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg border border-primary/5"><h4 class="text-xs font-bold uppercase text-primary/60 mb-2">Notification Rules</h4><ul class="text-[11px] space-y-1 opacity-70"><li>• 1 day before deadline -&gt; Automatic Reminder</li><li>• After deadline -&gt; Status Highlighted (Late / Pending)</li></ul></div><p class="text-[10px] italic text-primary/50 text-center px-4">This module tracks assignment completion status. Online file submission is not part of this system.</p></div></div>
+<!-- Attendance Flow -->
+<div class="flex flex-col gap-6"><div class="flex items-center gap-3 mb-6"><span class="material-symbols-outlined text-primary">how_to_reg</span><h2 class="text-xl font-bold">Attendance Flow</h2></div><div class="flex flex-col gap-4 items-center"><div class="w-full p-3 bg-white dark:bg-slate-900 border border-primary/10 rounded shadow-sm text-center"><div class="font-bold text-sm">Mark Attendance</div><div class="text-[10px] uppercase text-primary/40 font-bold">Teacher</div></div><span class="material-symbols-outlined text-primary/20">arrow_downward</span><div class="w-full p-3 bg-white dark:bg-slate-900 border border-primary/10 rounded shadow-sm text-center"><div class="font-bold text-sm">System Calculates %</div><div class="text-[10px] uppercase text-primary/40 font-bold">System</div></div><span class="material-symbols-outlined text-primary/20">arrow_downward</span><div class="w-20 h-20 bg-rose-500 text-white flex items-center justify-center rotate-45 rounded shadow-sm"><span class="-rotate-45 font-bold text-[10px] text-center">Low Attendance?</span></div><span class="material-symbols-outlined text-primary/20">arrow_downward</span><div class="w-full p-3 bg-rose-100 text-rose-700 border border-rose-200 rounded shadow-sm text-center"><div class="font-bold text-sm">Warning &amp; Update</div><div class="text-[10px] uppercase text-rose-400 font-bold">Student Dashboard</div></div></div></div>
+</section>
+<!-- Footer Section -->
+<footer class="bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 py-12 w-full">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid md:grid-cols-3 gap-8 items-start">
+            <div class="space-y-4">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary text-2xl">school</span>
+                    <span class="text-lg font-bold text-primary dark:text-white">Smart College Portal</span>
+                </div>
+                <p class="text-sm text-slate-500 max-w-xs">Final Year Diploma Project<br />Academic Year 2025-2026</p>
+            </div>
+            <div class="flex flex-col gap-2">
+                <h4 class="font-bold text-slate-900 dark:text-white mb-2">Links</h4>
+                <a class="text-sm text-slate-500 hover:text-primary transition-colors" href="../docs/01-Submission-Checklist.md">Documentation</a>
+                <a class="text-sm text-slate-500 hover:text-primary transition-colors" href="../docs/03-Project-Status.md">Project Status</a>
+                <a class="text-sm text-slate-500 hover:text-primary transition-colors" href="../docs/02-Demo-Guide.md">Demo Guide</a>
+            </div>
+            <div class="flex flex-col gap-4 items-start md:items-end">
+                <a class="flex items-center gap-2 text-slate-900 dark:text-white font-bold hover:text-primary transition-colors" href="https://github.com" target="_blank">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+                    GitHub Repository
+                </a>
+                <div class="text-xs text-slate-400">(c) 2026 Smart College Portal. Designed for Excellence.</div>
+            </div>
+        </div>
+    </div>
+</footer>
+</main>
+</div>
+</div>
+</body></html>

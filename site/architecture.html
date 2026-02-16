@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>Architecture - Smart College Academic Portal</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#1a355b",
+            "background-light": "#f6f7f8",
+            "background-dark": "#13181f"
+          },
+          fontFamily: {
+            "display": ["Manrope", "sans-serif"]
+          },
+          borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"}
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'Manrope', sans-serif;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+  </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-[#101419] font-display">
+  <nav class="sticky top-0 z-50 w-full bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary text-3xl">school</span>
+          <span class="text-xl font-bold text-primary dark:text-white tracking-tight">Smart College</span>
+        </div>
+        <div class="hidden md:flex items-center space-x-8">
+          <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="../index.html">Overview</a>
+          <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="system-flow.html">System Flow</a>
+          <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="modules.html">Modules</a>
+          <a class="text-primary font-bold border-b-2 border-primary py-1 text-sm" href="architecture.html">Architecture</a>
+          <a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-white font-medium text-sm transition-colors" href="demo-flow.html">Demo Flow</a>
+        </div>
+        <div>
+          <button class="bg-primary text-white px-5 py-2 rounded-lg font-bold text-sm hover:bg-opacity-90 transition-all shadow-lg shadow-primary/20">Documentation</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="flex-1 max-w-[1200px] mx-auto w-full px-10 py-10">
+    <div class="mb-12">
+      <h1 class="text-[#101419] text-4xl font-black leading-tight tracking-[-0.033em] mb-3">System Architecture</h1>
+      <p class="text-[#5a6f8c] text-lg font-normal leading-normal max-w-3xl">A conceptual blueprint of the Smart College Academic Portal tech stack and data flow mechanisms, ensuring scalability and security.</p>
+    </div>
+
+    <section class="mb-16">
+      <h3 class="text-primary text-xl font-bold mb-6 flex items-center gap-2">
+        <span class="material-symbols-outlined">layers</span> Core Tech Stack
+      </h3>
+      <div class="flex flex-wrap gap-4">
+        <div class="flex items-center gap-3 bg-white border border-[#e9ecf1] rounded-xl px-5 py-3 shadow-sm">
+          <div class="size-8 bg-[#61dafb]/10 text-[#61dafb] rounded flex items-center justify-center">
+            <span class="material-symbols-outlined">javascript</span>
+          </div>
+          <div>
+            <p class="text-sm font-bold text-[#101419]">React</p>
+            <p class="text-xs text-[#5a6f8c]">Frontend Library</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 bg-white border border-[#e9ecf1] rounded-xl px-5 py-3 shadow-sm">
+          <div class="size-8 bg-[#68a063]/10 text-[#68a063] rounded flex items-center justify-center">
+            <span class="material-symbols-outlined">settings_ethernet</span>
+          </div>
+          <div>
+            <p class="text-sm font-bold text-[#101419]">Node.js</p>
+            <p class="text-xs text-[#5a6f8c]">Backend Runtime</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 bg-white border border-[#e9ecf1] rounded-xl px-5 py-3 shadow-sm">
+          <div class="size-8 bg-[#47a248]/10 text-[#47a248] rounded flex items-center justify-center">
+            <span class="material-symbols-outlined">database</span>
+          </div>
+          <div>
+            <p class="text-sm font-bold text-[#101419]">MongoDB</p>
+            <p class="text-xs text-[#5a6f8c]">NoSQL Database</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 bg-white border border-[#e9ecf1] rounded-xl px-5 py-3 shadow-sm">
+          <div class="size-8 bg-primary/10 text-primary rounded flex items-center justify-center">
+            <span class="material-symbols-outlined">cloud</span>
+          </div>
+          <div>
+            <p class="text-sm font-bold text-[#101419]">REST API</p>
+            <p class="text-xs text-[#5a6f8c]">Communication</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mb-16">
+      <h3 class="text-primary text-xl font-bold mb-8 flex items-center gap-2">
+        <span class="material-symbols-outlined">account_tree</span> Data Flow Visualization
+      </h3>
+      <div class="relative flex flex-col md:flex-row items-center justify-between gap-8 md:gap-4 p-8 bg-white border border-[#e9ecf1] rounded-2xl shadow-sm">
+        <div class="flex flex-col items-center text-center max-w-[180px] z-10">
+          <div class="size-16 rounded-full bg-primary/5 border-2 border-primary/20 flex items-center justify-center text-primary mb-4">
+            <span class="material-symbols-outlined text-3xl">devices</span>
+          </div>
+          <h4 class="font-bold text-[#101419] mb-1 text-sm">User Interface</h4>
+          <p class="text-xs text-[#5a6f8c]">User inputs and interactions via React</p>
+        </div>
+        <span class="material-symbols-outlined text-primary/30 hidden md:block text-4xl">trending_flat</span>
+        <span class="material-symbols-outlined text-primary/30 md:hidden text-4xl rotate-90">trending_flat</span>
+        <div class="flex flex-col items-center text-center max-w-[180px] z-10">
+          <div class="size-16 rounded-full bg-primary/5 border-2 border-primary/20 flex items-center justify-center text-primary mb-4">
+            <span class="material-symbols-outlined text-3xl">api</span>
+          </div>
+          <h4 class="font-bold text-[#101419] mb-1 text-sm">API Layer</h4>
+          <p class="text-xs text-[#5a6f8c]">Authentication, routing, and logic</p>
+        </div>
+        <span class="material-symbols-outlined text-primary/30 hidden md:block text-4xl">trending_flat</span>
+        <span class="material-symbols-outlined text-primary/30 md:hidden text-4xl rotate-90">trending_flat</span>
+        <div class="flex flex-col items-center text-center max-w-[180px] z-10">
+          <div class="size-16 rounded-full bg-primary/5 border-2 border-primary/20 flex items-center justify-center text-primary mb-4">
+            <span class="material-symbols-outlined text-3xl">storage</span>
+          </div>
+          <h4 class="font-bold text-[#101419] mb-1 text-sm">Database</h4>
+          <p class="text-xs text-[#5a6f8c]">Persistent storage in MongoDB</p>
+        </div>
+        <span class="material-symbols-outlined text-primary/30 hidden md:block text-4xl">trending_flat</span>
+        <span class="material-symbols-outlined text-primary/30 md:hidden text-4xl rotate-90">trending_flat</span>
+        <div class="flex flex-col items-center text-center max-w-[180px] z-10">
+          <div class="size-16 rounded-full bg-green-500/10 border-2 border-green-500/20 flex items-center justify-center text-green-600 mb-4">
+            <span class="material-symbols-outlined text-3xl">check_circle</span>
+          </div>
+          <h4 class="font-bold text-[#101419] mb-1 text-sm">Response</h4>
+          <p class="text-xs text-[#5a6f8c]">UI updates and feedback</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="mb-16">
+      <div class="flex justify-between items-end mb-8">
+        <div>
+          <h3 class="text-primary text-xl font-bold flex items-center gap-2">
+            <span class="material-symbols-outlined">schema</span> Database Collections
+          </h3>
+          <p class="text-[#5a6f8c] text-sm mt-1">Core entities managed within the system.</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="p-5 bg-white border border-[#e9ecf1] rounded-xl hover:border-primary/30 transition-all cursor-default">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="size-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <span class="material-symbols-outlined">group</span>
+            </div>
+            <span class="font-bold text-[#101419]">Users</span>
+          </div>
+          <p class="text-xs text-[#5a6f8c]">Profiles, roles, and auth credentials.</p>
+        </div>
+        <div class="p-5 bg-white border border-[#e9ecf1] rounded-xl hover:border-primary/30 transition-all cursor-default">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="size-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+              <span class="material-symbols-outlined">menu_book</span>
+            </div>
+            <span class="font-bold text-[#101419]">Subjects</span>
+          </div>
+          <p class="text-xs text-[#5a6f8c]">Course data, marks, and resources.</p>
+        </div>
+        <div class="p-5 bg-white border border-[#e9ecf1] rounded-xl hover:border-primary/30 transition-all cursor-default">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="size-10 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
+              <span class="material-symbols-outlined">assignment</span>
+            </div>
+            <span class="font-bold text-[#101419]">Tasks</span>
+          </div>
+          <p class="text-xs text-[#5a6f8c]">Assignments, deadlines, submissions.</p>
+        </div>
+        <div class="p-5 bg-white border border-[#e9ecf1] rounded-xl hover:border-primary/30 transition-all cursor-default">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="size-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
+              <span class="material-symbols-outlined">campaign</span>
+            </div>
+            <span class="font-bold text-[#101419]">Notices</span>
+          </div>
+          <p class="text-xs text-[#5a6f8c]">Announcements and alerts.</p>
+        </div>
+        <div class="p-5 bg-white border border-[#e9ecf1] rounded-xl hover:border-primary/30 transition-all cursor-default">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="size-10 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
+              <span class="material-symbols-outlined">verified_user</span>
+            </div>
+            <span class="font-bold text-[#101419]">Attendance</span>
+          </div>
+          <p class="text-xs text-[#5a6f8c]">Session records and summaries.</p>
+        </div>
+        <div class="p-5 bg-white border border-[#e9ecf1] rounded-xl hover:border-primary/30 transition-all cursor-default">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="size-10 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center">
+              <span class="material-symbols-outlined">calendar_today</span>
+            </div>
+            <span class="font-bold text-[#101419]">Timetable</span>
+          </div>
+          <p class="text-xs text-[#5a6f8c]">Class schedules and sessions.</p>
+        </div>
+        <div class="p-5 bg-white border border-[#e9ecf1] rounded-xl hover:border-primary/30 transition-all cursor-default">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="size-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <span class="material-symbols-outlined">local_library</span>
+            </div>
+            <span class="font-bold text-[#101419]">Library</span>
+          </div>
+          <p class="text-xs text-[#5a6f8c]">Books and learning resources.</p>
+        </div>
+        <div class="p-5 bg-primary/5 border border-primary/10 border-dashed rounded-xl flex items-center justify-center text-[#5a6f8c] text-xs text-center italic">
+          Scalable schema for future modules
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid md:grid-cols-3 gap-8 items-start">
+        <div class="space-y-4">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-2xl">school</span>
+            <span class="text-lg font-bold text-primary dark:text-white">Smart College Portal</span>
+          </div>
+          <p class="text-sm text-slate-500 max-w-xs">Final Year Diploma Project<br />Academic Year 2025-2026</p>
+        </div>
+        <div class="flex flex-col gap-2">
+          <h4 class="font-bold text-slate-900 dark:text-white mb-2">Links</h4>
+          <a class="text-sm text-slate-500 hover:text-primary transition-colors" href="../docs/01-Submission-Checklist.md">Documentation</a>
+          <a class="text-sm text-slate-500 hover:text-primary transition-colors" href="../docs/03-Project-Status.md">Project Status</a>
+          <a class="text-sm text-slate-500 hover:text-primary transition-colors" href="../docs/02-Demo-Guide.md">Demo Guide</a>
+        </div>
+        <div class="flex flex-col gap-4 items-start md:items-end">
+          <a class="flex items-center gap-2 text-slate-900 dark:text-white font-bold hover:text-primary transition-colors" href="https://github.com" target="_blank">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+            GitHub Repository
+          </a>
+          <div class="text-xs text-slate-400">(c) 2026 Smart College Portal. Designed for Excellence.</div>
+        </div>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
