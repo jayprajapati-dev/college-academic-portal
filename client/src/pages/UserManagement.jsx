@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { RoleLayout } from '../components';
+import { Input, RoleLayout } from '../components';
 import useRoleNav from '../hooks/useRoleNav';
 
 const UserManagement = () => {
@@ -26,10 +26,42 @@ const UserManagement = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const [showAddHodModal, setShowAddHodModal] = useState(false);
+  const [showAddTeacherModal, setShowAddTeacherModal] = useState(false);
   const [adminTab, setAdminTab] = useState('new');
   const [adminForm, setAdminForm] = useState({ name: '', mobile: '', email: '' });
   const [adminSearch, setAdminSearch] = useState('');
   const [adminCandidateId, setAdminCandidateId] = useState('');
+  const [branches, setBranches] = useState([]);
+  const [semesters, setSemesters] = useState([]);
+  const [hodSubjects, setHodSubjects] = useState([]);
+  const [teacherSubjects, setTeacherSubjects] = useState([]);
+  const [addHodLoading, setAddHodLoading] = useState(false);
+  const [addTeacherLoading, setAddTeacherLoading] = useState(false);
+  const [addHodError, setAddHodError] = useState('');
+  const [addTeacherError, setAddTeacherError] = useState('');
+  const [hodForm, setHodForm] = useState({
+    name: '',
+    mobile: '',
+    selectedBranches: [],
+    selectedSemesters: [],
+    selectedSubjects: []
+  });
+  const [teacherForm, setTeacherForm] = useState({
+    name: '',
+    mobile: '',
+    selectedBranches: [],
+    selectedSemesters: [],
+    selectedSubjects: []
+  });
+  const [showCoordinatorModal, setShowCoordinatorModal] = useState(false);
+  const [coordinatorForm, setCoordinatorForm] = useState({
+    branchId: '',
+    semesterIds: [],
+    academicYear: '',
+    validFrom: '',
+    validTill: ''
+  });
 
   const location = useLocation();
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -39,7 +71,16 @@ const UserManagement = () => {
   const isAdminMode = location.pathname.startsWith('/admin');
   const navRole = isAdminMode ? 'admin' : role;
   const { navItems, loading: navLoading } = useRoleNav(navRole);
-  const panelLabel = isAdminMode ? 'Admin Panel' : role === 'hod' ? 'HOD Panel' : 'Teacher Panel';
+  const panelLabel = isAdminMode ? 'Admin Panel' : role === 'hod' ? 'HOD Panel' : role === 'coordinator' ? 'Coordinator Panel' : 'Teacher Panel';
+  const [branchFilter, setBranchFilter] = useState('');
+  const [semesterFilter, setSemesterFilter] = useState('');
+
+  const toDateInputValue = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toISOString().slice(0, 10);
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -64,6 +105,21 @@ const UserManagement = () => {
       }
     } catch (error) {
       console.error('Error fetching permissions:', error);
+    }
+  }, []);
+
+  const fetchAcademicMeta = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const [branchesRes, semestersRes] = await Promise.all([
+        fetch('/api/academic/branches', { headers: { Authorization: `Bearer ${token}` } }).then((res) => res.json()),
+        fetch('/api/academic/semesters', { headers: { Authorization: `Bearer ${token}` } }).then((res) => res.json())
+      ]);
+
+      if (branchesRes?.success) setBranches(branchesRes.data || []);
+      if (semestersRes?.success) setSemesters(semestersRes.data || []);
+    } catch (error) {
+      console.error('Error fetching academic metadata:', error);
     }
   }, []);
 
@@ -99,7 +155,27 @@ const UserManagement = () => {
     if (hasAdminAccess && isAdminMode) {
       fetchPermissionModules();
     }
-  }, [fetchPermissionModules, fetchUsers, hasAdminAccess, isAdminMode, navigate, role]);
+    if (isAdminMode || role === 'hod') {
+      fetchAcademicMeta();
+    }
+  }, [fetchAcademicMeta, fetchPermissionModules, fetchUsers, hasAdminAccess, isAdminMode, navigate, role]);
+
+  const getUserBranchIds = (user) => {
+    if (!user) return [];
+    const ids = [];
+    if (user.branch) ids.push(user.branch._id || user.branch);
+    if (user.department) ids.push(user.department._id || user.department);
+    if (Array.isArray(user.branches)) ids.push(...user.branches.map((b) => b?._id || b));
+    return ids.filter(Boolean).map(String);
+  };
+
+  const getUserSemesterIds = (user) => {
+    if (!user) return [];
+    const ids = [];
+    if (user.semester) ids.push(user.semester._id || user.semester);
+    if (Array.isArray(user.semesters)) ids.push(...user.semesters.map((s) => s?._id || s));
+    return ids.filter(Boolean).map(String);
+  };
 
   const filterUsers = useCallback(() => {
     let filtered = users;
@@ -127,9 +203,17 @@ const UserManagement = () => {
       filtered = filtered.filter(u => u.status === statusFilter);
     }
 
+    if (branchFilter) {
+      filtered = filtered.filter((u) => getUserBranchIds(u).includes(String(branchFilter)));
+    }
+
+    if (semesterFilter) {
+      filtered = filtered.filter((u) => getUserSemesterIds(u).includes(String(semesterFilter)));
+    }
+
     setFilteredUsers(filtered);
     setCurrentPage(1);
-  }, [users, searchTerm, roleFilter, statusFilter]);
+  }, [users, searchTerm, roleFilter, statusFilter, branchFilter, semesterFilter]);
 
   useEffect(() => {
     filterUsers();
@@ -215,6 +299,86 @@ const UserManagement = () => {
     }
   };
 
+  const handleOpenCoordinatorModal = (user) => {
+    setSelectedUser(user);
+    const existing = user?.coordinator || {};
+    setCoordinatorForm({
+      branchId: existing.branch || '',
+      semesterIds: Array.isArray(existing.semesters) ? existing.semesters : [],
+      academicYear: existing.academicYear || '',
+      validFrom: toDateInputValue(existing.validFrom),
+      validTill: toDateInputValue(existing.validTill)
+    });
+    setShowCoordinatorModal(true);
+  };
+
+  const handleAssignCoordinator = async () => {
+    if (!selectedUser) return;
+    if (!coordinatorForm.branchId || coordinatorForm.semesterIds.length === 0) {
+      setErrorMessage('Please select branch and at least one semester');
+      return;
+    }
+    if (!coordinatorForm.academicYear) {
+      setErrorMessage('Please provide academic year');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/admin/users/${selectedUser._id}/coordinator`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          branchId: coordinatorForm.branchId,
+          semesterIds: coordinatorForm.semesterIds,
+          academicYear: coordinatorForm.academicYear,
+          validFrom: coordinatorForm.validFrom,
+          validTill: coordinatorForm.validTill
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setShowCoordinatorModal(false);
+        setSuccessMessage('Coordinator assigned successfully');
+        setTimeout(() => setSuccessMessage(''), 3000);
+        fetchUsers();
+      } else {
+        setErrorMessage(data.message || 'Failed to assign coordinator');
+      }
+    } catch (error) {
+      console.error('Error assigning coordinator:', error);
+      setErrorMessage('Error assigning coordinator');
+    }
+  };
+
+  const handleRevokeCoordinator = async (user) => {
+    if (!user) return;
+    if (!window.confirm('Revoke coordinator role for this user?')) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/admin/users/${user._id}/coordinator`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setSuccessMessage('Coordinator revoked successfully');
+        setTimeout(() => setSuccessMessage(''), 3000);
+        fetchUsers();
+      } else {
+        setErrorMessage(data.message || 'Failed to revoke coordinator');
+      }
+    } catch (error) {
+      console.error('Error revoking coordinator:', error);
+      setErrorMessage('Error revoking coordinator');
+    }
+  };
+
   const handleCreateAdmin = async () => {
     try {
       if (!adminForm.name || !adminForm.mobile) {
@@ -291,6 +455,236 @@ const UserManagement = () => {
     }
   };
 
+  const fetchSubjectsForHod = useCallback(async (branchIds, semesterIds) => {
+    if (branchIds.length === 0 || semesterIds.length === 0) {
+      setHodSubjects([]);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const params = new URLSearchParams({ page: '1', limit: '200' });
+      branchIds.forEach((id) => params.append('branchId', id));
+      semesterIds.forEach((id) => params.append('semesterId', id));
+
+      const response = await fetch(`/api/academic/subjects/admin/list?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
+      const data = await response.json();
+      setHodSubjects(data.subjects || []);
+    } catch (error) {
+      console.error('Error fetching HOD subjects:', error);
+    }
+  }, [handleLogout]);
+
+  const fetchSubjectsForTeacher = useCallback(async (branchIds, semesterIds) => {
+    if (branchIds.length === 0 || semesterIds.length === 0) {
+      setTeacherSubjects([]);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const params = new URLSearchParams({ page: '1', limit: '200' });
+      branchIds.forEach((id) => params.append('branchId', id));
+      semesterIds.forEach((id) => params.append('semesterId', id));
+
+      const response = await fetch(`/api/academic/subjects/admin/list?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
+      const data = await response.json();
+      setTeacherSubjects(data.subjects || []);
+    } catch (error) {
+      console.error('Error fetching teacher subjects:', error);
+    }
+  }, [handleLogout]);
+
+  const handleHodBranchToggle = (branchId) => {
+    setHodForm((prev) => {
+      const selectedBranches = prev.selectedBranches.includes(branchId)
+        ? prev.selectedBranches.filter((id) => id !== branchId)
+        : [...prev.selectedBranches, branchId];
+      fetchSubjectsForHod(selectedBranches, prev.selectedSemesters);
+      return { ...prev, selectedBranches };
+    });
+  };
+
+  const handleHodSemesterToggle = (semesterId) => {
+    setHodForm((prev) => {
+      const selectedSemesters = prev.selectedSemesters.includes(semesterId)
+        ? prev.selectedSemesters.filter((id) => id !== semesterId)
+        : [...prev.selectedSemesters, semesterId];
+      fetchSubjectsForHod(prev.selectedBranches, selectedSemesters);
+      return { ...prev, selectedSemesters };
+    });
+  };
+
+  const handleHodSubjectToggle = (subjectId) => {
+    setHodForm((prev) => {
+      const selectedSubjects = prev.selectedSubjects.includes(subjectId)
+        ? prev.selectedSubjects.filter((id) => id !== subjectId)
+        : [...prev.selectedSubjects, subjectId];
+      return { ...prev, selectedSubjects };
+    });
+  };
+
+  const handleTeacherBranchToggle = (branchId) => {
+    setTeacherForm((prev) => {
+      const selectedBranches = prev.selectedBranches.includes(branchId)
+        ? prev.selectedBranches.filter((id) => id !== branchId)
+        : [...prev.selectedBranches, branchId];
+      fetchSubjectsForTeacher(selectedBranches, prev.selectedSemesters);
+      return { ...prev, selectedBranches };
+    });
+  };
+
+  const handleTeacherSemesterToggle = (semesterId) => {
+    setTeacherForm((prev) => {
+      const selectedSemesters = prev.selectedSemesters.includes(semesterId)
+        ? prev.selectedSemesters.filter((id) => id !== semesterId)
+        : [...prev.selectedSemesters, semesterId];
+      fetchSubjectsForTeacher(prev.selectedBranches, selectedSemesters);
+      return { ...prev, selectedSemesters };
+    });
+  };
+
+  const handleTeacherSubjectToggle = (subjectId) => {
+    setTeacherForm((prev) => {
+      const selectedSubjects = prev.selectedSubjects.includes(subjectId)
+        ? prev.selectedSubjects.filter((id) => id !== subjectId)
+        : [...prev.selectedSubjects, subjectId];
+      return { ...prev, selectedSubjects };
+    });
+  };
+
+  const handleCreateHod = async () => {
+    setAddHodError('');
+    if (!hodForm.name || !hodForm.mobile) {
+      setAddHodError('Name and mobile number are required');
+      return;
+    }
+    if (hodForm.selectedBranches.length === 0) {
+      setAddHodError('Select at least one branch');
+      return;
+    }
+    if (hodForm.selectedSemesters.length === 0) {
+      setAddHodError('Select at least one semester');
+      return;
+    }
+
+    setAddHodLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const payload = {
+        name: hodForm.name,
+        mobile: hodForm.mobile,
+        branchIds: hodForm.selectedBranches,
+        semesterIds: hodForm.selectedSemesters,
+        subjectIds: hodForm.selectedSubjects,
+        addedBy: currentUser?._id,
+        addedByRole: currentUser?.role
+      };
+      const response = await fetch('/api/admin/hods', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setShowAddHodModal(false);
+        setHodForm({ name: '', mobile: '', selectedBranches: [], selectedSemesters: [], selectedSubjects: [] });
+        setHodSubjects([]);
+        fetchUsers();
+        setSuccessMessage('HOD added successfully! Temporary credentials sent.');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setAddHodError(data.message || 'Error adding HOD');
+      }
+    } catch (error) {
+      console.error('Error adding HOD:', error);
+      setAddHodError('Error adding HOD');
+    } finally {
+      setAddHodLoading(false);
+    }
+  };
+
+  const handleCreateTeacher = async () => {
+    setAddTeacherError('');
+    if (!teacherForm.name || !teacherForm.mobile) {
+      setAddTeacherError('Name and mobile number are required');
+      return;
+    }
+    if (teacherForm.selectedBranches.length === 0) {
+      setAddTeacherError('Select at least one branch');
+      return;
+    }
+    if (teacherForm.selectedSemesters.length === 0) {
+      setAddTeacherError('Select at least one semester');
+      return;
+    }
+    if (teacherForm.selectedSubjects.length === 0) {
+      setAddTeacherError('Select at least one subject');
+      return;
+    }
+
+    setAddTeacherLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const payload = {
+        name: teacherForm.name,
+        mobile: teacherForm.mobile,
+        branchIds: teacherForm.selectedBranches,
+        semesterIds: teacherForm.selectedSemesters,
+        subjectIds: teacherForm.selectedSubjects,
+        addedBy: currentUser?._id,
+        addedByRole: currentUser?.role
+      };
+      const response = await fetch('/api/admin/teachers', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setShowAddTeacherModal(false);
+        setTeacherForm({ name: '', mobile: '', selectedBranches: [], selectedSemesters: [], selectedSubjects: [] });
+        setTeacherSubjects([]);
+        fetchUsers();
+        setSuccessMessage('Teacher added successfully! Temporary credentials sent.');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setAddTeacherError(data.message || 'Error adding teacher');
+      }
+    } catch (error) {
+      console.error('Error adding teacher:', error);
+      setAddTeacherError('Error adding teacher');
+    } finally {
+      setAddTeacherLoading(false);
+    }
+  };
+
 
   const handleDeleteUser = async (user) => {
     try {
@@ -323,6 +717,7 @@ const UserManagement = () => {
     const colors = {
       admin: 'bg-red-100 text-red-800',
       hod: 'bg-purple-100 text-purple-800',
+      coordinator: 'bg-emerald-100 text-emerald-800',
       teacher: 'bg-blue-100 text-blue-800',
       student: 'bg-green-100 text-green-800'
     };
@@ -341,6 +736,7 @@ const UserManagement = () => {
   const getRoleLabel = (user) => {
     if (user.role === 'teacher' && user.adminAccess) return 'Teacher (Admin)';
     if (user.role === 'hod' && user.adminAccess) return 'HOD (Admin)';
+    if (user.role === 'coordinator') return 'COORDINATOR';
     return user.role?.toUpperCase() || 'USER';
   };
 
@@ -350,6 +746,7 @@ const UserManagement = () => {
         { value: 'all', label: 'All Roles' },
         { value: 'admin', label: 'Admin' },
         { value: 'hod', label: 'HOD' },
+        { value: 'coordinator', label: 'Coordinator' },
         { value: 'teacher', label: 'Teacher' },
         { value: 'student', label: 'Student' }
       ];
@@ -359,6 +756,7 @@ const UserManagement = () => {
       return [
         { value: 'all', label: 'All Roles' },
         { value: 'teacher', label: 'Teacher' },
+        { value: 'coordinator', label: 'Coordinator' },
         { value: 'student', label: 'Student' }
       ];
     }
@@ -369,10 +767,12 @@ const UserManagement = () => {
     ];
   }, [isAdminMode, role]);
 
-  const canEditRole = (user) => isAdminMode && user.role !== 'student';
-  const canToggleStudentBlock = (user) => isAdminMode && user.role === 'student';
-  const canEditPermissions = (user) => isAdminMode && ['admin', 'hod', 'teacher'].includes(user.role);
+  const canEditRole = (user) => isAdminMode && user.role !== 'student' && user.role !== 'coordinator';
+  const canToggleStudentBlock = (user) => (isAdminMode || role === 'coordinator') && user.role === 'student';
+  const canEditPermissions = (user) => isAdminMode && ['admin', 'hod', 'teacher', 'coordinator'].includes(user.role);
   const canToggleAdminAccess = (user) => isAdminMode && ['teacher', 'hod'].includes(user.role);
+  const canManageCoordinator = (user) => (isAdminMode || role === 'hod') && ['teacher', 'coordinator'].includes(user.role);
+  const canDeleteUser = (user) => (isAdminMode || role === 'coordinator') && user.role === 'student';
 
   const adminCandidates = useMemo(() => {
     const term = adminSearch.trim().toLowerCase();
@@ -532,6 +932,34 @@ const UserManagement = () => {
               ))}
             </select>
 
+            {(isAdminMode || role === 'hod') && (
+              <select
+                value={branchFilter}
+                onChange={(e) => setBranchFilter(e.target.value)}
+                className="h-11 px-4 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[160px]"
+              >
+                <option value="">All Branches</option>
+                {branches.map((branch) => (
+                  <option key={branch._id} value={branch._id}>{branch.name} ({branch.code})</option>
+                ))}
+              </select>
+            )}
+
+            {(isAdminMode || role === 'hod') && (
+              <select
+                value={semesterFilter}
+                onChange={(e) => setSemesterFilter(e.target.value)}
+                className="h-11 px-4 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[160px]"
+              >
+                <option value="">All Semesters</option>
+                {semesters.map((semester) => (
+                  <option key={semester._id} value={semester._id}>
+                    Sem {semester.semesterNumber} ({semester.academicYear})
+                  </option>
+                ))}
+              </select>
+            )}
+
             {/* Status Filter */}
             <select
               value={statusFilter}
@@ -549,14 +977,20 @@ const UserManagement = () => {
               {isAdminMode && (
                 <>
                   <button
-                    onClick={() => navigate('/admin/add-hod')}
+                    onClick={() => {
+                      setAddHodError('');
+                      setShowAddHodModal(true);
+                    }}
                     className="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-purple-500/20 hover:opacity-90 transition-all h-11"
                   >
                     <span className="material-symbols-outlined text-xl">badge</span>
                     Add HOD
                   </button>
                   <button
-                    onClick={() => navigate('/admin/add-teacher')}
+                    onClick={() => {
+                      setAddTeacherError('');
+                      setShowAddTeacherModal(true);
+                    }}
                     className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-blue-500/20 hover:opacity-90 transition-all h-11"
                   >
                     <span className="material-symbols-outlined text-xl">school</span>
@@ -741,6 +1175,17 @@ const UserManagement = () => {
                               </svg>
                             </button>
                           )}
+                          {canManageCoordinator(user) && (
+                            <button
+                              onClick={() => handleOpenCoordinatorModal(user)}
+                              className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                              title={user.role === 'coordinator' ? 'Edit Coordinator' : 'Assign Coordinator'}
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m-6 7a7 7 0 1114 0v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2a7 7 0 016-6z" />
+                              </svg>
+                            </button>
+                          )}
                           {canToggleAdminAccess(user) && (
                             <button
                               onClick={() => handleAdminAccessToggle(user, !user.adminAccess)}
@@ -752,7 +1197,7 @@ const UserManagement = () => {
                               </svg>
                             </button>
                           )}
-                          {isAdminMode && (
+                          {canDeleteUser(user) && (
                             <button 
                               onClick={() => {
                                 setSelectedUser(user);
@@ -1047,8 +1492,117 @@ const UserManagement = () => {
         </div>
       )}
 
+      {/* Coordinator Assignment Modal */}
+      {showCoordinatorModal && selectedUser && (isAdminMode || role === 'hod') && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full border border-gray-200 dark:border-gray-700">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-teal-600 to-emerald-500">
+              <h3 className="text-xl font-bold text-white">Coordinator Assignment</h3>
+              <p className="text-sm text-white/90 mt-1">
+                {selectedUser.name} • {selectedUser.role?.toUpperCase()}
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Branch *</label>
+                <select
+                  value={coordinatorForm.branchId}
+                  onChange={(e) => setCoordinatorForm((prev) => ({ ...prev, branchId: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                >
+                  <option value="">Select branch</option>
+                  {branches.map((branch) => (
+                    <option key={branch._id} value={branch._id}>
+                      {branch.name} ({branch.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Semesters *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {semesters.map((semester) => (
+                    <label key={semester._id} className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={coordinatorForm.semesterIds.includes(semester._id)}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setCoordinatorForm((prev) => {
+                            if (checked) {
+                              return { ...prev, semesterIds: [...prev.semesterIds, semester._id] };
+                            }
+                            return { ...prev, semesterIds: prev.semesterIds.filter((id) => id !== semester._id) };
+                          });
+                        }}
+                      />
+                      Sem {semester.semesterNumber} ({semester.academicYear})
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  label="Academic Year *"
+                  value={coordinatorForm.academicYear}
+                  onChange={(e) => setCoordinatorForm((prev) => ({ ...prev, academicYear: e.target.value }))}
+                  placeholder="2025-2026"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  label="Valid From"
+                  type="date"
+                  value={coordinatorForm.validFrom}
+                  onChange={(e) => setCoordinatorForm((prev) => ({ ...prev, validFrom: e.target.value }))}
+                />
+                <Input
+                  label="Valid Till"
+                  type="date"
+                  value={coordinatorForm.validTill}
+                  onChange={(e) => setCoordinatorForm((prev) => ({ ...prev, validTill: e.target.value }))}
+                />
+              </div>
+
+              <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                <p className="text-xs text-amber-800">
+                  Coordinator access is limited to the selected branch and semesters. Validity dates auto-expire the role.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex flex-wrap gap-3 justify-end">
+              {selectedUser.role === 'coordinator' && (
+                <button
+                  onClick={() => handleRevokeCoordinator(selectedUser)}
+                  className="px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 font-semibold"
+                >
+                  Revoke
+                </button>
+              )}
+              <button
+                onClick={() => setShowCoordinatorModal(false)}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAssignCoordinator}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:opacity-90 font-semibold"
+              >
+                Save Assignment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete User Modal */}
-      {showDeleteModal && selectedUser && isAdminMode && (
+      {showDeleteModal && selectedUser && (isAdminMode || role === 'coordinator') && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-gray-700">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-red-500 to-orange-500">
@@ -1090,6 +1644,276 @@ const UserManagement = () => {
                 className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold"
               >
                 Delete User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add HOD Modal */}
+      {showAddHodModal && isAdminMode && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-500 to-pink-500">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-white">Add New HOD</h3>
+                <button
+                  onClick={() => setShowAddHodModal(false)}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-sm text-white/90 mt-1">Create a new HOD account with branch and subject assignment.</p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {addHodError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                  {addHodError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
+                  <input
+                    value={hodForm.name}
+                    onChange={(e) => setHodForm((prev) => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Enter HOD name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Mobile Number *</label>
+                  <input
+                    value={hodForm.mobile}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setHodForm((prev) => ({ ...prev, mobile: value }));
+                    }}
+                    maxLength={10}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                    placeholder="1234567890"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">Assign Branches *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {branches.map((branch) => (
+                    <label key={branch._id} className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={hodForm.selectedBranches.includes(branch._id)}
+                        onChange={() => handleHodBranchToggle(branch._id)}
+                        className="w-4 h-4 text-purple-500 rounded"
+                      />
+                      <span className="ml-3 text-gray-700">{branch.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">Assign Semesters *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {semesters.map((semester) => (
+                    <label key={semester._id} className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={hodForm.selectedSemesters.includes(semester._id)}
+                        onChange={() => handleHodSemesterToggle(semester._id)}
+                        className="w-4 h-4 text-purple-500 rounded"
+                      />
+                      <span className="ml-3 text-gray-700">Sem {semester.semesterNumber} ({semester.academicYear})</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {hodForm.selectedBranches.length > 0 && hodForm.selectedSemesters.length > 0 && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Assign Subjects <span className="text-gray-500">(Optional)</span>
+                  </label>
+                  {hodSubjects.length === 0 ? (
+                    <p className="text-sm text-gray-600">No subjects available for selected branches and semesters</p>
+                  ) : (
+                    <div className="space-y-2 max-h-56 overflow-y-auto border border-gray-300 rounded-lg p-3">
+                      {hodSubjects.map((subject) => (
+                        <label key={subject._id} className="flex items-center p-2 hover:bg-gray-50 cursor-pointer rounded">
+                          <input
+                            type="checkbox"
+                            checked={hodForm.selectedSubjects.includes(subject._id)}
+                            onChange={() => handleHodSubjectToggle(subject._id)}
+                            className="w-4 h-4 text-purple-500 rounded"
+                          />
+                          <span className="ml-3 text-gray-700">{subject.name} ({subject.code})</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                <p className="text-sm text-purple-800">
+                  Temporary credentials will be sent to the HOD's mobile number.
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowAddHodModal(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateHod}
+                disabled={addHodLoading}
+                className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60"
+              >
+                {addHodLoading ? 'Adding...' : 'Add HOD'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Teacher Modal */}
+      {showAddTeacherModal && isAdminMode && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-500 to-cyan-500">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-white">Add New Teacher</h3>
+                <button
+                  onClick={() => setShowAddTeacherModal(false)}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-sm text-white/90 mt-1">Create a new teacher account with branch and subject assignment.</p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {addTeacherError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                  {addTeacherError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
+                  <input
+                    value={teacherForm.name}
+                    onChange={(e) => setTeacherForm((prev) => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Enter teacher name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Mobile Number *</label>
+                  <input
+                    value={teacherForm.mobile}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setTeacherForm((prev) => ({ ...prev, mobile: value }));
+                    }}
+                    maxLength={10}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                    placeholder="1234567890"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">Select Branches *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {branches.map((branch) => (
+                    <label key={branch._id} className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={teacherForm.selectedBranches.includes(branch._id)}
+                        onChange={() => handleTeacherBranchToggle(branch._id)}
+                        className="w-4 h-4 text-blue-500 rounded"
+                      />
+                      <span className="ml-3 text-gray-700">{branch.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">Select Semesters *</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {semesters.map((semester) => (
+                    <label key={semester._id} className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={teacherForm.selectedSemesters.includes(semester._id)}
+                        onChange={() => handleTeacherSemesterToggle(semester._id)}
+                        className="w-4 h-4 text-blue-500 rounded"
+                      />
+                      <span className="ml-3 text-gray-700">Sem {semester.semesterNumber} ({semester.academicYear})</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {teacherForm.selectedBranches.length > 0 && teacherForm.selectedSemesters.length > 0 && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Select Subjects *</label>
+                  {teacherSubjects.length === 0 ? (
+                    <p className="text-sm text-gray-600">No subjects available for selected branches and semesters</p>
+                  ) : (
+                    <div className="space-y-2 max-h-56 overflow-y-auto border border-gray-300 rounded-lg p-3">
+                      {teacherSubjects.map((subject) => (
+                        <label key={subject._id} className="flex items-center p-2 hover:bg-gray-50 cursor-pointer rounded">
+                          <input
+                            type="checkbox"
+                            checked={teacherForm.selectedSubjects.includes(subject._id)}
+                            onChange={() => handleTeacherSubjectToggle(subject._id)}
+                            className="w-4 h-4 text-blue-500 rounded"
+                          />
+                          <span className="ml-3 text-gray-700">{subject.name} ({subject.code})</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-800">
+                  Temporary credentials will be sent to the teacher's mobile number.
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowAddTeacherModal(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateTeacher}
+                disabled={addTeacherLoading}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60"
+              >
+                {addTeacherLoading ? 'Adding...' : 'Add Teacher'}
               </button>
             </div>
           </div>

@@ -4,13 +4,38 @@ const User = require('../models/User');
 const Branch = require('../models/Branch');
 const Semester = require('../models/Semester');
 const Subject = require('../models/Subject');
+const ActivityLog = require('../models/ActivityLog');
 const { protect, authorize } = require('../middleware/auth');
 const crypto = require('crypto');
 const { ROLE_DEFAULTS, getRoleDefaults } = require('../utils/rolePermissions');
+const { getCoordinatorStatus } = require('../utils/coordinatorScheduler');
 
 // Generate random password
 const generateTempPassword = () => {
   return crypto.randomBytes(4).toString('hex'); // 8 character password
+};
+
+const getHodBranchScope = (user) => ([
+  ...(Array.isArray(user.branches) ? user.branches : []),
+  user.branch,
+  user.department
+].filter(Boolean));
+
+const getCoordinatorScope = (user) => {
+  const assignment = user?.coordinator;
+  if (!assignment || assignment.status === 'expired') return null;
+  return {
+    branchId: assignment.branch,
+    semesterIds: Array.isArray(assignment.semesters) ? assignment.semesters : []
+  };
+};
+
+const logActivity = async (payload) => {
+  try {
+    await ActivityLog.create(payload);
+  } catch (error) {
+    console.error('Activity log error:', error);
+  }
 };
 
 // @route   POST /api/admin/add-hod
@@ -343,10 +368,67 @@ router.post('/add-admin', protect, authorize('admin'), async (req, res) => {
   }
 });
 
+// @route   GET /api/admin/activity
+// @desc    Get activity logs
+// @access  Private/Admin/HOD/Coordinator
+router.get('/activity', protect, authorize('admin', 'hod', 'coordinator'), async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const queryParts = [];
+
+    if (req.user.role === 'hod') {
+      const branchScope = getHodBranchScope(req.user).map((id) => String(id));
+      if (branchScope.length > 0) {
+        queryParts.push({ 'scope.branchId': { $in: branchScope } });
+      }
+    }
+
+    if (req.user.role === 'coordinator') {
+      const scope = getCoordinatorScope(req.user);
+      if (!scope || !scope.branchId) {
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          total: 0,
+          pages: 0,
+          currentPage: Number(page),
+          data: []
+        });
+      }
+
+      queryParts.push({ 'scope.branchId': scope.branchId });
+      if (scope.semesterIds.length > 0) {
+        queryParts.push({ 'scope.semesterIds': { $in: scope.semesterIds } });
+      }
+    }
+
+    const query = queryParts.length ? { $and: queryParts } : {};
+    const logs = await ActivityLog.find(query)
+      .limit(Number(limit))
+      .skip((Number(page) - 1) * Number(limit))
+      .sort({ createdAt: -1 });
+    const total = await ActivityLog.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      count: logs.length,
+      total,
+      pages: Math.ceil(total / Number(limit)),
+      currentPage: Number(page),
+      data: logs
+    });
+  } catch (error) {
+    console.error('Get activity logs error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error in fetching activity logs'
+    });
+  }
+});
 // @route   GET /api/admin/users
 // @desc    Get users with pagination and filters
-// @access  Private/Admin/HOD/Teacher (scoped)
-router.get('/users', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+// @access  Private/Admin/HOD/Teacher/Coordinator (scoped)
+router.get('/users', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { page = 1, limit = 10, role, status, search, scope } = req.query;
     const isAdmin = req.user.role === 'admin' || req.user.adminAccess === true;
@@ -376,11 +458,7 @@ router.get('/users', protect, authorize('admin', 'hod', 'teacher'), async (req, 
         }
       }
     } else if (req.user.role === 'hod') {
-      const branchIds = [
-        ...(Array.isArray(req.user.branches) ? req.user.branches : []),
-        req.user.branch,
-        req.user.department
-      ].filter(Boolean);
+      const branchIds = getHodBranchScope(req.user);
 
       if (branchIds.length === 0) {
         return res.status(200).json({
@@ -393,7 +471,7 @@ router.get('/users', protect, authorize('admin', 'hod', 'teacher'), async (req, 
         });
       }
 
-      if (role && !['teacher', 'student', 'all'].includes(role)) {
+      if (role && !['teacher', 'student', 'coordinator', 'all'].includes(role)) {
         return res.status(200).json({
           success: true,
           count: 0,
@@ -413,11 +491,17 @@ router.get('/users', protect, authorize('admin', 'hod', 'teacher'), async (req, 
         ]
       };
       const studentQuery = { role: 'student', branch: { $in: branchIds } };
+      const coordinatorQuery = {
+        role: 'coordinator',
+        'coordinator.branch': { $in: branchIds }
+      };
       const scopedRoleQuery = role === 'teacher'
         ? teacherQuery
         : role === 'student'
           ? studentQuery
-          : { $or: [teacherQuery, studentQuery] };
+          : role === 'coordinator'
+            ? coordinatorQuery
+            : { $or: [teacherQuery, studentQuery, coordinatorQuery] };
 
       queryParts.push(scopedRoleQuery);
     } else if (req.user.role === 'teacher') {
@@ -452,6 +536,35 @@ router.get('/users', protect, authorize('admin', 'hod', 'teacher'), async (req, 
       if (branchIds.length) studentQuery.branch = { $in: branchIds };
       if (semesterIds.length) studentQuery.semester = { $in: semesterIds };
 
+      queryParts.push(studentQuery);
+    } else if (req.user.role === 'coordinator') {
+      const scope = getCoordinatorScope(req.user);
+      if (!scope || !scope.branchId) {
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          total: 0,
+          totalPages: 0,
+          currentPage: Number(page),
+          data: []
+        });
+      }
+
+      if (role && !['student', 'all'].includes(role)) {
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          total: 0,
+          totalPages: 0,
+          currentPage: Number(page),
+          data: []
+        });
+      }
+
+      const studentQuery = { role: 'student', branch: scope.branchId };
+      if (scope.semesterIds.length > 0) {
+        studentQuery.semester = { $in: scope.semesterIds };
+      }
       queryParts.push(studentQuery);
     }
 
@@ -516,8 +629,8 @@ router.get('/user/:id', protect, authorize('admin'), async (req, res) => {
 
 // @route   PUT /api/admin/user/:id/status
 // @desc    Activate/Deactivate user
-// @access  Private/Admin
-router.put('/user/:id/status', protect, authorize('admin'), async (req, res) => {
+// @access  Private/Admin/Coordinator
+router.put('/user/:id/status', protect, authorize('admin', 'coordinator'), async (req, res) => {
   try {
     const { status } = req.body;
 
@@ -537,8 +650,41 @@ router.put('/user/:id/status', protect, authorize('admin'), async (req, res) => 
       });
     }
 
+    if (req.user.role === 'coordinator') {
+      if (user.role !== 'student') {
+        return res.status(403).json({
+          success: false,
+          message: 'Coordinators can only update student status'
+        });
+      }
+
+      const scope = getCoordinatorScope(req.user);
+      const inBranch = scope && String(user.branch) === String(scope.branchId);
+      const inSemester = scope && (!scope.semesterIds.length || scope.semesterIds.map(String).includes(String(user.semester)));
+      if (!inBranch || !inSemester) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only update students in your assigned classes'
+        });
+      }
+    }
+
     user.status = status;
     await user.save();
+
+    await logActivity({
+      actorId: req.user._id,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+      action: status === 'active' ? 'unblock_student' : 'block_student',
+      targetType: 'User',
+      targetId: user._id,
+      targetLabel: user.name,
+      scope: {
+        branchId: user.branch || null,
+        semesterIds: user.semester ? [user.semester] : []
+      }
+    });
 
     res.status(200).json({
       success: true,
@@ -565,10 +711,17 @@ router.put('/users/:id/role', protect, authorize('admin'), async (req, res) => {
   try {
     const { role } = req.body;
 
-    if (!['admin', 'hod', 'teacher', 'student'].includes(role)) {
+    if (!['admin', 'hod', 'teacher', 'student', 'coordinator'].includes(role)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid role'
+      });
+    }
+
+    if (role === 'coordinator') {
+      return res.status(400).json({
+        success: false,
+        message: 'Use coordinator assignment to set coordinator role'
       });
     }
 
@@ -590,6 +743,13 @@ router.put('/users/:id/role', protect, authorize('admin'), async (req, res) => {
     }
 
     user.role = role;
+    if (user.coordinator) {
+      user.coordinator = {
+        ...user.coordinator,
+        status: 'expired',
+        revokedAt: new Date()
+      };
+    }
     await user.save();
 
     res.status(200).json({
@@ -606,6 +766,237 @@ router.put('/users/:id/role', protect, authorize('admin'), async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error in updating user role'
+    });
+  }
+});
+
+// @route   POST /api/admin/users/:id/coordinator
+// @desc    Assign coordinator role with scope and validity
+// @access  Private/Admin/HOD
+router.post('/users/:id/coordinator', protect, authorize('admin', 'hod'), async (req, res) => {
+  try {
+    const { branchId, semesterIds = [], academicYear, validFrom, validTill } = req.body;
+
+    if (!branchId || !Array.isArray(semesterIds) || semesterIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Branch and at least one semester are required'
+      });
+    }
+
+    if (!academicYear) {
+      return res.status(400).json({
+        success: false,
+        message: 'Academic year is required'
+      });
+    }
+
+    const validFromDate = validFrom ? new Date(validFrom) : null;
+    const validTillDate = validTill ? new Date(validTill) : null;
+    if (validFromDate && Number.isNaN(validFromDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid valid from date'
+      });
+    }
+
+    if (validTillDate && Number.isNaN(validTillDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid valid till date'
+      });
+    }
+
+    if (validFromDate && validTillDate && validFromDate.getTime() > validTillDate.getTime()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid from must be before valid till'
+      });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (user.role === 'admin' || user.role === 'student') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only teacher or HOD can be assigned as coordinator'
+      });
+    }
+
+    if (req.user.role === 'hod' && user.role !== 'teacher') {
+      return res.status(400).json({
+        success: false,
+        message: 'HOD can only assign coordinator from teachers'
+      });
+    }
+
+    const branch = await Branch.findById(branchId);
+    if (!branch) {
+      return res.status(404).json({
+        success: false,
+        message: 'Branch not found'
+      });
+    }
+
+    const semesters = await Semester.find({ _id: { $in: semesterIds } });
+    if (semesters.length !== semesterIds.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'One or more semesters not found'
+      });
+    }
+
+    if (req.user.role === 'hod') {
+      const branchScope = getHodBranchScope(req.user).map((id) => String(id));
+      if (!branchScope.includes(String(branchId))) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only assign coordinators within your branch'
+        });
+      }
+
+      const allowedSemesters = Array.isArray(req.user.semesters) ? req.user.semesters.map((id) => String(id)) : [];
+      if (allowedSemesters.length > 0) {
+        const invalidSemester = semesterIds.some((id) => !allowedSemesters.includes(String(id)));
+        if (invalidSemester) {
+          return res.status(403).json({
+            success: false,
+            message: 'You can only assign coordinators within your semesters'
+          });
+        }
+      }
+    }
+
+    const baseRole = user.role === 'coordinator'
+      ? (user.coordinator?.baseRole || 'teacher')
+      : user.role;
+
+    user.role = 'coordinator';
+    user.coordinator = {
+      branch: branchId,
+      semesters: semesterIds,
+      academicYear: String(academicYear).trim(),
+      validFrom: validFromDate,
+      validTill: validTillDate,
+      graceDays: 0,
+      baseRole,
+      status: getCoordinatorStatus({
+        validTill: validTillDate,
+        graceDays: 0
+      }, new Date()),
+      assignedAt: new Date(),
+      revokedAt: null
+    };
+
+    await user.save();
+
+    await logActivity({
+      actorId: req.user._id,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+      action: 'assign_coordinator',
+      targetType: 'User',
+      targetId: user._id,
+      targetLabel: user.name,
+      scope: {
+        branchId,
+        semesterIds
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Coordinator assigned successfully',
+      data: {
+        id: user._id,
+        name: user.name,
+        role: user.role,
+        coordinator: user.coordinator
+      }
+    });
+  } catch (error) {
+    console.error('Assign coordinator error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error in assigning coordinator'
+    });
+  }
+});
+
+// @route   DELETE /api/admin/users/:id/coordinator
+// @desc    Revoke coordinator role and revert to base role
+// @access  Private/Admin/HOD
+router.delete('/users/:id/coordinator', protect, authorize('admin', 'hod'), async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (user.role !== 'coordinator') {
+      return res.status(400).json({
+        success: false,
+        message: 'User is not a coordinator'
+      });
+    }
+
+    if (req.user.role === 'hod') {
+      const branchScope = getHodBranchScope(req.user).map((id) => String(id));
+      if (!branchScope.includes(String(user.coordinator?.branch))) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only revoke coordinators within your branch'
+        });
+      }
+    }
+
+    const baseRole = user.coordinator?.baseRole || 'teacher';
+    user.role = baseRole;
+    user.coordinator = {
+      ...user.coordinator,
+      status: 'expired',
+      revokedAt: new Date()
+    };
+
+    await user.save();
+
+    await logActivity({
+      actorId: req.user._id,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+      action: 'revoke_coordinator',
+      targetType: 'User',
+      targetId: user._id,
+      targetLabel: user.name,
+      scope: {
+        branchId: user.coordinator?.branch || null,
+        semesterIds: user.coordinator?.semesters || []
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Coordinator revoked successfully',
+      data: {
+        id: user._id,
+        name: user.name,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Revoke coordinator error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error in revoking coordinator'
     });
   }
 });
@@ -691,10 +1082,10 @@ router.put('/users/:id/permissions', protect, authorize('admin'), async (req, re
       });
     }
 
-    if (!['admin', 'hod', 'teacher'].includes(user.role)) {
+    if (!['admin', 'hod', 'teacher', 'coordinator'].includes(user.role)) {
       return res.status(400).json({
         success: false,
-        message: 'Permissions are only supported for admin, hod, or teacher'
+        message: 'Permissions are only supported for admin, hod, teacher, or coordinator'
       });
     }
 
@@ -734,8 +1125,8 @@ router.get('/permissions/modules', protect, authorize('admin'), async (req, res)
 
 // @route   DELETE /api/admin/users/:id
 // @desc    Delete a user
-// @access  Private/Admin
-router.delete('/users/:id', protect, authorize('admin'), async (req, res) => {
+// @access  Private/Admin/Coordinator
+router.delete('/users/:id', protect, authorize('admin', 'coordinator'), async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
 
@@ -752,6 +1143,25 @@ router.delete('/users/:id', protect, authorize('admin'), async (req, res) => {
         success: false,
         message: 'Cannot delete admin users'
       });
+    }
+
+    if (req.user.role === 'coordinator') {
+      if (user.role !== 'student') {
+        return res.status(403).json({
+          success: false,
+          message: 'Coordinators can only delete students'
+        });
+      }
+
+      const scope = getCoordinatorScope(req.user);
+      const inBranch = scope && String(user.branch) === String(scope.branchId);
+      const inSemester = scope && (!scope.semesterIds.length || scope.semesterIds.map(String).includes(String(user.semester)));
+      if (!inBranch || !inSemester) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only delete students in your assigned classes'
+        });
+      }
     }
 
     // If teacher, remove from subjects
@@ -771,6 +1181,20 @@ router.delete('/users/:id', protect, authorize('admin'), async (req, res) => {
     }
 
     await User.findByIdAndDelete(req.params.id);
+
+    await logActivity({
+      actorId: req.user._id,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+      action: 'delete_user',
+      targetType: 'User',
+      targetId: user._id,
+      targetLabel: user.name,
+      scope: {
+        branchId: user.branch || null,
+        semesterIds: user.semester ? [user.semester] : []
+      }
+    });
 
     res.status(200).json({
       success: true,

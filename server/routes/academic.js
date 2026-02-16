@@ -154,6 +154,42 @@ router.get('/subjects/hod', protect, authorize('hod', 'admin'), async (req, res)
     });
   }
 });
+// @route   GET /api/academic/subjects/coordinator
+// @desc    Get subjects for coordinator scope
+// @access  Private (Coordinator)
+router.get('/subjects/coordinator', protect, authorize('coordinator'), async (req, res) => {
+  try {
+    const assignment = req.user.coordinator;
+    if (!assignment || assignment.status === 'expired') {
+      return res.status(403).json({
+        success: false,
+        message: 'Coordinator scope is not configured'
+      });
+    }
+
+    const branchId = assignment.branch;
+    const semesterIds = Array.isArray(assignment.semesters) ? assignment.semesters : [];
+
+    const query = {};
+    if (branchId) query.branchId = branchId;
+    if (semesterIds.length > 0) query.semesterId = { $in: semesterIds };
+
+    const subjects = await Subject.find(query)
+      .populate('branchId', 'name code')
+      .populate('semesterId', 'semesterNumber academicYear')
+      .sort({ name: 1 });
+
+    res.json({
+      success: true,
+      data: subjects
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
 
 // @route   GET /api/academic/subjects/:id/public
 // @desc    Get subject details with materials (PUBLIC)

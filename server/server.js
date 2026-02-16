@@ -3,6 +3,7 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
 const { startTaskReminderScheduler } = require('./utils/taskReminders');
+const { startCoordinatorScheduler } = require('./utils/coordinatorScheduler');
 
 const app = express();
 
@@ -74,6 +75,7 @@ const startServer = async () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
     startTaskReminderScheduler();
+    startCoordinatorScheduler();
   });
 };
 

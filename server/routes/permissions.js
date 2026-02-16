@@ -23,7 +23,7 @@ router.get('/me', protect, async (req, res) => {
       ? getRoleDefaults('admin')
       : (hasCustom ? user.permissions : getRoleDefaults(baseRole));
 
-    if (baseRole === 'hod' || baseRole === 'teacher') {
+    if (baseRole === 'hod' || baseRole === 'teacher' || baseRole === 'coordinator') {
       const moduleSet = new Set(Array.isArray(allowedModules) ? allowedModules : []);
       moduleSet.add('users');
       allowedModules = Array.from(moduleSet);

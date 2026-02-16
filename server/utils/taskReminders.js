@@ -22,7 +22,13 @@ const getTeacherIdsForTask = async (task) => {
     status: 'active',
     assignedSubjects: task.subjectId
   }).select('_id');
-  return teachers.map((teacher) => teacher._id);
+
+  const ids = new Set(teachers.map((teacher) => String(teacher._id)));
+  if (task.createdBy) {
+    ids.add(String(task.createdBy));
+  }
+
+  return Array.from(ids).map((id) => id);
 };
 
 const sendNotifications = async (userIds, task, title, message, actionUrl) => {

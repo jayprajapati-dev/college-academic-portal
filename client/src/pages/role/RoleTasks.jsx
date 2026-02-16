@@ -12,7 +12,8 @@ const RoleTasks = () => {
   const { navItems, loading: navLoading } = useRoleNav(role);
   const isTeacher = role === 'teacher';
   const isHodTeacher = role === 'hod' && (user?.assignedSubjects || []).length > 0;
-  const canManageTasks = isTeacher || isHodTeacher;
+  const isCoordinator = role === 'coordinator';
+  const canManageTasks = isTeacher || isHodTeacher || isCoordinator;
 
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +43,14 @@ const RoleTasks = () => {
 
   const token = localStorage.getItem('token');
   const tasksEndpoint = '/api/tasks/all';
-  const panelLabel = role === 'admin' ? 'Admin Panel' : role === 'hod' ? 'HOD Panel' : 'Teacher Panel';
+  const submissionsBasePath = role === 'coordinator' ? '/coordinator' : role === 'hod' ? '/hod' : '/teacher';
+  const panelLabel = role === 'admin'
+    ? 'Admin Panel'
+    : role === 'hod'
+      ? 'HOD Panel'
+      : role === 'coordinator'
+        ? 'Coordinator Panel'
+        : 'Teacher Panel';
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -93,8 +101,12 @@ const RoleTasks = () => {
         axios.get('/api/academic/semesters', { headers: { Authorization: `Bearer ${token}` } })
       ];
 
-      if (!user?._id) return;
-      requests.push(axios.get(`/api/academic/teacher/${user._id}/subjects`, { headers: { Authorization: `Bearer ${token}` } }));
+      if (role === 'coordinator') {
+        requests.push(axios.get('/api/academic/subjects/coordinator', { headers: { Authorization: `Bearer ${token}` } }));
+      } else {
+        if (!user?._id) return;
+        requests.push(axios.get(`/api/academic/teacher/${user._id}/subjects`, { headers: { Authorization: `Bearer ${token}` } }));
+      }
 
       const results = await Promise.all(requests);
       const semestersRes = results[0];
@@ -102,7 +114,10 @@ const RoleTasks = () => {
 
       if (semestersRes.data.success) setSemesters(semestersRes.data.data || []);
 
-      if (subjectsRes?.data?.success) setSubjects(subjectsRes.data.subjects || []);
+      if (subjectsRes?.data?.success) {
+        const subjectData = subjectsRes.data.subjects || subjectsRes.data.data || [];
+        setSubjects(subjectData);
+      }
     } catch (error) {
       if (!handleAuthError(error)) {
         console.error('Error fetching metadata:', error);
@@ -424,7 +439,7 @@ const RoleTasks = () => {
                       <td className="px-6 py-4 text-right text-sm">
                         <div className="flex items-center justify-end gap-3">
                           <button
-                            onClick={() => navigate(`/teacher/tasks/${task._id}/submissions`)}
+                            onClick={() => navigate(`${submissionsBasePath}/tasks/${task._id}/submissions`)}
                             className="text-slate-700 hover:text-slate-900 font-medium"
                           >
                             Submissions

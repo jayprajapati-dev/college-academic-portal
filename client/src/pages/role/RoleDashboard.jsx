@@ -183,6 +183,7 @@ const RoleDashboard = () => {
   const panelLabel = useMemo(() => {
     if (role === 'admin') return 'Admin Panel';
     if (role === 'hod') return 'HOD Panel';
+    if (role === 'coordinator') return 'Coordinator Panel';
     return 'Teacher Panel';
   }, [role]);
 
@@ -370,13 +371,13 @@ const RoleDashboard = () => {
           </div>
           <div className="flex flex-wrap gap-3">
             <button
-              onClick={() => navigate('/teacher/materials')}
+              onClick={() => navigate(`${role === 'coordinator' ? '/coordinator' : '/teacher'}/materials`)}
               className="px-5 py-3 rounded-2xl bg-white text-[#312e81] text-sm font-bold shadow-lg hover:-translate-y-0.5 transition-transform"
             >
               Manage Materials
             </button>
             <button
-              onClick={() => navigate('/teacher/tasks')}
+              onClick={() => navigate(`${role === 'coordinator' ? '/coordinator' : '/teacher'}/tasks`)}
               className="px-5 py-3 rounded-2xl border border-white/40 text-sm font-bold hover:bg-white/10 transition"
             >
               Create Tasks
@@ -393,32 +394,32 @@ const RoleDashboard = () => {
 
       <Card title="Quick Actions" subtitle="Jump to the tools you use most">
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          <button onClick={() => navigate('/teacher/subjects')} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
+          <button onClick={() => navigate(`${role === 'coordinator' ? '/coordinator' : '/teacher'}/subjects`)} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
             <p className="text-xs uppercase tracking-[0.2em] text-[#6B7280]">Subjects</p>
             <p className="text-lg font-bold mt-2">My Subjects</p>
             <p className="text-sm text-[#6B7280]">Review assignments</p>
           </button>
-          <button onClick={() => navigate('/teacher/library')} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
+          <button onClick={() => navigate(`${role === 'coordinator' ? '/coordinator' : '/teacher'}/library`)} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
             <p className="text-xs uppercase tracking-[0.2em] text-[#6B7280]">Library</p>
             <p className="text-lg font-bold mt-2">Resources</p>
             <p className="text-sm text-[#6B7280]">Curate reading list</p>
           </button>
-          <button onClick={() => navigate('/teacher/timetable')} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
+          <button onClick={() => navigate(`${role === 'coordinator' ? '/coordinator' : '/teacher'}/timetable`)} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
             <p className="text-xs uppercase tracking-[0.2em] text-[#6B7280]">Schedule</p>
             <p className="text-lg font-bold mt-2">Timetable</p>
             <p className="text-sm text-[#6B7280]">Check weekly plan</p>
           </button>
-          <button onClick={() => navigate('/teacher/notices')} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
+          <button onClick={() => navigate(`${role === 'coordinator' ? '/coordinator' : '/teacher'}/notices`)} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
             <p className="text-xs uppercase tracking-[0.2em] text-[#6B7280]">Notices</p>
             <p className="text-lg font-bold mt-2">Announcements</p>
             <p className="text-sm text-[#6B7280]">Campus updates</p>
           </button>
-          <button onClick={() => navigate('/teacher/tasks')} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
+          <button onClick={() => navigate(`${role === 'coordinator' ? '/coordinator' : '/teacher'}/tasks`)} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
             <p className="text-xs uppercase tracking-[0.2em] text-[#6B7280]">Tasks</p>
             <p className="text-lg font-bold mt-2">Assignments</p>
             <p className="text-sm text-[#6B7280]">Publish and manage</p>
           </button>
-          <button onClick={() => navigate('/teacher/users')} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
+          <button onClick={() => navigate(`${role === 'coordinator' ? '/coordinator' : '/teacher'}/users`)} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
             <p className="text-xs uppercase tracking-[0.2em] text-[#6B7280]">People</p>
             <p className="text-lg font-bold mt-2">Manage Users</p>
             <p className="text-sm text-[#6B7280]">View assigned students</p>
@@ -520,9 +521,61 @@ const RoleDashboard = () => {
     </div>
   );
 
+  const renderCoordinator = () => (
+    <div className="space-y-8 font-display">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#0b3d91] via-[#14532d] to-[#0f766e] text-white p-8 md:p-10">
+        <div className="absolute -right-10 top-10 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-emerald-100">Coordinator Desk</p>
+            <h2 className="text-3xl md:text-4xl font-black">Welcome, {user?.name || 'Coordinator'}</h2>
+            <p className="text-sm md:text-base text-emerald-50 mt-2">
+              Branch: {user?.coordinator?.branch?.name || 'N/A'} • Semesters: {Array.isArray(user?.coordinator?.semesters) ? user.coordinator.semesters.length : 0}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => navigate('/coordinator/tasks')}
+              className="px-5 py-3 rounded-2xl bg-white text-[#0f766e] text-sm font-bold shadow-lg hover:-translate-y-0.5 transition-transform"
+            >
+              Manage Tasks
+            </button>
+            <button
+              onClick={() => navigate('/coordinator/attendance')}
+              className="px-5 py-3 rounded-2xl border border-white/40 text-sm font-bold hover:bg-white/10 transition"
+            >
+              Mark Attendance
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <Card title="Coordinator Actions" subtitle="Class-level updates and tracking">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          <button onClick={() => navigate('/coordinator/tasks')} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#6B7280]">Tasks</p>
+            <p className="text-lg font-bold mt-2">Assignments</p>
+            <p className="text-sm text-[#6B7280]">Create and track tasks</p>
+          </button>
+          <button onClick={() => navigate('/coordinator/notices')} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#6B7280]">Notices</p>
+            <p className="text-lg font-bold mt-2">Announcements</p>
+            <p className="text-sm text-[#6B7280]">Share updates</p>
+          </button>
+          <button onClick={() => navigate('/coordinator/attendance')} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#6B7280]">Attendance</p>
+            <p className="text-lg font-bold mt-2">Sessions</p>
+            <p className="text-sm text-[#6B7280]">Mark and review</p>
+          </button>
+        </div>
+      </Card>
+    </div>
+  );
+
   const renderBody = () => {
     if (role === 'admin') return renderAdmin();
     if (role === 'hod') return renderHod();
+    if (role === 'coordinator') return renderCoordinator();
     return renderTeacher();
   };
 

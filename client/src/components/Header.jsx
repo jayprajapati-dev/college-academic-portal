@@ -167,10 +167,12 @@ const Header = () => {
                               <p>Semester {userProfile.semester?.semesterNumber}</p>
                             </>
                           )}
-                          {(currentUser?.role === 'teacher' || currentUser?.role === 'hod') && (
+                          {(currentUser?.role === 'teacher' || currentUser?.role === 'hod' || currentUser?.role === 'coordinator') && (
                             <>
                               <p className="capitalize">{currentUser.role}</p>
-                              {userProfile.branch?.name && <p>{userProfile.branch.name}</p>}
+                              {currentUser?.role === 'coordinator'
+                                ? userProfile.coordinator?.branch?.name && <p>{userProfile.coordinator.branch.name}</p>
+                                : userProfile.branch?.name && <p>{userProfile.branch.name}</p>}
                             </>
                           )}
                         </div>
@@ -183,6 +185,8 @@ const Header = () => {
                             ? '/teacher/profile' 
                             : currentUser?.role === 'hod'
                             ? '/hod/profile'
+                            : currentUser?.role === 'coordinator'
+                            ? '/coordinator/profile'
                             : '/student/profile';
                           navigate(profilePath);
                           setShowProfileDropdown(false);

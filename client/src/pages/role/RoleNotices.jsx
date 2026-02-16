@@ -67,7 +67,11 @@ const RoleNotices = () => {
     loadProfile();
   }, [navigate]);
 
-  const noticesEndpoint = role === 'teacher' ? '/api/notices/teacher' : '/api/notices/admin';
+  const noticesEndpoint = role === 'teacher'
+    ? '/api/notices/teacher'
+    : role === 'coordinator'
+      ? '/api/notices/coordinator'
+      : '/api/notices/admin';
 
   const fetchNotices = useCallback(async () => {
     try {
@@ -108,6 +112,7 @@ const RoleNotices = () => {
     return [
       { value: 'hod', label: 'HODs' },
       { value: 'teacher', label: 'Teachers' },
+      { value: 'coordinator', label: 'Coordinators' },
       { value: 'student', label: 'Students' }
     ];
   }, []);
@@ -259,7 +264,7 @@ const RoleNotices = () => {
         onLogout={handleLogout}
         navItems={navItems}
         navLoading={navLoading}
-        panelLabel={role === 'admin' ? 'Admin Panel' : role === 'hod' ? 'HOD Panel' : 'Teacher Panel'}
+        panelLabel={role === 'admin' ? 'Admin Panel' : role === 'hod' ? 'HOD Panel' : role === 'coordinator' ? 'Coordinator Panel' : 'Teacher Panel'}
         profileLinks={role === 'admin' ? [] : [{ label: 'Profile', to: `/${role}/profile` }]}
       >
         <LoadingSpinner />
@@ -274,7 +279,7 @@ const RoleNotices = () => {
       onLogout={handleLogout}
       navItems={navItems}
       navLoading={navLoading}
-      panelLabel={role === 'admin' ? 'Admin Panel' : role === 'hod' ? 'HOD Panel' : 'Teacher Panel'}
+      panelLabel={role === 'admin' ? 'Admin Panel' : role === 'hod' ? 'HOD Panel' : role === 'coordinator' ? 'Coordinator Panel' : 'Teacher Panel'}
       profileLinks={role === 'admin' ? [] : [{ label: 'Profile', to: `/${role}/profile` }]}
     >
       <div className="space-y-6">

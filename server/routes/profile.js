@@ -9,7 +9,7 @@ const { protect } = require('../middleware/auth');
 router.get('/me', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
-      .populate('branch semester assignedSubjects assignedHOD')
+      .populate('branch semester assignedSubjects assignedHOD coordinator.branch coordinator.semesters')
       .select('-password -tempPassword -securityAnswer');
 
     res.status(200).json({
@@ -50,10 +50,10 @@ router.put('/me', protect, async (req, res) => {
     if (address) user.address = address;
     
     // Teachers and HODs can update qualifications and experience
-    if ((user.role === 'teacher' || user.role === 'hod') && qualifications !== undefined) {
+    if ((user.role === 'teacher' || user.role === 'hod' || user.role === 'coordinator') && qualifications !== undefined) {
       user.qualifications = qualifications;
     }
-    if ((user.role === 'teacher' || user.role === 'hod') && experience !== undefined) {
+    if ((user.role === 'teacher' || user.role === 'hod' || user.role === 'coordinator') && experience !== undefined) {
       user.experience = experience;
     }
 
@@ -61,7 +61,7 @@ router.put('/me', protect, async (req, res) => {
 
     // Get updated user with populated fields
     const updatedUser = await User.findById(user._id)
-      .populate('branch semester assignedSubjects assignedHOD')
+      .populate('branch semester assignedSubjects assignedHOD coordinator.branch coordinator.semesters')
       .select('-password -tempPassword -securityAnswer');
 
     res.status(200).json({
@@ -86,7 +86,7 @@ router.put('/complete-profile', protect, async (req, res) => {
     const { name } = req.body;
 
     const user = await User.findById(req.user._id)
-      .populate('branch semester assignedSubjects assignedHOD');
+      .populate('branch semester assignedSubjects assignedHOD coordinator.branch coordinator.semesters');
 
     if (!user) {
       return res.status(404).json({

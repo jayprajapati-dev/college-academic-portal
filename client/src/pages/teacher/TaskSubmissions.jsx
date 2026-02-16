@@ -72,6 +72,14 @@ const TaskSubmissions = () => {
     );
   }, [searchTerm, submissions]);
 
+  const panelLabel = role === 'admin'
+    ? 'Admin Panel'
+    : role === 'hod'
+      ? 'HOD Panel'
+      : role === 'coordinator'
+        ? 'Coordinator Panel'
+        : 'Teacher Panel';
+
   if (loading) {
     return (
       <RoleLayout
@@ -80,7 +88,7 @@ const TaskSubmissions = () => {
         onLogout={handleLogout}
         navItems={navItems}
         navLoading={navLoading}
-        panelLabel={role === 'admin' ? 'Admin Panel' : role === 'hod' ? 'HOD Panel' : 'Teacher Panel'}
+        panelLabel={panelLabel}
       >
         <LoadingSpinner />
       </RoleLayout>
@@ -94,7 +102,7 @@ const TaskSubmissions = () => {
       onLogout={handleLogout}
       navItems={navItems}
       navLoading={navLoading}
-      panelLabel={role === 'admin' ? 'Admin Panel' : role === 'hod' ? 'HOD Panel' : 'Teacher Panel'}
+        panelLabel={panelLabel}
     >
       <div className="space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -105,7 +113,7 @@ const TaskSubmissions = () => {
             </p>
           </div>
           <button
-            onClick={() => navigate(role === 'hod' ? '/hod/tasks' : '/teacher/tasks')}
+            onClick={() => navigate(role === 'hod' ? '/hod/tasks' : role === 'coordinator' ? '/coordinator/tasks' : '/teacher/tasks')}
             className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700"
           >
             Back to Tasks

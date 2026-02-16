@@ -5,6 +5,7 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const Branch = require('../models/Branch');
 const Subject = require('../models/Subject');
+const ActivityLog = require('../models/ActivityLog');
 const { protect, authorize } = require('../middleware/auth');
 
 // Links-based attachments only (Google Drive, Dropbox, etc.)
@@ -15,7 +16,7 @@ const getEligibleUserIds = async (targetAudience, targetRoles, targetBranch, cre
     let query = { status: 'active' };
 
     const roleList = Array.isArray(targetRoles) ? targetRoles.filter(Boolean) : [];
-    const normalizedRoles = roleList.filter((role) => ['admin', 'hod', 'teacher', 'student'].includes(role));
+    const normalizedRoles = roleList.filter((role) => ['admin', 'hod', 'teacher', 'student', 'coordinator'].includes(role));
     const useRoleList = normalizedRoles.length > 0;
 
     if (useRoleList) {
@@ -54,6 +55,13 @@ const getEligibleUserIds = async (targetAudience, targetRoles, targetBranch, cre
         orQueries.push(hodQuery);
       }
 
+      if (normalizedRoles.includes('coordinator')) {
+        const coordinatorQuery = { role: 'coordinator' };
+        if (branchScope.length) coordinatorQuery['coordinator.branch'] = { $in: branchScope };
+        if (semesterScope.length) coordinatorQuery['coordinator.semesters'] = { $in: semesterScope };
+        orQueries.push(coordinatorQuery);
+      }
+
       if (normalizedRoles.includes('admin')) {
         orQueries.push({ role: 'admin' });
       }
@@ -78,7 +86,7 @@ const getEligibleUserIds = async (targetAudience, targetRoles, targetBranch, cre
       const users = await User.find(query).select('_id');
       return users.map(u => u._id);
     } else if (targetAudience === 'Staff') {
-      query.role = { $in: ['admin', 'hod'] };
+      query.role = { $in: ['admin', 'hod', 'coordinator'] };
       const users = await User.find(query).select('_id');
       return users.map(u => u._id);
     } else if (targetAudience === 'Branch' && targetBranch) {
@@ -116,9 +124,17 @@ const notifyNoticeRecipients = async (notice, recipientIds) => {
   }
 };
 
+const logActivity = async (payload) => {
+  try {
+    await ActivityLog.create(payload);
+  } catch (error) {
+    console.error('Notice activity log error:', error);
+  }
+};
+
 
 // CREATE NOTICE
-router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+router.post('/create', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { title, content, priority, targetAudience, targetRoles, attachments, status } = req.body;
 
@@ -134,7 +150,7 @@ router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req
     let targetBranch = null;
     let branchIds = [];
     let semesterIds = [];
-    const normalizedRoles = Array.isArray(targetRoles) ? targetRoles.filter((role) => ['admin', 'hod', 'teacher', 'student'].includes(role)) : [];
+    const normalizedRoles = Array.isArray(targetRoles) ? targetRoles.filter((role) => ['admin', 'hod', 'teacher', 'student', 'coordinator'].includes(role)) : [];
     const shouldSendAll = targetAudience === 'Everyone' || normalizedRoles.length >= 3;
 
     if (!shouldSendAll && normalizedRoles.length === 0 && targetAudience === 'Selected') {
@@ -156,17 +172,21 @@ router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req
         semesterIds = Array.from(new Set(subjectDocs.map((s) => s.semesterId).filter(Boolean)));
       }
     }
+    if (req.user.role === 'coordinator') {
+      branchIds = [req.user.coordinator?.branch].filter(Boolean);
+      semesterIds = Array.isArray(req.user.coordinator?.semesters) ? req.user.coordinator.semesters : [];
+    }
     if (targetAudience === 'Branch') {
-      if (req.user.role !== 'hod') {
+      if (req.user.role !== 'hod' && req.user.role !== 'coordinator') {
         return res.status(403).json({
           success: false,
-          message: 'Only HODs can send branch-specific notices'
+          message: 'Only HODs or coordinators can send branch-specific notices'
         });
       }
-      targetBranch = req.user.branch;
-    } else if (req.user.role === 'hod' && (targetAudience === 'Everyone' || shouldSendAll)) {
-      // HOD sending to everyone defaults to their branch
-      targetBranch = req.user.branch;
+      targetBranch = req.user.role === 'coordinator' ? req.user.coordinator?.branch : req.user.branch;
+    } else if ((req.user.role === 'hod' || req.user.role === 'coordinator') && (targetAudience === 'Everyone' || shouldSendAll)) {
+      // HOD/Coordinator sending to everyone defaults to their branch
+      targetBranch = req.user.role === 'coordinator' ? req.user.coordinator?.branch : req.user.branch;
     }
 
     // Process attachments (links only - validate URL format)
@@ -215,6 +235,20 @@ router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req
       data: {
         ...notice.toObject(),
         recipientCount: eligibleUserIds.length
+      }
+    });
+
+    await logActivity({
+      actorId: req.user._id,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+      action: noticeStatus === 'draft' ? 'notice_draft_saved' : 'notice_published',
+      targetType: 'Notice',
+      targetId: notice._id,
+      targetLabel: notice.title,
+      scope: {
+        branchId: notice.targetBranch || null,
+        semesterIds
       }
     });
   } catch (error) {
@@ -352,8 +386,43 @@ router.get('/teacher', protect, authorize('teacher'), async (req, res) => {
   }
 });
 
+// GET COORDINATOR NOTICES (Own notices only)
+router.get('/coordinator', protect, authorize('coordinator'), async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status } = req.query;
+    const query = { createdBy: req.user._id };
+
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    const notices = await Notice.find(query)
+      .populate('createdBy', 'name email role')
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .sort({ createdAt: -1 });
+
+    const total = await Notice.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      count: notices.length,
+      total,
+      pages: Math.ceil(total / limit),
+      currentPage: page,
+      data: notices
+    });
+  } catch (error) {
+    console.error('Get coordinator notices error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching notices'
+    });
+  }
+});
+
 // UPDATE NOTICE (edit or publish draft)
-router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+router.put('/:id', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { title, content, priority, targetAudience, targetRoles, attachments, status } = req.body;
     const notice = await Notice.findById(req.params.id);
@@ -386,7 +455,7 @@ router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, re
     let targetBranch = notice.targetBranch || null;
     let branchIds = [];
     let semesterIds = [];
-    const normalizedRoles = Array.isArray(targetRoles) ? targetRoles.filter((role) => ['admin', 'hod', 'teacher', 'student'].includes(role)) : [];
+    const normalizedRoles = Array.isArray(targetRoles) ? targetRoles.filter((role) => ['admin', 'hod', 'teacher', 'student', 'coordinator'].includes(role)) : [];
     const shouldSendAll = targetAudience === 'Everyone' || normalizedRoles.length >= 3;
 
     if (req.user.role === 'hod') {
@@ -401,16 +470,20 @@ router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, re
         semesterIds = Array.from(new Set(subjectDocs.map((s) => s.semesterId).filter(Boolean)));
       }
     }
+    if (req.user.role === 'coordinator') {
+      branchIds = [req.user.coordinator?.branch].filter(Boolean);
+      semesterIds = Array.isArray(req.user.coordinator?.semesters) ? req.user.coordinator.semesters : [];
+    }
     if (targetAudience === 'Branch') {
-      if (req.user.role !== 'hod') {
+      if (req.user.role !== 'hod' && req.user.role !== 'coordinator') {
         return res.status(403).json({
           success: false,
-          message: 'Only HODs can send branch-specific notices'
+          message: 'Only HODs or coordinators can send branch-specific notices'
         });
       }
-      targetBranch = req.user.branch;
-    } else if (req.user.role === 'hod' && (targetAudience === 'Everyone' || shouldSendAll)) {
-      targetBranch = req.user.branch;
+      targetBranch = req.user.role === 'coordinator' ? req.user.coordinator?.branch : req.user.branch;
+    } else if ((req.user.role === 'hod' || req.user.role === 'coordinator') && (targetAudience === 'Everyone' || shouldSendAll)) {
+      targetBranch = req.user.role === 'coordinator' ? req.user.coordinator?.branch : req.user.branch;
     }
 
     if (title) notice.title = title;
@@ -431,6 +504,7 @@ router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, re
     }
 
     const nextStatus = status === 'published' ? 'published' : status === 'draft' ? 'draft' : notice.status;
+    const publishedNow = notice.status === 'draft' && nextStatus === 'published';
 
     if (notice.status === 'draft' && nextStatus === 'published') {
       const rolesForSend = Array.isArray(notice.targetRoles) ? notice.targetRoles : [];
@@ -445,6 +519,20 @@ router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, re
 
     notice.status = nextStatus;
     await notice.save();
+
+    await logActivity({
+      actorId: req.user._id,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+      action: publishedNow ? 'notice_published' : 'notice_updated',
+      targetType: 'Notice',
+      targetId: notice._id,
+      targetLabel: notice.title,
+      scope: {
+        branchId: notice.targetBranch || null,
+        semesterIds
+      }
+    });
 
     res.status(200).json({
       success: true,
@@ -509,7 +597,7 @@ router.get('/:id', protect, async (req, res) => {
 });
 
 // DELETE NOTICE
-router.delete('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+router.delete('/:id', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const notice = await Notice.findById(req.params.id);
 
@@ -542,6 +630,20 @@ router.delete('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req,
     // No files to delete - links only system
     notice.status = 'archived';
     await notice.save();
+
+    await logActivity({
+      actorId: req.user._id,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+      action: 'notice_deleted',
+      targetType: 'Notice',
+      targetId: notice._id,
+      targetLabel: notice.title,
+      scope: {
+        branchId: notice.targetBranch || null,
+        semesterIds: []
+      }
+    });
 
     res.status(200).json({
       success: true,

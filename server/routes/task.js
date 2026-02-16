@@ -4,6 +4,7 @@ const Task = require('../models/Task');
 const Notification = require('../models/Notification');
 const Subject = require('../models/Subject');
 const User = require('../models/User');
+const ActivityLog = require('../models/ActivityLog');
 const { protect, authorize } = require('../middleware/auth');
 
 // Links-based attachments only (Google Drive, Dropbox, etc.)
@@ -11,6 +12,28 @@ const { protect, authorize } = require('../middleware/auth');
 const hasAssignedSubject = (user, subjectId) => {
   const assigned = Array.isArray(user.assignedSubjects) ? user.assignedSubjects : [];
   return assigned.some((id) => String(id) === String(subjectId));
+};
+
+const getCoordinatorScope = (user) => {
+  const assignment = user?.coordinator;
+  if (!assignment || assignment.status === 'expired') return null;
+  return {
+    branchId: assignment.branch,
+    semesterIds: Array.isArray(assignment.semesters) ? assignment.semesters : []
+  };
+};
+
+const canCoordinatorManageSubject = (user, subject) => {
+  if (user?.role !== 'coordinator') return false;
+  const scope = getCoordinatorScope(user);
+  if (!scope || !scope.branchId) return false;
+  const subjectBranchId = subject?.branchId?._id || subject?.branchId;
+  const subjectSemesterId = subject?.semesterId?._id || subject?.semesterId;
+  if (!subjectBranchId || !subjectSemesterId) return false;
+
+  const semesterSet = new Set(scope.semesterIds.map((id) => String(id)));
+  return String(scope.branchId) === String(subjectBranchId)
+    && semesterSet.has(String(subjectSemesterId));
 };
 
 const getSubjectStudents = async (subject) => {
@@ -71,7 +94,12 @@ const notifyTaskRecipients = async (task) => {
 const notifyTaskTeachers = async (task, title, message) => {
   try {
     const teacherIds = await getSubjectTeacherIds(task.subjectId);
-    const notifications = teacherIds.map((teacherId) => ({
+    const uniqueIds = new Set(teacherIds.map((id) => String(id)));
+    if (task.createdBy) {
+      uniqueIds.add(String(task.createdBy));
+    }
+
+    const notifications = Array.from(uniqueIds).map((teacherId) => ({
       userId: teacherId,
       type: task.category,
       title,
@@ -91,8 +119,16 @@ const notifyTaskTeachers = async (task, title, message) => {
   }
 };
 
+const logActivity = async (payload) => {
+  try {
+    await ActivityLog.create(payload);
+  } catch (error) {
+    console.error('Task activity log error:', error);
+  }
+};
+
 // CREATE TASK (Teacher or HOD assigned to subject)
-router.post('/create', protect, authorize('hod', 'teacher'), async (req, res) => {
+router.post('/create', protect, authorize('hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { title, description, category, subjectId, dueDate, attachments, status } = req.body;
 
@@ -114,10 +150,10 @@ router.post('/create', protect, authorize('hod', 'teacher'), async (req, res) =>
     }
 
     // Authorization check: only subject teachers can create
-    if (!hasAssignedSubject(req.user, subjectId)) {
+    if (!hasAssignedSubject(req.user, subjectId) && !canCoordinatorManageSubject(req.user, subject)) {
       return res.status(403).json({
         success: false,
-        message: 'You can only create tasks for your assigned subjects'
+        message: 'You can only create tasks for your assigned subjects or coordinator scope'
       });
     }
 
@@ -151,6 +187,20 @@ router.post('/create', protect, authorize('hod', 'teacher'), async (req, res) =>
       // Send notifications to students
       await notifyTaskRecipients(task, 'created');
     }
+
+    await logActivity({
+      actorId: req.user._id,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+      action: taskStatus === 'draft' ? 'task_draft_saved' : 'task_created',
+      targetType: 'Task',
+      targetId: task._id,
+      targetLabel: task.title,
+      scope: {
+        branchId: task.branchId || null,
+        semesterIds: task.semesterId ? [task.semesterId] : []
+      }
+    });
 
     res.status(201).json({
       success: true,
@@ -280,7 +330,7 @@ router.get('/hod', protect, authorize('hod'), async (req, res) => {
 });
 
 
-router.get('/all', protect, authorize('hod', 'teacher'), async (req, res) => {
+router.get('/all', protect, authorize('hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { page = 1, limit = 10, category, branchId, semesterId, status } = req.query;
 
@@ -369,7 +419,7 @@ router.get('/:id', protect, async (req, res) => {
 });
 
 // GET TASK SUBMISSIONS (Teacher/HOD)
-router.get('/:id/submissions', protect, authorize('teacher', 'hod'), async (req, res) => {
+router.get('/:id/submissions', protect, authorize('teacher', 'hod', 'coordinator'), async (req, res) => {
   try {
     const task = await Task.findById(req.params.id)
       .populate('subjectId', 'name code')
@@ -493,7 +543,7 @@ router.post('/:id/submit', protect, authorize('student'), async (req, res) => {
 });
 
 // UPDATE STUDENT STATUS (Teacher/HOD)
-router.put('/:taskId/recipients/:studentId/status', protect, authorize('teacher', 'hod'), async (req, res) => {
+router.put('/:taskId/recipients/:studentId/status', protect, authorize('teacher', 'hod', 'coordinator'), async (req, res) => {
   try {
     const { status } = req.body;
     const allowed = ['pending', 'in-progress', 'submitted', 'completed'];
@@ -591,6 +641,7 @@ router.put('/:id', protect, async (req, res) => {
     }
 
     const nextStatus = status === 'active' ? 'active' : status === 'draft' ? 'draft' : task.status;
+    const publishedNow = task.status === 'draft' && nextStatus === 'active';
 
     if (task.status === 'draft' && nextStatus === 'active') {
       if (!task.recipients || task.recipients.length === 0) {
@@ -603,6 +654,20 @@ router.put('/:id', protect, async (req, res) => {
 
     task.updatedAt = Date.now();
     await task.save();
+
+    await logActivity({
+      actorId: req.user._id,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+      action: publishedNow ? 'task_published' : 'task_updated',
+      targetType: 'Task',
+      targetId: task._id,
+      targetLabel: task.title,
+      scope: {
+        branchId: task.branchId || null,
+        semesterIds: task.semesterId ? [task.semesterId] : []
+      }
+    });
 
     res.status(200).json({
       success: true,
@@ -649,6 +714,20 @@ router.delete('/:id', protect, async (req, res) => {
 
     task.status = 'deleted';
     await task.save();
+
+    await logActivity({
+      actorId: req.user._id,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+      action: 'task_deleted',
+      targetType: 'Task',
+      targetId: task._id,
+      targetLabel: task.title,
+      scope: {
+        branchId: task.branchId || null,
+        semesterIds: task.semesterId ? [task.semesterId] : []
+      }
+    });
 
     res.status(200).json({
       success: true,

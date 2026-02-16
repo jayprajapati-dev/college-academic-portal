@@ -159,7 +159,8 @@ router.post('/login', async (req, res) => {
         passwordChangeRequired: user.passwordChangeRequired,
         branch: user.branch,
         semester: user.semester,
-        assignedSubjects: user.assignedSubjects || []
+        assignedSubjects: user.assignedSubjects || [],
+        coordinator: user.coordinator || null
       }
     });
   } catch (error) {

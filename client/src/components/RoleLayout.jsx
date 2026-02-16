@@ -26,6 +26,7 @@ const RoleLayout = ({
   const roleLabel = useMemo(() => {
     if (role === 'hod') return 'HOD';
     if (role === 'teacher') return 'Teacher';
+    if (role === 'coordinator') return 'Coordinator';
     return 'Role';
   }, [role]);
 

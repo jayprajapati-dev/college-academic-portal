@@ -11,7 +11,8 @@ const ROLE_DEFAULTS = {
     'attendance',
     'exams',
     'users',
-    'contacts'
+    'contacts',
+    'activity'
   ],
   hod: [
     'dashboard',
@@ -37,6 +38,15 @@ const ROLE_DEFAULTS = {
     'exams',
     'profile',
     'users'
+  ],
+  coordinator: [
+    'dashboard',
+    'tasks',
+    'notices',
+    'attendance',
+    'profile',
+    'users',
+    'activity'
   ]
 };
 

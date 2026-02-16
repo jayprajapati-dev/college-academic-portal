@@ -27,9 +27,55 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['student', 'teacher', 'hod', 'admin'],
+    enum: ['student', 'teacher', 'hod', 'admin', 'coordinator'],
     default: 'student',
     required: true
+  },
+  coordinator: {
+    branch: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      default: null
+    },
+    semesters: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Semester'
+    }],
+    academicYear: {
+      type: String,
+      trim: true
+    },
+    validFrom: {
+      type: Date,
+      default: null
+    },
+    validTill: {
+      type: Date,
+      default: null
+    },
+    graceDays: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    status: {
+      type: String,
+      enum: ['active', 'grace', 'expired'],
+      default: 'active'
+    },
+    baseRole: {
+      type: String,
+      enum: ['teacher', 'hod'],
+      default: 'teacher'
+    },
+    assignedAt: {
+      type: Date,
+      default: Date.now
+    },
+    revokedAt: {
+      type: Date,
+      default: null
+    }
   },
   adminAccess: {
     type: Boolean,

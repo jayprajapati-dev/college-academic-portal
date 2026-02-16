@@ -4,6 +4,7 @@ const router = express.Router();
 const Attendance = require('../models/Attendance');
 const Subject = require('../models/Subject');
 const User = require('../models/User');
+const ActivityLog = require('../models/ActivityLog');
 const { protect, authorize } = require('../middleware/auth');
 
 const buildBranchScope = (user) => {
@@ -12,6 +13,18 @@ const buildBranchScope = (user) => {
   if (user.department) branchIds.push(user.department);
   if (Array.isArray(user.branches)) branchIds.push(...user.branches);
   return [...new Set(branchIds.map((id) => String(id)))].filter(Boolean);
+};
+
+const getCoordinatorScope = (user) => {
+  if (user?.role !== 'coordinator') return null;
+  const assignment = user.coordinator;
+  if (!assignment || assignment.status === 'expired') return null;
+  return {
+    branchId: assignment.branch ? String(assignment.branch) : null,
+    semesterIds: Array.isArray(assignment.semesters)
+      ? assignment.semesters.map((id) => String(id))
+      : []
+  };
 };
 
 const buildDateKey = (value) => {
@@ -47,8 +60,16 @@ const buildSummary = (records) => {
   return summary;
 };
 
+const logActivity = async (payload) => {
+  try {
+    await ActivityLog.create(payload);
+  } catch (error) {
+    console.error('Attendance activity log error:', error);
+  }
+};
+
 // GET students for attendance
-router.get('/students', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+router.get('/students', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { subjectId, branchId, semesterId } = req.query;
     const query = { role: 'student', status: { $ne: 'disabled' } };
@@ -77,6 +98,13 @@ router.get('/students', protect, authorize('admin', 'hod', 'teacher'), async (re
         }
       }
 
+      if (req.user.role === 'coordinator') {
+        const scope = getCoordinatorScope(req.user);
+        if (!scope || scope.branchId !== String(subject.branchId) || !scope.semesterIds.includes(String(subject.semesterId))) {
+          return res.status(403).json({ success: false, message: 'You can only access attendance for your assigned branch and semesters' });
+        }
+      }
+
       query.branch = subject.branchId;
       query.semester = subject.semesterId;
     } else {
@@ -102,6 +130,23 @@ router.get('/students', protect, authorize('admin', 'hod', 'teacher'), async (re
           query.branch = { $in: allowedBranches };
         }
       }
+
+      if (req.user.role === 'coordinator') {
+        const scope = getCoordinatorScope(req.user);
+        if (!scope || !scope.branchId) {
+          return res.status(403).json({ success: false, message: 'Coordinator scope is not configured' });
+        }
+        if (query.branch && String(query.branch) !== scope.branchId) {
+          return res.status(403).json({ success: false, message: 'You can only access students in your assigned branch' });
+        }
+        if (query.semester && !scope.semesterIds.includes(String(query.semester))) {
+          return res.status(403).json({ success: false, message: 'You can only access students in your assigned semesters' });
+        }
+        query.branch = scope.branchId;
+        if (!query.semester && scope.semesterIds.length > 0) {
+          query.semester = { $in: scope.semesterIds };
+        }
+      }
     }
 
     const students = await User.find(query)
@@ -120,7 +165,7 @@ router.get('/students', protect, authorize('admin', 'hod', 'teacher'), async (re
 });
 
 // CREATE/UPDATE attendance session
-router.post('/sessions', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+router.post('/sessions', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { subjectId, date, session = 'Lecture', records = [] } = req.body;
 
@@ -149,6 +194,13 @@ router.post('/sessions', protect, authorize('admin', 'hod', 'teacher'), async (r
       const allowedBranches = buildBranchScope(req.user);
       if (!allowedBranches.includes(String(subject.branchId))) {
         return res.status(403).json({ success: false, message: 'You can only mark attendance for your branch' });
+      }
+    }
+
+    if (req.user.role === 'coordinator') {
+      const scope = getCoordinatorScope(req.user);
+      if (!scope || scope.branchId !== String(subject.branchId) || !scope.semesterIds.includes(String(subject.semesterId))) {
+        return res.status(403).json({ success: false, message: 'You can only mark attendance for your assigned branch and semesters' });
       }
     }
 
@@ -187,6 +239,20 @@ router.post('/sessions', protect, authorize('admin', 'hod', 'teacher'), async (r
       runValidators: true
     });
 
+    await logActivity({
+      actorId: req.user._id,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+      action: 'attendance_saved',
+      targetType: 'Attendance',
+      targetId: attendance._id,
+      targetLabel: subject.name,
+      scope: {
+        branchId: subject.branchId || null,
+        semesterIds: subject.semesterId ? [subject.semesterId] : []
+      }
+    });
+
     res.status(201).json({
       success: true,
       message: 'Attendance saved successfully',
@@ -199,7 +265,7 @@ router.post('/sessions', protect, authorize('admin', 'hod', 'teacher'), async (r
 });
 
 // GET attendance sessions (admin/hod/teacher)
-router.get('/sessions', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+router.get('/sessions', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { page = 1, limit = 10, subjectId, branchId, semesterId, dateKey, session } = req.query;
     const query = {};
@@ -225,6 +291,23 @@ router.get('/sessions', protect, authorize('admin', 'hod', 'teacher'), async (re
       }
       if (!query.branchId) {
         query.branchId = { $in: allowedBranches };
+      }
+    }
+
+    if (req.user.role === 'coordinator') {
+      const scope = getCoordinatorScope(req.user);
+      if (!scope || !scope.branchId) {
+        return res.status(403).json({ success: false, message: 'Coordinator scope is not configured' });
+      }
+      if (query.branchId && String(query.branchId) !== scope.branchId) {
+        return res.status(403).json({ success: false, message: 'You can only access attendance for your assigned branch' });
+      }
+      if (query.semesterId && !scope.semesterIds.includes(String(query.semesterId))) {
+        return res.status(403).json({ success: false, message: 'You can only access attendance for your assigned semesters' });
+      }
+      query.branchId = scope.branchId;
+      if (!query.semesterId && scope.semesterIds.length > 0) {
+        query.semesterId = { $in: scope.semesterIds };
       }
     }
 
@@ -254,7 +337,7 @@ router.get('/sessions', protect, authorize('admin', 'hod', 'teacher'), async (re
 });
 
 // GET attendance session by ID
-router.get('/sessions/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+router.get('/sessions/:id', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -286,6 +369,13 @@ router.get('/sessions/:id', protect, authorize('admin', 'hod', 'teacher'), async
       }
     }
 
+    if (req.user.role === 'coordinator') {
+      const scope = getCoordinatorScope(req.user);
+      if (!scope || scope.branchId !== String(session.branchId) || !scope.semesterIds.includes(String(session.semesterId))) {
+        return res.status(403).json({ success: false, message: 'You can only access attendance for your assigned branch and semesters' });
+      }
+    }
+
     res.json({ success: true, data: session });
   } catch (error) {
     console.error('Get attendance session error:', error);
@@ -294,7 +384,7 @@ router.get('/sessions/:id', protect, authorize('admin', 'hod', 'teacher'), async
 });
 
 // UPDATE attendance session
-router.put('/sessions/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+router.put('/sessions/:id', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -321,6 +411,13 @@ router.put('/sessions/:id', protect, authorize('admin', 'hod', 'teacher'), async
       }
     }
 
+    if (req.user.role === 'coordinator') {
+      const scope = getCoordinatorScope(req.user);
+      if (!scope || scope.branchId !== String(session.branchId) || !scope.semesterIds.includes(String(session.semesterId))) {
+        return res.status(403).json({ success: false, message: 'You can only update attendance for your assigned branch and semesters' });
+      }
+    }
+
     const normalizedRecords = Array.isArray(req.body.records)
       ? req.body.records.map((record) => ({
           studentId: record.studentId,
@@ -337,6 +434,20 @@ router.put('/sessions/:id', protect, authorize('admin', 'hod', 'teacher'), async
     session.markedByRole = req.user.role;
     await session.save();
 
+    await logActivity({
+      actorId: req.user._id,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+      action: 'attendance_updated',
+      targetType: 'Attendance',
+      targetId: session._id,
+      targetLabel: session.subjectId?.name || 'Attendance',
+      scope: {
+        branchId: session.branchId || null,
+        semesterIds: session.semesterId ? [session.semesterId] : []
+      }
+    });
+
     res.json({ success: true, message: 'Attendance updated successfully', data: session });
   } catch (error) {
     console.error('Update attendance error:', error);
@@ -345,7 +456,7 @@ router.put('/sessions/:id', protect, authorize('admin', 'hod', 'teacher'), async
 });
 
 // DELETE attendance session
-router.delete('/sessions/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+router.delete('/sessions/:id', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -372,7 +483,28 @@ router.delete('/sessions/:id', protect, authorize('admin', 'hod', 'teacher'), as
       }
     }
 
+    if (req.user.role === 'coordinator') {
+      const scope = getCoordinatorScope(req.user);
+      if (!scope || scope.branchId !== String(session.branchId) || !scope.semesterIds.includes(String(session.semesterId))) {
+        return res.status(403).json({ success: false, message: 'You can only delete attendance for your assigned branch and semesters' });
+      }
+    }
+
     await Attendance.findByIdAndDelete(id);
+
+    await logActivity({
+      actorId: req.user._id,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+      action: 'attendance_deleted',
+      targetType: 'Attendance',
+      targetId: session._id,
+      targetLabel: session.subjectId?.name || 'Attendance',
+      scope: {
+        branchId: session.branchId || null,
+        semesterIds: session.semesterId ? [session.semesterId] : []
+      }
+    });
 
     res.json({ success: true, message: 'Attendance session deleted' });
   } catch (error) {

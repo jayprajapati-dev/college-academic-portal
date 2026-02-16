@@ -23,8 +23,9 @@ const RoleProfile = () => {
 
   const isAdmin = role === 'admin';
   const isHod = role === 'hod';
+  const isCoordinator = role === 'coordinator';
   const isTeacher = role === 'teacher';
-  const panelLabel = isAdmin ? 'Admin Panel' : isHod ? 'HOD Panel' : 'Teacher Panel';
+  const panelLabel = isAdmin ? 'Admin Panel' : isHod ? 'HOD Panel' : isCoordinator ? 'Coordinator Panel' : 'Teacher Panel';
 
   const getLabel = (value) => {
     if (!value) return '';
@@ -179,8 +180,9 @@ const RoleProfile = () => {
   const roleLabel = useMemo(() => {
     if (isAdmin) return 'Administrator';
     if (isHod) return 'Head of Department';
+    if (isCoordinator) return 'Coordinator';
     return 'Teacher';
-  }, [isAdmin, isHod]);
+  }, [isAdmin, isHod, isCoordinator]);
 
   if (loading) {
     return (

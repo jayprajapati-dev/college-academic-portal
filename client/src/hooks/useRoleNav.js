@@ -13,7 +13,8 @@ const ROLE_NAV = {
     { key: 'attendance', label: 'Attendance', to: '/admin/attendance', icon: 'fact_check' },
     { key: 'exams', label: 'Exams', to: '/admin/exams', icon: 'quiz' },
     { key: 'users', label: 'Manage Users', to: '/admin/users', icon: 'group' },
-    { key: 'contacts', label: 'Contact Requests', to: '/admin/contacts', icon: 'contact_mail' }
+    { key: 'contacts', label: 'Contact Requests', to: '/admin/contacts', icon: 'contact_mail' },
+    { key: 'activity', label: 'Activity Log', to: '/admin/activity', icon: 'history' }
   ],
   hod: [
     { key: 'dashboard', label: 'Dashboard', to: '/hod/dashboard', icon: 'space_dashboard' },
@@ -37,6 +38,14 @@ const ROLE_NAV = {
     { key: 'attendance', label: 'Attendance', to: '/teacher/attendance', icon: 'fact_check' },
     { key: 'exams', label: 'Exams', to: '/teacher/exams', icon: 'quiz' },
     { key: 'users', label: 'Manage Users', to: '/teacher/users', icon: 'group' }
+  ],
+  coordinator: [
+    { key: 'dashboard', label: 'Dashboard', to: '/coordinator/dashboard', icon: 'space_dashboard' },
+    { key: 'tasks', label: 'Tasks', to: '/coordinator/tasks', icon: 'assignment' },
+    { key: 'notices', label: 'Notices', to: '/coordinator/notices', icon: 'notifications' },
+    { key: 'attendance', label: 'Attendance', to: '/coordinator/attendance', icon: 'fact_check' },
+    { key: 'users', label: 'Students', to: '/coordinator/users', icon: 'group' },
+    { key: 'activity', label: 'Activity Log', to: '/coordinator/activity', icon: 'history' }
   ]
 };
 
@@ -76,7 +85,7 @@ const useRoleNav = (role) => {
         if (Object.prototype.hasOwnProperty.call(data, 'allowedModules')) {
           const allowed = Array.isArray(data.allowedModules) ? data.allowedModules : [];
           const allowedSet = new Set(allowed);
-          if (role === 'teacher' || role === 'hod') {
+          if (role === 'teacher' || role === 'hod' || role === 'coordinator') {
             allowedSet.add('users');
           }
           const hasTeachingSubjects = Array.isArray(storedUser?.assignedSubjects) && storedUser.assignedSubjects.length > 0;

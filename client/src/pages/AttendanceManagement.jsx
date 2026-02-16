@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AdminLayout, Button, Card, HodLayout, Input, LoadingSpinner, Pagination, TeacherLayout } from '../components';
+import { AdminLayout, Button, Card, HodLayout, Input, LoadingSpinner, Pagination, RoleLayout, TeacherLayout } from '../components';
+import useRoleNav from '../hooks/useRoleNav';
 import axios from 'axios';
 
 const AttendanceManagement = () => {
@@ -10,8 +11,11 @@ const AttendanceManagement = () => {
   const Layout = useMemo(() => {
     if (role === 'admin') return AdminLayout;
     if (role === 'hod') return HodLayout;
+    if (role === 'coordinator') return RoleLayout;
     return TeacherLayout;
   }, [role]);
+  const { navItems, loading: navLoading } = useRoleNav(role);
+  const panelLabel = role === 'admin' ? 'Admin Panel' : role === 'hod' ? 'HOD Panel' : role === 'coordinator' ? 'Coordinator Panel' : 'Teacher Panel';
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,7 +67,11 @@ const AttendanceManagement = () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-      const endpoint = role === 'hod' ? '/api/academic/subjects/hod' : '/api/academic/subjects';
+      const endpoint = role === 'hod'
+        ? '/api/academic/subjects/hod'
+        : role === 'coordinator'
+          ? '/api/academic/subjects/coordinator'
+          : '/api/academic/subjects';
       const res = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -295,16 +303,26 @@ const AttendanceManagement = () => {
       : 'bg-amber-50 text-amber-700 hover:bg-amber-100';
   };
 
+  const layoutProps = {
+    title: 'Attendance',
+    userName: storedUser?.name || 'User',
+    onLogout: handleLogout,
+    navItems,
+    navLoading,
+    panelLabel,
+    profileLinks: role === 'admin' ? [] : [{ label: 'Profile', to: `/${role}/profile` }]
+  };
+
   if (loading) {
     return (
-      <Layout title="Attendance" userName={storedUser?.name || 'User'} onLogout={handleLogout}>
+      <Layout {...layoutProps}>
         <LoadingSpinner />
       </Layout>
     );
   }
 
   return (
-    <Layout title="Attendance" userName={storedUser?.name || 'User'} onLogout={handleLogout}>
+    <Layout {...layoutProps}>
       <div className="space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>

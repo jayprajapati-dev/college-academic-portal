@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { getCoordinatorStatus } = require('../utils/coordinatorScheduler');
 
 // Protect routes - verify JWT token
 const protect = async (req, res, next) => {
@@ -38,6 +39,26 @@ const protect = async (req, res, next) => {
           success: false,
           message: 'Your account has been disabled'
         });
+      }
+
+      if (req.user.role === 'coordinator' && req.user.coordinator) {
+        const now = new Date();
+        const status = getCoordinatorStatus(req.user.coordinator, now);
+        if (status === 'expired') {
+          req.user.role = req.user.coordinator.baseRole || 'teacher';
+          req.user.coordinator = {
+            ...req.user.coordinator,
+            status: 'expired',
+            revokedAt: now
+          };
+          await req.user.save();
+        } else if (status !== req.user.coordinator.status) {
+          req.user.coordinator = {
+            ...req.user.coordinator,
+            status
+          };
+          await req.user.save();
+        }
       }
 
       next();

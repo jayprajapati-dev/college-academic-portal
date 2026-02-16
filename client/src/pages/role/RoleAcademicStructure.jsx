@@ -157,7 +157,7 @@ const RoleAcademicStructure = () => {
       );
   }, [structure, searchQuery]);
 
-  const panelLabel = role === 'admin' ? 'Admin Panel' : role === 'hod' ? 'HOD Panel' : 'Teacher Panel';
+  const panelLabel = role === 'admin' ? 'Admin Panel' : role === 'hod' ? 'HOD Panel' : role === 'coordinator' ? 'Coordinator Panel' : 'Teacher Panel';
 
   if (loading) {
     return (
