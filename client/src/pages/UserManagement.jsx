@@ -592,7 +592,7 @@ const UserManagement = () => {
         addedBy: currentUser?._id,
         addedByRole: currentUser?.role
       };
-      const response = await fetch('/api/admin/hods', {
+      const response = await fetch('/api/admin/add-hod', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -654,7 +654,7 @@ const UserManagement = () => {
         addedBy: currentUser?._id,
         addedByRole: currentUser?.role
       };
-      const response = await fetch('/api/admin/teachers', {
+      const response = await fetch('/api/admin/add-teacher', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

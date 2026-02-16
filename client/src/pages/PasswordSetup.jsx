@@ -19,13 +19,13 @@ const PasswordSetup = () => {
   });
 
   const securityQuestions = [
-    "What is your mother's name?",
+    "What is your mother's maiden name?",
+    "What was the name of your first pet?",
     "What city were you born in?",
-    "What is your pet's name?",
-    "What is your favorite color?",
     "What is your favorite book?",
+    "What is your favorite movie?",
+    "What was the name of your first school?",
     "What is your favorite food?",
-    "What school did you attend?",
     "What is your favorite sport?"
   ];
 
@@ -47,7 +47,7 @@ const PasswordSetup = () => {
       });
 
       if (response.data.success) {
-        localStorage.setItem('setupToken', response.data.token);
+        localStorage.setItem('setupToken', response.data.setupToken);
         localStorage.setItem('userId', response.data.userId);
         setSuccess('Credentials verified! Setting up new password...');
         setTimeout(() => {
@@ -100,6 +100,7 @@ const PasswordSetup = () => {
       const response = await axios.post('/api/auth/setup-password', {
         userId,
         newPassword: formData.newPassword,
+        confirmPassword: formData.confirmPassword,
         securityQuestion: formData.securityQuestion,
         securityAnswer: formData.securityAnswer
       }, {

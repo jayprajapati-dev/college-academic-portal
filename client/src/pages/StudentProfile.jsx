@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { StudentLayout } from '../components';
+import { LandingFrame } from '../components';
+import useLandingAuth from '../hooks/useLandingAuth';
 
 const StudentProfile = () => {
   const navigate = useNavigate();
+  const { isLoggedIn, currentUser, userProfile, notifications } = useLandingAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState({});
+  const [branches, setBranches] = useState([]);
+  const [semesters, setSemesters] = useState([]);
   const [saving, setSaving] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [passwordData, setPasswordData] = useState({
@@ -44,11 +48,30 @@ const StudentProfile = () => {
     fetchProfile();
   }, [fetchProfile]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login');
-  };
+  useEffect(() => {
+    let isMounted = true;
+    const loadOptions = async () => {
+      try {
+        const [branchesRes, semestersRes] = await Promise.all([
+          fetch('/api/academic/branches'),
+          fetch('/api/academic/semesters')
+        ]);
+        const branchesData = await branchesRes.json();
+        const semestersData = await semestersRes.json();
+        if (isMounted) {
+          setBranches(Array.isArray(branchesData?.data) ? branchesData.data : []);
+          setSemesters(Array.isArray(semestersData?.data) ? semestersData.data : []);
+        }
+      } catch (error) {
+        console.error('Error loading branch/semester options:', error);
+      }
+    };
+
+    loadOptions();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleEditToggle = () => {
     if (editMode) {
@@ -56,6 +79,8 @@ const StudentProfile = () => {
     } else {
       setEditData({
         name: profile?.name || '',
+        mobile: profile?.mobile || '',
+        branch: profile?.branch?._id || '',
         semester: profile?.semester?._id || ''
       });
     }
@@ -142,9 +167,13 @@ const StudentProfile = () => {
   }
 
   return (
-    <StudentLayout title="My Profile" onLogout={handleLogout} userName={profile?.name || 'Student'}>
-      <main className="mesh-background min-h-screen">
-        <div className="max-w-4xl mx-auto px-6 py-6">
+    <LandingFrame
+      isLoggedIn={isLoggedIn}
+      currentUser={currentUser}
+      userProfile={userProfile}
+      notifications={notifications}
+    >
+      <div className="max-w-4xl mx-auto px-6 py-10">
           <div className="bg-white dark:bg-background-dark/50 border border-[#dcdee5] dark:border-white/10 rounded-2xl shadow-sm overflow-hidden">
             {/* Profile Header */}
             <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-8 text-white">
@@ -287,32 +316,65 @@ const StudentProfile = () => {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-500 mb-2">Mobile No.</label>
-                  <p className="text-lg font-semibold">
-                    {profile?.mobile || (
-                      <span className="text-gray-400 text-base">Not provided</span>
-                    )}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">Cannot be changed</p>
+                  {editMode ? (
+                    <input
+                      type="tel"
+                      value={editData.mobile}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setEditData({ ...editData, mobile: value });
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-lg font-semibold"
+                      placeholder="Enter mobile number"
+                    />
+                  ) : (
+                    <p className="text-lg font-semibold">
+                      {profile?.mobile || (
+                        <span className="text-gray-400 text-base">Not provided</span>
+                      )}
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-500 mb-2">Branch</label>
-                  <p className="text-lg font-semibold">
-                    {profile?.branch?.name || (
-                      <span className="text-gray-400 text-base">Not assigned yet</span>
-                    )}
-                  </p>
+                  {editMode ? (
+                    <select
+                      value={editData.branch}
+                      onChange={(e) => setEditData({ ...editData, branch: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-lg font-semibold"
+                    >
+                      <option value="">Select branch</option>
+                      {branches.map((branch) => (
+                        <option key={branch._id} value={branch._id}>
+                          {branch.name} {branch.code ? `(${branch.code})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-lg font-semibold">
+                      {profile?.branch?.name || (
+                        <span className="text-gray-400 text-base">Not assigned yet</span>
+                      )}
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-500 mb-2">Semester</label>
                   {editMode ? (
-                    <input
-                      type="text"
-                      value={editData.semester ? `Semester ${profile?.semester?.semesterNumber}` : ''}
-                      disabled
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-lg font-semibold cursor-not-allowed"
-                    />
+                    <select
+                      value={editData.semester}
+                      onChange={(e) => setEditData({ ...editData, semester: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-lg font-semibold"
+                    >
+                      <option value="">Select semester</option>
+                      {semesters.map((semester) => (
+                        <option key={semester._id} value={semester._id}>
+                          Semester {semester.semesterNumber}
+                        </option>
+                      ))}
+                    </select>
                   ) : (
                     <p className="text-lg font-semibold">
                       {profile?.semester ? (
@@ -354,8 +416,7 @@ const StudentProfile = () => {
             </div>
           </div>
         </div>
-      </main>
-    </StudentLayout>
+    </LandingFrame>
   );
 };
 

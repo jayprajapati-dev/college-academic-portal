@@ -15,13 +15,14 @@ const FirstLoginPage = () => {
   const [loading, setLoading] = useState(false);
 
   const securityQuestions = [
-    'What is your mother\'s maiden name?',
-    'What was the name of your first pet?',
-    'What city were you born in?',
-    'What is your favorite color?',
-    'What was the name of your elementary school?',
-    'What is your favorite food?',
-    'What is your father\'s middle name?'
+    "What is your mother's maiden name?",
+    "What was the name of your first pet?",
+    "What city were you born in?",
+    "What is your favorite book?",
+    "What is your favorite movie?",
+    "What was the name of your first school?",
+    "What is your favorite food?",
+    "What is your favorite sport?"
   ];
 
   const handleChange = (e) => {
@@ -75,7 +76,7 @@ const FirstLoginPage = () => {
     try {
       const token = localStorage.getItem('token');
       
-      const response = await fetch('http://localhost:5000/api/auth/first-login', {
+      const response = await fetch('/api/auth/first-login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

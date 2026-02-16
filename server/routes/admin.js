@@ -125,9 +125,9 @@ router.post('/add-hod', protect, authorize('admin'), async (req, res) => {
       subjects: subjectIds,
       department: branchIds[0], // Primary branch as department
       tempPassword: tempPassword,
-      password: 'temp', // Will be hashed, replaced during password setup
+      password: tempPassword, // Will be hashed, replaced during first login
       status: 'active',
-      passwordSetupRequired: true,
+      passwordChangeRequired: true,
       addedBy: req.user._id,
       addedByRole: req.user.role
     });
@@ -149,9 +149,9 @@ router.post('/add-hod', protect, authorize('admin'), async (req, res) => {
         subjects: hod.subjects.map(s => ({ id: s._id, name: s.name })),
         department: hod.department?.name,
         tempPassword: tempPassword, // Share with HOD
-        passwordSetupRequired: true,
+        passwordChangeRequired: true,
         status: hod.status,
-        setupInstructions: 'HOD should visit password-setup page and enter mobile + temp password'
+        setupInstructions: 'HOD should login with mobile + temp password and complete first-login flow'
       }
     });
   } catch (error) {
@@ -254,9 +254,9 @@ router.post('/add-teacher', protect, authorize('admin', 'hod'), async (req, res)
       semesters: semesterIds,
       subjects: subjectIds,
       tempPassword: tempPassword,
-      password: 'temp', // Will be hashed, replaced during password setup
+      password: tempPassword, // Will be hashed, replaced during first login
       status: 'active',
-      passwordSetupRequired: true,
+      passwordChangeRequired: true,
       addedBy: req.user._id,
       addedByRole: req.user.role
     });
@@ -285,9 +285,9 @@ router.post('/add-teacher', protect, authorize('admin', 'hod'), async (req, res)
         semesters: teacher.semesters.map(s => ({ id: s._id, name: s.name })),
         subjects: teacher.subjects.map(s => ({ id: s._id, name: s.name })),
         tempPassword: tempPassword, // Share with teacher
-        passwordSetupRequired: true,
+        passwordChangeRequired: true,
         status: teacher.status,
-        setupInstructions: 'Teacher should visit password-setup page and enter mobile + temp password'
+        setupInstructions: 'Teacher should login with mobile + temp password and complete first-login flow'
       }
     });
   } catch (error) {
@@ -669,8 +669,18 @@ router.put('/user/:id/status', protect, authorize('admin', 'coordinator'), async
       }
     }
 
-    user.status = status;
-    await user.save();
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      { $set: { status } },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
 
     await logActivity({
       actorId: req.user._id,
@@ -678,11 +688,11 @@ router.put('/user/:id/status', protect, authorize('admin', 'coordinator'), async
       actorRole: req.user.role,
       action: status === 'active' ? 'unblock_student' : 'block_student',
       targetType: 'User',
-      targetId: user._id,
-      targetLabel: user.name,
+      targetId: updatedUser._id,
+      targetLabel: updatedUser.name,
       scope: {
-        branchId: user.branch || null,
-        semesterIds: user.semester ? [user.semester] : []
+        branchId: updatedUser.branch || null,
+        semesterIds: updatedUser.semester ? [updatedUser.semester] : []
       }
     });
 
@@ -690,9 +700,9 @@ router.put('/user/:id/status', protect, authorize('admin', 'coordinator'), async
       success: true,
       message: `User ${status === 'active' ? 'activated' : 'deactivated'} successfully`,
       data: {
-        id: user._id,
-        name: user.name,
-        status: user.status
+        id: updatedUser._id,
+        name: updatedUser.name,
+        status: updatedUser.status
       }
     });
   } catch (error) {

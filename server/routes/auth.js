@@ -77,19 +77,19 @@ router.post('/register', async (req, res) => {
 // @access  Public
 router.post('/login', async (req, res) => {
   try {
-    const { identifier, password } = req.body; // identifier can be email or mobile
+    const { identifier, password } = req.body; // identifier can be email, mobile, or enrollment number
 
     // Validation
     if (!identifier || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide email/mobile and password'
+        message: 'Please provide email/mobile/enrollment and password'
       });
     }
 
     // Find user by email or mobile
     const user = await User.findOne({
-      $or: [{ email: identifier }, { mobile: identifier }]
+      $or: [{ email: identifier }, { mobile: identifier }, { enrollmentNumber: identifier }]
     }).select('+password +tempPassword');
 
     if (!user) {

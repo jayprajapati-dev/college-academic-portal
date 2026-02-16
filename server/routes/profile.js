@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const User = require('../models/User');
+const Branch = require('../models/Branch');
+const Semester = require('../models/Semester');
 const { protect } = require('../middleware/auth');
 
 // @route   GET /api/profile/me
@@ -30,7 +33,7 @@ router.get('/me', protect, async (req, res) => {
 // @access  Private
 router.put('/me', protect, async (req, res) => {
   try {
-    const { name, email, phone, dateOfBirth, gender, address, qualifications, experience } = req.body;
+    const { name, email, phone, mobile, branch, semester, dateOfBirth, gender, address, qualifications, experience } = req.body;
 
     const user = await User.findById(req.user._id);
 
@@ -48,6 +51,40 @@ router.put('/me', protect, async (req, res) => {
     if (dateOfBirth) user.dateOfBirth = dateOfBirth;
     if (gender) user.gender = gender;
     if (address) user.address = address;
+
+    if (user.role === 'student') {
+      if (mobile) {
+        if (!/^[0-9]{10}$/.test(mobile)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Please provide a valid 10-digit mobile number'
+          });
+        }
+        user.mobile = mobile;
+      }
+
+      if (branch) {
+        if (!mongoose.Types.ObjectId.isValid(branch)) {
+          return res.status(400).json({ success: false, message: 'Invalid branch id' });
+        }
+        const branchDoc = await Branch.findById(branch);
+        if (!branchDoc) {
+          return res.status(404).json({ success: false, message: 'Branch not found' });
+        }
+        user.branch = branchDoc._id;
+      }
+
+      if (semester) {
+        if (!mongoose.Types.ObjectId.isValid(semester)) {
+          return res.status(400).json({ success: false, message: 'Invalid semester id' });
+        }
+        const semesterDoc = await Semester.findById(semester);
+        if (!semesterDoc) {
+          return res.status(404).json({ success: false, message: 'Semester not found' });
+        }
+        user.semester = semesterDoc._id;
+      }
+    }
     
     // Teachers and HODs can update qualifications and experience
     if ((user.role === 'teacher' || user.role === 'hod' || user.role === 'coordinator') && qualifications !== undefined) {

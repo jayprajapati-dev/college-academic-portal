@@ -30,6 +30,7 @@ import RoleProfile from './pages/role/RoleProfile';
 import RoleManageTeachers from './pages/role/RoleManageTeachers';
 
 // Import dashboards
+import StudentDashboard from './pages/StudentDashboard';
 import StudentProfile from './pages/StudentProfile';
 import UserManagement from './pages/UserManagement';
 import SubjectMaterialsManagement from './pages/SubjectMaterialsManagement';
@@ -84,7 +85,7 @@ function App() {
         <Route path="/password-setup" element={<PasswordSetup />} />
         
         {/* Dashboards (Role-based) */}
-        <Route path="/student/dashboard" element={<Navigate to="/" replace />} />
+        <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route path="/student/subjects" element={<StudentSubjects />} />
         <Route path="/student/library" element={<StudentLibrary />} />
         <Route path="/student/attendance" element={<StudentAttendance />} />
