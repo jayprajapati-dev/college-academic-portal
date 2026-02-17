@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const path = require('path');
 require('dotenv').config();
 const { startTaskReminderScheduler } = require('./utils/taskReminders');
 const { startCoordinatorScheduler } = require('./utils/coordinatorScheduler');
@@ -14,6 +15,9 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static views (dashboard)
+app.use(express.static(path.join(__dirname, 'views')));
 
 // MongoDB Connection
 const connectDB = async () => {
@@ -39,9 +43,15 @@ app.get('/', (req, res) => {
   });
 });
 
+// Dashboard Route
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'views', 'dashboard.html'));
+});
+
 // API Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/profile', require('./routes/profile'));
 app.use('/api/academic', require('./routes/academic'));
 app.use('/api/contact', require('./routes/contact'));
@@ -72,8 +82,60 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   await connectDB();
   app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    // Professional startup message with ASCII art
+    console.clear();
+    console.log(`
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║           🎓 SMARTACADEMICS BACKEND SERVER 🎓                ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────┐
+│ ✅ SERVER STATUS                                            │
+├─────────────────────────────────────────────────────────────┤
+│ Status      : 🔴 LIVE & RUNNING                             │
+│ Port        : ${PORT}                                   │
+│ URL         : http://localhost:${PORT}                      │
+│ Environment : ${(process.env.NODE_ENV || 'development').toUpperCase()}                            │
+│ Version     : 1.0.0                                         │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ 📊 DATABASE STATUS                                          │
+├─────────────────────────────────────────────────────────────┤
+│ Database    : ✅ MongoDB Connected                          │
+│ Host        : localhost:27017                               │
+│ Database    : smartacademics                                │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ 🔗 QUICK LINKS                                              │
+├─────────────────────────────────────────────────────────────┤
+│ 📈 Dashboard    : http://localhost:${PORT}/dashboard        │
+│ 🏠 API Home     : http://localhost:${PORT}/                 │
+│ 🔐 Auth API     : http://localhost:${PORT}/api/auth         │
+│ 📚 Academic API : http://localhost:${PORT}/api/academic     │
+│ 👤 Admin API    : http://localhost:${PORT}/api/admin        │
+│ 📋 Tasks API    : http://localhost:${PORT}/api/tasks        │
+│ 📌 Attendance   : http://localhost:${PORT}/api/attendance   │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ 🚀 FEATURES ENABLED                                         │
+├─────────────────────────────────────────────────────────────┤
+│ ✅ Task Reminder Scheduler                                  │
+│ ✅ Coordinator Scheduler                                    │
+│ ✅ MongoDB Connection Pool                                  │
+│ ✅ CORS Enabled                                             │
+│ ✅ Error Handling Middleware                                │
+│ ✅ Dashboard Monitoring                                     │
+└─────────────────────────────────────────────────────────────┘
+
+⏱️  Ready to accept requests...
+    `);
+    console.log(`\n💡 OPEN DASHBOARD: http://localhost:${PORT}/dashboard\n`);
+    
     startTaskReminderScheduler();
     startCoordinatorScheduler();
   });

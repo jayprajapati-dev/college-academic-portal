@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Architecture - Smart College Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet">
+    <style>
+        * { font-family: 'Manrope', sans-serif; }
+        .flow-arrow { display: flex; align-items: center; justify-content: center; }
+        .flow-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .collection-card { transition: all 0.3s ease; border-left: 4px solid #667eea; }
+        .collection-card:hover { transform: translateX(4px); }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+<!-- Header -->
+<header class="bg-white shadow">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-rounded text-3xl text-blue-600">storage</span>
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Database Architecture</h1>
+                <p class="text-gray-600 text-sm">MongoDB Collections & Data Flow</p>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
+    <!-- Section 1: Database Overview -->
+    <section class="mb-12">
+        <div class="bg-white rounded-lg shadow p-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <span class="material-symbols-rounded">info</span>
+                Database Overview
+            </h2>
+            <p class="text-gray-700 leading-7 mb-6">
+                This system uses <strong>MongoDB</strong> as the primary database. MongoDB is a NoSQL database 
+                that stores data in structured collections based on academic hierarchy and workflows. 
+                Data is organized by role, semester, subject, and academic activities.
+            </p>
+
+            <!-- Data Flow Diagram -->
+            <div class="bg-gray-50 rounded-lg p-6 overflow-x-auto">
+                <div class="flex items-center justify-between gap-4 min-w-max">
+                    <!-- UI -->
+                    <div class="bg-blue-50 border-2 border-blue-500 rounded-lg p-4 text-center min-w-fit">
+                        <span class="material-symbols-rounded text-2xl text-blue-600 block mb-2">computer</span>
+                        <div class="font-semibold text-gray-900">React UI</div>
+                        <div class="text-xs text-gray-600">Web Interface</div>
+                    </div>
+
+                    <!-- Arrow -->
+                    <div class="text-2xl text-gray-400">→</div>
+
+                    <!-- API -->
+                    <div class="bg-purple-50 border-2 border-purple-500 rounded-lg p-4 text-center min-w-fit">
+                        <span class="material-symbols-rounded text-2xl text-purple-600 block mb-2">api</span>
+                        <div class="font-semibold text-gray-900">Express API</div>
+                        <div class="text-xs text-gray-600">Backend (Node.js)</div>
+                    </div>
+
+                    <!-- Arrow -->
+                    <div class="text-2xl text-gray-400">→</div>
+
+                    <!-- Database -->
+                    <div class="flow-box border-2 border-purple-600 rounded-lg p-4 text-center min-w-fit">
+                        <span class="material-symbols-rounded text-2xl text-white block mb-2">storage</span>
+                        <div class="font-semibold text-white">MongoDB</div>
+                        <div class="text-xs text-purple-100">Data Storage</div>
+                    </div>
+
+                    <!-- Arrow -->
+                    <div class="text-2xl text-gray-400">←</div>
+
+                    <!-- Response -->
+                    <div class="bg-green-50 border-2 border-green-500 rounded-lg p-4 text-center min-w-fit">
+                        <span class="material-symbols-rounded text-2xl text-green-600 block mb-2">check_circle</span>
+                        <div class="font-semibold text-gray-900">Response</div>
+                        <div class="text-xs text-gray-600">Back to UI</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 2: Collections Overview -->
+    <section class="mb-12">
+        <div class="bg-white rounded-lg shadow p-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <span class="material-symbols-rounded">list_alt</span>
+                Collections (Data Storage)
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                <!-- Users Collection -->
+                <div class="collection-card bg-gray-50 rounded-lg p-6">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="material-symbols-rounded text-blue-600">person</span>
+                        <h3 class="font-bold text-gray-900">Users</h3>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-3">
+                        Stores all user accounts (Students, Teachers, HOD, Admin)
+                    </p>
+                    <div class="text-xs bg-white rounded p-2 font-mono text-gray-600">
+                        name, email, password, role, semester
+                    </div>
+                </div>
+
+                <!-- Branches Collection -->
+                <div class="collection-card bg-gray-50 rounded-lg p-6">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="material-symbols-rounded text-blue-600">apartment</span>
+                        <h3 class="font-bold text-gray-900">Branches</h3>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-3">
+                        Engineering branches (CSE, IT, ECE, etc.)
+                    </p>
+                    <div class="text-xs bg-white rounded p-2 font-mono text-gray-600">
+                        name, code, createdBy (Admin)
+                    </div>
+                </div>
+
+                <!-- Semesters Collection -->
+                <div class="collection-card bg-gray-50 rounded-lg p-6">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="material-symbols-rounded text-blue-600">calendar_month</span>
+                        <h3 class="font-bold text-gray-900">Semesters</h3>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-3">
+                        Semester structure (1st Sem, 2nd Sem, etc.)
+                    </p>
+                    <div class="text-xs bg-white rounded p-2 font-mono text-gray-600">
+                        semesterNum, branchId, startDate, endDate
+                    </div>
+                </div>
+
+                <!-- Subjects Collection -->
+                <div class="collection-card bg-gray-50 rounded-lg p-6">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="material-symbols-rounded text-blue-600">school</span>
+                        <h3 class="font-bold text-gray-900">Subjects</h3>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-3">
+                        Course subjects (Data Structures, DBMS, etc.)
+                    </p>
+                    <div class="text-xs bg-white rounded p-2 font-mono text-gray-600">
+                        subjectCode, subjectName, credits, semesterId
+                    </div>
+                </div>
+
+                <!-- Subject Details Collection -->
+                <div class="collection-card bg-gray-50 rounded-lg p-6">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="material-symbols-rounded text-blue-600">notes</span>
+                        <h3 class="font-bold text-gray-900">Subject Details</h3>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-3">
+                        Exam marks, exam patterns for each subject
+                    </p>
+                    <div class="text-xs bg-white rounded p-2 font-mono text-gray-600">
+                        subjectId, examType, maxMarks, totalStudents
+                    </div>
+                </div>
+
+                <!-- Tasks Collection -->
+                <div class="collection-card bg-gray-50 rounded-lg p-6">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="material-symbols-rounded text-blue-600">assignment</span>
+                        <h3 class="font-bold text-gray-900">Tasks</h3>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-3">
+                        Assignments given by teachers to students
+                    </p>
+                    <div class="text-xs bg-white rounded p-2 font-mono text-gray-600">
+                        taskTitle, description, dueDate, teacherId, subjectId
+                    </div>
+                </div>
+
+                <!-- Task Status Collection -->
+                <div class="collection-card bg-gray-50 rounded-lg p-6">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="material-symbols-rounded text-blue-600">check_box</span>
+                        <h3 class="font-bold text-gray-900">Task Status</h3>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-3">
+                        Student submission status for each task
+                    </p>
+                    <div class="text-xs bg-white rounded p-2 font-mono text-gray-600">
+                        taskId, studentId, status, submittedAt, markedBy
+                    </div>
+                </div>
+
+                <!-- Attendance Collection -->
+                <div class="collection-card bg-gray-50 rounded-lg p-6">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="material-symbols-rounded text-blue-600">event_available</span>
+                        <h3 class="font-bold text-gray-900">Attendance</h3>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-3">
+                        Daily attendance records for each student
+                    </p>
+                    <div class="text-xs bg-white rounded p-2 font-mono text-gray-600">
+                        studentId, subjectId, date, status, percentage
+                    </div>
+                </div>
+
+                <!-- Library Books Collection -->
+                <div class="collection-card bg-gray-50 rounded-lg p-6">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="material-symbols-rounded text-blue-600">library_books</span>
+                        <h3 class="font-bold text-gray-900">Library Books</h3>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-3">
+                        Book inventory and issue/return tracking
+                    </p>
+                    <div class="text-xs bg-white rounded p-2 font-mono text-gray-600">
+                        bookTitle, authorName, isbn, availability, issuedTo
+                    </div>
+                </div>
+
+                <!-- Projects Collection -->
+                <div class="collection-card bg-gray-50 rounded-lg p-6">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="material-symbols-rounded text-blue-600">build</span>
+                        <h3 class="font-bold text-gray-900">Projects</h3>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-3">
+                        Student projects and group work assignments
+                    </p>
+                    <div class="text-xs bg-white rounded p-2 font-mono text-gray-600">
+                        projectTitle, teamMembers, submissionDate, status
+                    </div>
+                </div>
+
+                <!-- Notices Collection -->
+                <div class="collection-card bg-gray-50 rounded-lg p-6">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="material-symbols-rounded text-blue-600">notifications</span>
+                        <h3 class="font-bold text-gray-900">Notices</h3>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-3">
+                        College announcements and important notices
+                    </p>
+                    <div class="text-xs bg-white rounded p-2 font-mono text-gray-600">
+                        title, content, postedBy, postedDate, visibility
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 3: Role-Based Database Access -->
+    <section class="mb-12">
+        <div class="bg-white rounded-lg shadow p-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <span class="material-symbols-rounded">security</span>
+                Role-Based Database Access
+            </h2>
+
+            <div class="space-y-4">
+                <!-- Admin -->
+                <div class="border-l-4 border-red-500 bg-red-50 rounded-lg p-6">
+                    <h3 class="font-bold text-lg text-gray-900 mb-3 flex items-center gap-2">
+                        <span class="material-symbols-rounded text-red-600">admin_panel_settings</span>
+                        Administrator
+                    </h3>
+                    <ul class="text-sm text-gray-700 space-y-2 ml-8">
+                        <li>✓ Create/Update/Delete Branches</li>
+                        <li>✓ Create/Update Semesters</li>
+                        <li>✓ Add HOD & Teacher Accounts</li>
+                        <li>✓ Full database access (Read/Write/Update)</li>
+                        <li>✓ View all system data</li>
+                    </ul>
+                </div>
+
+                <!-- HOD -->
+                <div class="border-l-4 border-orange-500 bg-orange-50 rounded-lg p-6">
+                    <h3 class="font-bold text-lg text-gray-900 mb-3 flex items-center gap-2">
+                        <span class="material-symbols-rounded text-orange-600">person_4</span>
+                        Head of Department (HOD)
+                    </h3>
+                    <ul class="text-sm text-gray-700 space-y-2 ml-8">
+                        <li>✓ Assign Teachers to Subjects</li>
+                        <li>✓ Add Subject-Level Details (marks, exam types)</li>
+                        <li>✓ View Attendance & Task data</li>
+                        <li>✓ Monitor branch performance</li>
+                        <li>✗ Cannot create branches or users</li>
+                    </ul>
+                </div>
+
+                <!-- Teacher -->
+                <div class="border-l-4 border-blue-500 bg-blue-50 rounded-lg p-6">
+                    <h3 class="font-bold text-lg text-gray-900 mb-3 flex items-center gap-2">
+                        <span class="material-symbols-rounded text-blue-600">person_3</span>
+                        Teacher
+                    </h3>
+                    <ul class="text-sm text-gray-700 space-y-2 ml-8">
+                        <li>✓ Add Tasks & Assignments</li>
+                        <li>✓ Mark Attendance</li>
+                        <li>✓ Update Task Submission Status</li>
+                        <li>✓ Enter Subject Marks & Exam Details</li>
+                        <li>✓ View student data for assigned subjects</li>
+                        <li>✗ Cannot create subjects or branches</li>
+                    </ul>
+                </div>
+
+                <!-- Student -->
+                <div class="border-l-4 border-green-500 bg-green-50 rounded-lg p-6">
+                    <h3 class="font-bold text-lg text-gray-900 mb-3 flex items-center gap-2">
+                        <span class="material-symbols-rounded text-green-600">person</span>
+                        Student
+                    </h3>
+                    <ul class="text-sm text-gray-700 space-y-2 ml-8">
+                        <li>✓ View assigned Subjects & Tasks</li>
+                        <li>✓ View Attendance records</li>
+                        <li>✓ View Marks & Exam details</li>
+                        <li>✓ Mark Task as Done/Not Done</li>
+                        <li>✗ Cannot modify database directly</li>
+                        <li>✗ Cannot access other students' data</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 4: Real Data Flow Examples -->
+    <section class="mb-12">
+        <div class="bg-white rounded-lg shadow p-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <span class="material-symbols-rounded">trending_up</span>
+                Real Data Flow Examples
+            </h2>
+
+            <!-- Example 1: Attendance -->
+            <div class="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-6 mb-6">
+                <h3 class="font-bold text-lg text-gray-900 mb-4 flex items-center gap-2">
+                    <span class="material-symbols-rounded text-blue-600">event_available</span>
+                    Example 1: Teacher Marks Attendance
+                </h3>
+                <div class="bg-white rounded p-4 text-sm text-gray-700 space-y-2">
+                    <p><strong>Step 1:</strong> Teacher opens Attendance page in UI</p>
+                    <p><strong>Step 2:</strong> Click "Mark Attendance" button</p>
+                    <p><strong>Step 3:</strong> API receives request → Express server processes</p>
+                    <p><strong>Step 4:</strong> MongoDB <code class="bg-gray-100 px-2 py-1 rounded">attendance</code> collection updated with date, status</p>
+                    <p><strong>Step 5:</strong> Percentage auto-calculated</p>
+                    <p><strong>Step 6:</strong> UI shows "Marked Successfully"</p>
+                    <p><strong>Step 7:</strong> Student dashboard updates automatically (Real-time or on refresh)</p>
+                </div>
+            </div>
+
+            <!-- Example 2: Task Assignment -->
+            <div class="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg p-6 mb-6">
+                <h3 class="font-bold text-lg text-gray-900 mb-4 flex items-center gap-2">
+                    <span class="material-symbols-rounded text-purple-600">assignment</span>
+                    Example 2: Teacher Assigns Task
+                </h3>
+                <div class="bg-white rounded p-4 text-sm text-gray-700 space-y-2">
+                    <p><strong>Step 1:</strong> Teacher goes to Tasks → Create New Task</p>
+                    <p><strong>Step 2:</strong> Fills: Title, Description, Due Date, Subject</p>
+                    <p><strong>Step 3:</strong> Clicks "Save Task" → API request sent</p>
+                    <p><strong>Step 4:</strong> MongoDB <code class="bg-gray-100 px-2 py-1 rounded">tasks</code> collection gets new entry</p>
+                    <p><strong>Step 5:</strong> Task is now visible in student's SubjectHub</p>
+                    <p><strong>Step 6:</strong> Student marks "Done" → <code class="bg-gray-100 px-2 py-1 rounded">taskStatus</code> updated (Pending)</p>
+                    <p><strong>Step 7:</strong> Teacher reviews → Marks "Completed" or "Not Completed"</p>
+                </div>
+            </div>
+
+            <!-- Example 3: Marks Entry -->
+            <div class="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-6">
+                <h3 class="font-bold text-lg text-gray-900 mb-4 flex items-center gap-2">
+                    <span class="material-symbols-rounded text-green-600">grade</span>
+                    Example 3: Teacher Enters Exam Marks
+                </h3>
+                <div class="bg-white rounded p-4 text-sm text-gray-700 space-y-2">
+                    <p><strong>Step 1:</strong> Teacher goes to "Subject" → Select exam type (Midterm, Final, etc.)</p>
+                    <p><strong>Step 2:</strong> Enters marks for all students</p>
+                    <p><strong>Step 3:</strong> Clicks "Save Marks" → API processes</p>
+                    <p><strong>Step 4:</strong> MongoDB <code class="bg-gray-100 px-2 py-1 rounded">subjectDetails</code> collection updated</p>
+                    <p><strong>Step 5:</strong> Student dashboard shows marks immediately</p>
+                    <p><strong>Step 6:</strong> System auto-calculates total percentage</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 5: Where Data is Stored -->
+    <section class="mb-12">
+        <div class="bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg shadow p-8 text-white">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                <span class="material-symbols-rounded">storage</span>
+                Where Is The Database?
+            </h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="font-bold text-lg mb-3 text-blue-200">Local Development</h3>
+                    <div class="bg-white bg-opacity-10 rounded p-4 text-sm space-y-2">
+                        <p><strong>Host:</strong> localhost</p>
+                        <p><strong>Port:</strong> 27017</p>
+                        <p><strong>Database Name:</strong> smart-college-portal</p>
+                        <p><strong>Type:</strong> MongoDB Community Edition</p>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-lg mb-3 text-blue-200">Access Method</h3>
+                    <div class="bg-white bg-opacity-10 rounded p-4 text-sm space-y-2">
+                        <p><strong>Connection String:</strong></p>
+                        <p class="font-mono bg-black bg-opacity-20 p-2 rounded">mongodb://localhost:27017/smart-college-portal</p>
+                        <p class="text-xs text-blue-100 mt-2">Used by: Express Backend API</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 bg-white bg-opacity-10 rounded p-4 text-sm">
+                <p><strong>How data flows:</strong></p>
+                <p class="mt-2 text-blue-100">
+                    React UI → Express API (Backend) → MongoDB (Local) → Stores/Retrieves Data → Returns Response → UI Updates
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 6: Quick Summary Table -->
+    <section class="mb-12">
+        <div class="bg-white rounded-lg shadow p-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <span class="material-symbols-rounded">summarize</span>
+                Quick Reference
+            </h2>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-bold text-gray-900">Component</th>
+                            <th class="px-4 py-3 text-left font-bold text-gray-900">Technology</th>
+                            <th class="px-4 py-3 text-left font-bold text-gray-900">Purpose</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 font-semibold text-gray-900">Database</td>
+                            <td class="px-4 py-3 text-gray-700">MongoDB NoSQL</td>
+                            <td class="px-4 py-3 text-gray-700">Stores all college data in collections</td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 font-semibold text-gray-900">Backend</td>
+                            <td class="px-4 py-3 text-gray-700">Node.js + Express</td>
+                            <td class="px-4 py-3 text-gray-700">API endpoints for CRUD operations</td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 font-semibold text-gray-900">Frontend</td>
+                            <td class="px-4 py-3 text-gray-700">React.js</td>
+                            <td class="px-4 py-3 text-gray-700">User interface for all roles</td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 font-semibold text-gray-900">Collections</td>
+                            <td class="px-4 py-3 text-gray-700">12 Main Collections</td>
+                            <td class="px-4 py-3 text-gray-700">Users, Subjects, Tasks, Attendance, etc.</td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 font-semibold text-gray-900">Access Control</td>
+                            <td class="px-4 py-3 text-gray-700">Role-Based (4 Roles)</td>
+                            <td class="px-4 py-3 text-gray-700">Admin, HOD, Teacher, Student</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<!-- Footer -->
+<footer class="bg-gray-900 text-white mt-16 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <p class="text-sm text-gray-400">Smart College Academic Portal • Database Architecture</p>
+        <p class="text-xs text-gray-500 mt-2">All data is stored securely in MongoDB collections</p>
+    </div>
+</footer>
+
+</body>
+</html>

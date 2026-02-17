@@ -486,7 +486,9 @@ router.get('/:id/submissions', protect, authorize('teacher', 'hod', 'coordinator
   }
 });
 
-// STUDENT SUBMIT TASK
+// STUDENT SUBMIT TASK - DISABLED: Only teachers can mark submission status
+// Students cannot self-submit; teachers decide submission status manually
+/*
 router.post('/:id/submit', protect, authorize('student'), async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
@@ -541,6 +543,7 @@ router.post('/:id/submit', protect, authorize('student'), async (req, res) => {
     });
   }
 });
+*/
 
 // UPDATE STUDENT STATUS (Teacher/HOD)
 router.put('/:taskId/recipients/:studentId/status', protect, authorize('teacher', 'hod', 'coordinator'), async (req, res) => {

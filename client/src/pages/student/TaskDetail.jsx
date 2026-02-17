@@ -8,7 +8,6 @@ const StudentTaskDetail = () => {
   const { taskId } = useParams();
   const [task, setTask] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -37,30 +36,6 @@ const StudentTaskDetail = () => {
 
     fetchTask();
   }, [taskId]);
-
-  const handleSubmitTask = async () => {
-    try {
-      setSubmitting(true);
-      const token = localStorage.getItem('token');
-      const res = await axios.post(`/api/tasks/${taskId}/submit`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (res.data?.success) {
-        const updated = await axios.get(`/api/tasks/${taskId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (updated.data?.success) {
-          setTask(updated.data.data);
-        }
-      }
-    } catch (error) {
-      console.error('Error submitting task:', error);
-      alert(error.response?.data?.message || 'Failed to submit task');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -114,25 +89,31 @@ const StudentTaskDetail = () => {
           </div>
         </Card>
 
-        {task.studentStatus !== 'submitted' && task.studentStatus !== 'completed' && (
-          <Card>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700">Submission</h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  Tap submit to mark this task as completed.
-                </p>
-              </div>
-              <Button
-                onClick={handleSubmitTask}
-                disabled={submitting}
-                className="bg-emerald-600 hover:bg-emerald-700"
-              >
-                {submitting ? 'Submitting...' : 'Mark as Submitted'}
-              </Button>
+        <Card>
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700">Submission Status</h3>
+            <div className="flex items-center gap-3">
+              <span className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize ${
+                task.studentStatus === 'completed'
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : task.studentStatus === 'submitted'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-100 text-gray-700'
+              }`}>
+                {task.studentStatus || 'pending'}
+              </span>
             </div>
-          </Card>
-        )}
+            <p className="text-sm text-gray-600">
+              {task.studentStatus === 'completed' ? (
+                'Your teacher has marked this task as completed.'
+              ) : task.studentStatus === 'submitted' ? (
+                'Your submission is pending teacher approval.'
+              ) : (
+                'Your teacher will mark your submission status after reviewing your work.'
+              )}
+            </p>
+          </div>
+        </Card>
 
         {task.attachments && task.attachments.length > 0 && (
           <Card>

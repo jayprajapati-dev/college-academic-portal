@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backend Dashboard - SmartAcademics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet">
+    <style>
+        * { font-family: 'Manrope', sans-serif; }
+        .status-badge { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .collection-stat { box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white min-h-screen">
+
+<!-- Header -->
+<header class="bg-black bg-opacity-50 backdrop-blur border-b border-gray-700 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-6 py-6">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-rounded text-4xl text-blue-400">dashboard</span>
+                <div>
+                    <h1 class="text-3xl font-bold">SmartAcademics Backend</h1>
+                    <p class="text-gray-400 text-sm">Real-time System Dashboard & Monitoring</p>
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="text-2xl font-mono text-green-400 status-badge" id="live-status">● LIVE</p>
+                <p id="time" class="text-gray-400 text-sm font-mono"></p>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-6 py-8">
+
+    <!-- Status Cards Section -->
+    <section class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-6 shadow-lg collection-stat">
+            <div class="flex items-center justify-between mb-3">
+                <span class="material-symbols-rounded text-3xl">check_circle</span>
+                <span class="bg-green-700 px-3 py-1 rounded-full text-xs font-bold" id="server-badge">LOADING</span>
+            </div>
+            <h3 class="text-sm text-green-100 uppercase tracking-wide">Server</h3>
+            <p class="text-2xl font-bold mt-1" id="server-status">...</p>
+            <p class="text-xs text-green-100 mt-2 font-mono" id="server-info">Connecting...</p>
+        </div>
+
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-6 shadow-lg collection-stat">
+            <div class="flex items-center justify-between mb-3">
+                <span class="material-symbols-rounded text-3xl">storage</span>
+                <span class="bg-blue-700 px-3 py-1 rounded-full text-xs font-bold" id="db-badge">CONNECTING</span>
+            </div>
+            <h3 class="text-sm text-blue-100 uppercase tracking-wide">Database</h3>
+            <p class="text-2xl font-bold mt-1" id="db-status">MongoDB</p>
+            <p class="text-xs text-blue-100 mt-2 font-mono" id="db-info">Connecting...</p>
+        </div>
+
+        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-6 shadow-lg collection-stat">
+            <div class="flex items-center justify-between mb-3">
+                <span class="material-symbols-rounded text-3xl">dataset</span>
+                <span class="bg-purple-700 px-3 py-1 rounded-full text-xs font-bold" id="collections-badge">-</span>
+            </div>
+            <h3 class="text-sm text-purple-100 uppercase tracking-wide">Collections</h3>
+            <p class="text-2xl font-bold mt-1" id="collections-count">0</p>
+            <p class="text-xs text-purple-100 mt-2">Total: <span id="total-docs">0</span> docs</p>
+        </div>
+
+        <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-6 shadow-lg collection-stat">
+            <div class="flex items-center justify-between mb-3">
+                <span class="material-symbols-rounded text-3xl">schedule</span>
+                <span class="bg-orange-700 px-3 py-1 rounded-full text-xs font-bold">UPTIME</span>
+            </div>
+            <h3 class="text-sm text-orange-100 uppercase tracking-wide">Uptime</h3>
+            <p class="text-2xl font-bold mt-1" id="uptime">0s</p>
+            <p class="text-xs text-orange-100 mt-2 font-mono" id="last-update">Last update: just now</p>
+        </div>
+
+        <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-lg p-6 shadow-lg collection-stat">
+            <div class="flex items-center justify-between mb-3">
+                <span class="material-symbols-rounded text-3xl">sd_storage</span>
+                <span class="bg-red-700 px-3 py-1 rounded-full text-xs font-bold" id="storage-badge">NORMAL</span>
+            </div>
+            <h3 class="text-sm text-red-100 uppercase tracking-wide">Storage Used</h3>
+            <p class="text-2xl font-bold mt-1" id="storage-used">0 MB</p>
+            <p class="text-xs text-red-100 mt-2" id="storage-percent">0% of 256 GB</p>
+        </div>
+    </section>
+
+    <!-- Collections Stats Section -->
+    <section class="bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
+        <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+            <span class="material-symbols-rounded">database</span>
+            MongoDB Collections (Live Count & Storage)
+        </h2>
+        
+        <div id="collections-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-gray-700 rounded p-4 animate-pulse">
+                <p class="text-gray-400">Loading collections...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Storage Breakdown Section -->
+    <section class="bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
+        <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+            <span class="material-symbols-rounded">pie_chart</span>
+            Storage Breakdown by Collection
+        </h2>
+
+        <div class="space-y-4">
+            <div class="bg-gray-700 rounded p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-sm text-gray-300 font-mono" id="storage-info-top">Total Storage: 0 MB / 256 GB</p>
+                    <p class="text-sm text-gray-300 font-bold" id="storage-remaining">Remaining: 256 GB</p>
+                </div>
+                <div class="w-full bg-gray-900 rounded-full h-4 overflow-hidden">
+                    <div id="storage-bar" class="bg-gradient-to-r from-blue-500 to-purple-500 h-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div id="storage-breakdown" class="space-y-3">
+                <!-- Storage breakdown will be filled by JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Sample Data Section -->
+    <section class="bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
+        <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+            <span class="material-symbols-rounded">preview</span>
+            Sample Data from Collections
+        </h2>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-gray-700 rounded p-4">
+                <p class="text-sm text-gray-300 uppercase mb-3 font-bold flex items-center gap-2">
+                    <span class="material-symbols-rounded text-sm">person</span>
+                    Users Collection
+                </p>
+                <pre id="users-data" class="text-xs text-gray-200 overflow-x-auto font-mono bg-gray-900 p-3 rounded h-48 max-h-48">{
+  "status": "Loading data...",
+  "please": "Wait for API response"
+}</pre>
+            </div>
+
+            <div class="bg-gray-700 rounded p-4">
+                <p class="text-sm text-gray-300 uppercase mb-3 font-bold flex items-center gap-2">
+                    <span class="material-symbols-rounded text-sm">school</span>
+                    Subjects Collection
+                </p>
+                <pre id="subjects-data" class="text-xs text-gray-200 overflow-x-auto font-mono bg-gray-900 p-3 rounded h-48 max-h-48">{
+  "status": "Loading data...",
+  "please": "Wait for API response"
+}</pre>
+            </div>
+
+            <div class="bg-gray-700 rounded p-4">
+                <p class="text-sm text-gray-300 uppercase mb-3 font-bold flex items-center gap-2">
+                    <span class="material-symbols-rounded text-sm">assignment</span>
+                    Tasks Collection
+                </p>
+                <pre id="tasks-data" class="text-xs text-gray-200 overflow-x-auto font-mono bg-gray-900 p-3 rounded h-48 max-h-48">{
+  "status": "Loading data...",
+  "please": "Wait for API response"
+}</pre>
+            </div>
+
+            <div class="bg-gray-700 rounded p-4">
+                <p class="text-sm text-gray-300 uppercase mb-3 font-bold flex items-center gap-2">
+                    <span class="material-symbols-rounded text-sm">event_available</span>
+                    Attendance Collection
+                </p>
+                <pre id="attendance-data" class="text-xs text-gray-200 overflow-x-auto font-mono bg-gray-900 p-3 rounded h-48 max-h-48">{
+  "status": "Loading data...",
+  "please": "Wait for API response"
+}</pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- API Info Section -->
+    <section class="bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
+        <h2 class="text-2xl font-bold mb-6 flex items-center gap-2">
+            <span class="material-symbols-rounded">api</span>
+            Available API Endpoints
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div class="bg-gray-700 rounded p-4 border-l-4 border-blue-500">
+                <p class="text-gray-400 uppercase text-xs">Authentication</p>
+                <p class="font-mono text-blue-300 mt-1">/api/auth</p>
+            </div>
+            <div class="bg-gray-700 rounded p-4 border-l-4 border-green-500">
+                <p class="text-gray-400 uppercase text-xs">Academic Data</p>
+                <p class="font-mono text-green-300 mt-1">/api/academic</p>
+            </div>
+            <div class="bg-gray-700 rounded p-4 border-l-4 border-purple-500">
+                <p class="text-gray-400 uppercase text-xs">Tasks Management</p>
+                <p class="font-mono text-purple-300 mt-1">/api/tasks</p>
+            </div>
+            <div class="bg-gray-700 rounded p-4 border-l-4 border-pink-500">
+                <p class="text-gray-400 uppercase text-xs">Attendance</p>
+                <p class="font-mono text-pink-300 mt-1">/api/attendance</p>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<!-- Footer -->
+<footer class="bg-black bg-opacity-50 border-t border-gray-700 mt-16 py-6">
+    <div class="max-w-7xl mx-auto px-6 text-center">
+        <p class="text-gray-400 text-sm">SmartAcademics Backend Dashboard • Real-time Monitoring</p>
+        <p class="text-gray-500 text-xs mt-2">Database: MongoDB • Framework: Express.js • Language: Node.js</p>
+    </div>
+</footer>
+
+<script>
+    let lastUpdateTime = null;
+
+    // Update time
+    setInterval(() => {
+        const now = new Date();
+        document.getElementById('time').textContent = now.toLocaleTimeString('en-IN');
+    }, 1000);
+
+    // Format uptime
+    function formatUptime(seconds) {
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        return `${h}h ${m}m ${s}s`;
+    }
+
+    // Format JSON for display
+    function formatJSON(obj) {
+        return JSON.stringify(obj, null, 2);
+    }
+
+    // Fetch and update dashboard
+    async function loadDashboard() {
+        try {
+            const response = await fetch('/api/dashboard/status');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
+            const data = await response.json();
+            lastUpdateTime = new Date();
+
+            console.log('Dashboard data:', data);
+
+            // Update server status
+            if (data.server) {
+                document.getElementById('server-badge').textContent = data.server.running ? '🔴 LIVE' : '❌ OFFLINE';
+                document.getElementById('server-status').textContent = data.server.running ? 'Running' : 'Offline';
+                document.getElementById('server-info').textContent = `Port: ${data.server.port} • Uptime: ${formatUptime(data.server.uptime)}`;
+                document.getElementById('uptime').textContent = formatUptime(data.server.uptime);
+            }
+
+            // Update database status
+            if (data.database) {
+                const dbConnected = data.database.connected;
+                document.getElementById('db-badge').textContent = dbConnected ? '✅ CONNECTED' : '❌ DISCONNECTED';
+                document.getElementById('db-info').textContent = data.database.host;
+            }
+
+            // Update storage status
+            if (data.storage) {
+                const storagePercent = parseFloat(data.storage.used) || 0;
+                const storageBadge = storagePercent > 90 ? '🔴 CRITICAL' : storagePercent > 80 ? '⚠️ WARNING' : '✅ NORMAL';
+                document.getElementById('storage-badge').textContent = storageBadge;
+                
+                // Format capacity display (always show GB for simplicity)
+                const capacityText = data.storage.capacityGB + ' GB';
+                
+                // Format remaining display (always show GB for simplicity)
+                const remainingText = data.storage.remainingGB + ' GB';
+                
+                // Smart display: show KB for very small data, MB for medium, GB for large
+                let usedDisplay = '';
+                if (data.storage.totalUsed === 0) {
+                    usedDisplay = '0 KB';
+                } else if (parseFloat(data.storage.totalUsedMB) < 0.01) {
+                    usedDisplay = data.storage.totalUsedKB + ' KB';
+                } else if (parseFloat(data.storage.totalUsedGB) < 0.01) {
+                    usedDisplay = data.storage.totalUsedMB + ' MB';
+                } else {
+                    usedDisplay = data.storage.totalUsedGB + ' GB';
+                }
+                
+                document.getElementById('storage-used').textContent = usedDisplay;
+                document.getElementById('storage-percent').textContent = storagePercent.toFixed(4) + '% of ' + capacityText;
+                document.getElementById('storage-info-top').textContent = `Total Storage: ${usedDisplay} / ${capacityText}`;
+                document.getElementById('storage-remaining').textContent = `Remaining: ${remainingText}`;
+                document.getElementById('storage-bar').style.width = Math.min(storagePercent, 100) + '%';
+
+                // Storage breakdown by collection
+                if (data.collections && data.collections.length > 0 && data.storage.totalUsed > 0) {
+                    const breakdown = document.getElementById('storage-breakdown');
+                    breakdown.innerHTML = data.collections.map((col, idx) => {
+                        const colPercent = ((col.size / data.storage.totalUsed) * 100).toFixed(1);
+                        const colors = ['from-blue-500', 'from-purple-500', 'from-pink-500', 'from-green-500', 'from-yellow-500', 'from-red-500'];
+                        const color = colors[idx % colors.length];
+                        
+                        // Smart size display
+                        const sizeDisplay = parseFloat(col.sizeInMB) < 0.01 ? col.sizeInKB + ' KB' : col.sizeInMB + ' MB';
+                        
+                        return `
+                            <div class="bg-gray-700 rounded p-3">
+                                <div class="flex items-center justify-between mb-1">
+                                    <p class="text-xs text-gray-300 font-mono">${col.name}</p>
+                                    <p class="text-xs text-gray-400">${sizeDisplay} (${colPercent}%) • ${col.count} docs</p>
+                                </div>
+                                <div class="w-full bg-gray-900 rounded-full h-2 overflow-hidden">
+                                    <div class="bg-gradient-to-r ${color} to-transparent h-full" style="width: ${Math.max(colPercent, 1)}%"></div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    document.getElementById('storage-breakdown').innerHTML = `
+                        <div class="bg-gray-700 rounded p-4 text-center">
+                            <p class="text-gray-400 text-sm">⚠️ No data in database yet. Add some data to see storage breakdown.</p>
+                            <p class="text-gray-500 text-xs mt-2">Start the server with sample data or add data through the UI</p>
+                        </div>
+                    `;
+                }
+            }
+
+            // Update collections
+            if (data.collections && data.collections.length > 0) {
+                document.getElementById('collections-count').textContent = data.collections.length;
+                document.getElementById('collections-badge').textContent = data.collections.length;
+                document.getElementById('total-docs').textContent = data.totalDocuments || 0;
+
+                const grid = document.getElementById('collections-grid');
+                grid.innerHTML = data.collections.map(col => {
+                    // Smart size display
+                    const sizeDisplay = parseFloat(col.sizeInMB) < 0.01 ? col.sizeInKB + ' KB' : col.sizeInMB + ' MB';
+                    
+                    return `
+                        <div class="bg-gray-700 rounded p-4 border-l-4 border-blue-500 fade-in">
+                            <p class="text-xs text-gray-400 uppercase mb-2 font-semibold">${col.name}</p>
+                            <div class="flex items-baseline gap-2 mb-2">
+                                <p class="text-2xl font-bold text-blue-300">${col.count}</p>
+                                <p class="text-xs text-gray-500">Documents</p>
+                            </div>
+                            <p class="text-xs text-gray-400 font-mono">Storage: ${sizeDisplay}</p>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Update sample data
+            if (data.sampleData) {
+                document.getElementById('users-data').textContent = formatJSON(data.sampleData.users);
+                document.getElementById('subjects-data').textContent = formatJSON(data.sampleData.subjects);
+                document.getElementById('tasks-data').textContent = formatJSON(data.sampleData.tasks);
+                document.getElementById('attendance-data').textContent = formatJSON(data.sampleData.attendance);
+            }
+
+            // Update last update time
+            const timeDiff = Math.floor((new Date() - lastUpdateTime) / 1000);
+            document.getElementById('last-update').textContent = `Last update: ${timeDiff}s ago`;
+
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
+            document.getElementById('live-status').textContent = '● ERROR';
+            document.getElementById('server-badge').textContent = '❌ ERROR';
+        }
+    }
+
+    // Load on page load
+    loadDashboard();
+
+    // Auto-refresh every 5 seconds
+    setInterval(loadDashboard, 5000);
+</script>
+
+</body>
+</html>
