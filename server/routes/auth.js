@@ -16,13 +16,29 @@ const generateToken = (id) => {
 // @access  Public
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, enrollmentNumber, password } = req.body;
+    const { name, email, enrollmentNumber, password, mobile, securityQuestion, securityAnswer } = req.body;
 
     // Validation
     if (!name || !email || !enrollmentNumber || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide all required fields'
+        message: 'Please provide all required fields (name, email, enrollmentNumber, password)'
+      });
+    }
+
+    // Validate password length and special character
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters'
+      });
+    }
+
+    const specialCharRegex = /[!@#$%^&*(),.?":{}|<>]/;
+    if (!specialCharRegex.test(password)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must contain at least one special character'
       });
     }
 
@@ -38,14 +54,17 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Create user
+    // Create user with optional security question and answer
     const user = await User.create({
       name,
       email,
       enrollmentNumber,
       password,
       role: 'student',
-      status: 'active'
+      status: 'active',
+      mobile: mobile || '',
+      securityQuestion: securityQuestion || '',
+      securityAnswer: securityAnswer || ''
     });
 
     // Generate token
@@ -59,6 +78,8 @@ router.post('/register', async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        enrollmentNumber: user.enrollmentNumber,
+        mobile: user.mobile,
         role: user.role,
         status: user.status
       }
@@ -67,7 +88,8 @@ router.post('/register', async (req, res) => {
     console.error('Register error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error in registration'
+      message: 'Error in registration',
+      error: error.message
     });
   }
 });

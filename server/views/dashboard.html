@@ -270,7 +270,17 @@
 
             // Update storage status
             if (data.storage) {
-                const storagePercent = parseFloat(data.storage.used) || 0;
+                // Use the numeric usedPercent field directly (not the string)
+                const storagePercent = data.storage.usedPercent || 0;
+                
+                console.log('💾 Storage Display:', {
+                    totalUsedBytes: data.storage.totalUsed,
+                    totalUsedMB: data.storage.totalUsedMB,
+                    capacityGB: data.storage.capacityGB,
+                    usedPercent: storagePercent,
+                    percentFormatted: storagePercent.toFixed(8)
+                });
+                
                 const storageBadge = storagePercent > 90 ? '🔴 CRITICAL' : storagePercent > 80 ? '⚠️ WARNING' : '✅ NORMAL';
                 document.getElementById('storage-badge').textContent = storageBadge;
                 
@@ -293,7 +303,22 @@
                 }
                 
                 document.getElementById('storage-used').textContent = usedDisplay;
-                document.getElementById('storage-percent').textContent = storagePercent.toFixed(4) + '% of ' + capacityText;
+                
+                // Smart percentage display: show more decimals for tiny percentages
+                let percentDisplay;
+                if (storagePercent === 0) {
+                    percentDisplay = '0.00000000%';
+                } else if (storagePercent < 0.0001) {
+                    percentDisplay = storagePercent.toFixed(8) + '%';
+                } else if (storagePercent < 0.01) {
+                    percentDisplay = storagePercent.toFixed(6) + '%';
+                } else if (storagePercent < 1) {
+                    percentDisplay = storagePercent.toFixed(4) + '%';
+                } else {
+                    percentDisplay = storagePercent.toFixed(2) + '%';
+                }
+                
+                document.getElementById('storage-percent').textContent = percentDisplay + ' of ' + capacityText;
                 document.getElementById('storage-info-top').textContent = `Total Storage: ${usedDisplay} / ${capacityText}`;
                 document.getElementById('storage-remaining').textContent = `Remaining: ${remainingText}`;
                 document.getElementById('storage-bar').style.width = Math.min(storagePercent, 100) + '%';

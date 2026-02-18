@@ -11,6 +11,9 @@ const AddTeacher = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [tempPassword, setTempPassword] = useState('');
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [createdTeacher, setCreatedTeacher] = useState(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -165,25 +168,29 @@ const AddTeacher = () => {
         addedByRole: currentUser.role
       };
 
-      await axios.post('/api/admin/teachers', payload, {
+      const response = await axios.post('/api/admin/add-teacher', payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      setSuccess('Teacher created successfully! They will receive a temporary password to set up their account.');
-      
-      // Reset form
-      setFormData({
-        name: '',
-        mobile: '',
-        selectedBranches: [],
-        selectedSemesters: [],
-        selectedSubjects: []
-      });
-
-      // Redirect after 2 seconds
-      setTimeout(() => {
-        navigate(currentUser.role === 'admin' ? '/admin/users' : '/hod/dashboard');
-      }, 2000);
+      if (response.data?.data?.tempPassword) {
+        setTempPassword(response.data.data.tempPassword);
+        setCreatedTeacher(response.data.data);
+        setShowPasswordModal(true);
+        
+        // Reset form
+        setFormData({
+          name: '',
+          mobile: '',
+          selectedBranches: [],
+          selectedSemesters: [],
+          selectedSubjects: []
+        });
+      } else {
+        setSuccess('Teacher created successfully!');
+        setTimeout(() => {
+          navigate(currentUser.role === 'admin' ? '/admin/users' : '/hod/dashboard');
+        }, 2000);
+      }
     } catch (error) {
       if (!handleAuthError(error)) {
         setError(error.response?.data?.message || 'Failed to create teacher');
@@ -193,13 +200,111 @@ const AddTeacher = () => {
     }
   };
 
+  const handleCopyPassword = () => {
+    navigator.clipboard.writeText(tempPassword);
+    alert('Temporary password copied to clipboard!');
+  };
+
+  const handleClosePasswordModal = () => {
+    setShowPasswordModal(false);
+    setTempPassword('');
+    setCreatedTeacher(null);
+    navigate(currentUser.role === 'admin' ? '/admin/users' : '/hod/dashboard');
+  };
+
   return (
     <HodLayout title="Add Teacher" userName={currentUser?.name || 'HOD'} onLogout={() => {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       navigate('/login');
     }}>
-      <div className="max-w-2xl mx-auto">
+      <>
+        {/* Password Modal */}
+        {showPasswordModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-8 border border-gray-200 dark:border-gray-700">
+              {/* Modal Header */}
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-3 rounded-xl">
+                  <span className="material-symbols-outlined text-white text-2xl">check_circle</span>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black text-gray-900 dark:text-white">Teacher Created!</h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Share credentials with teacher</p>
+                </div>
+              </div>
+
+              {/* Teacher Details */}
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6 space-y-2 text-sm">
+                <div>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs uppercase font-semibold">Name</p>
+                  <p className="text-gray-900 dark:text-white font-semibold">{createdTeacher?.name}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs uppercase font-semibold">Mobile</p>
+                  <p className="text-gray-900 dark:text-white font-semibold">{createdTeacher?.mobile}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs uppercase font-semibold">Email</p>
+                  <p className="text-gray-900 dark:text-white font-semibold break-all">{createdTeacher?.email}</p>
+                </div>
+              </div>
+
+              {/* Temporary Password */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Temporary Password</label>
+                <div className="flex gap-2">
+                  <div className="flex-1 bg-gray-900 dark:bg-gray-900 rounded-lg px-4 py-3 border-2 border-blue-500">
+                    <p className="text-lg font-mono font-bold text-blue-400 tracking-widest">{tempPassword}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyPassword}
+                    className="px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span className="material-symbols-outlined">content_copy</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 p-4 rounded-lg mb-6">
+                <p className="text-xs text-yellow-800 dark:text-yellow-200 font-semibold mb-2 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-base">warning</span>
+                  Important
+                </p>
+                <ul className="text-xs text-yellow-700 dark:text-yellow-300 space-y-1 ml-2">
+                  <li>• Share password via secure channel only</li>
+                  <li>• Teacher must login with Mobile + Password</li>
+                  <li>• Password expires after first login</li>
+                  <li>• Teacher must set new password on first login</li>
+                </ul>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleCopyPassword}
+                  className="flex-1 px-4 py-3 border border-blue-500 text-blue-600 dark:text-blue-400 rounded-lg font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined">content_copy</span>
+                  Copy Password
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClosePasswordModal}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined">done</span>
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
           <div className="bg-gradient-to-br from-blue-500 to-cyan-600 p-3 rounded-xl shadow-lg">
@@ -360,7 +465,8 @@ const AddTeacher = () => {
             </button>
           </div>
         </form>
-      </div>
+        </div>
+      </>
     </HodLayout>
   );
 };

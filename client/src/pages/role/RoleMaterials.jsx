@@ -16,7 +16,7 @@ const RoleMaterials = () => {
   const [subjects, setSubjects] = useState([]);
   const [selectedSubject, setSelectedSubject] = useState('');
   const [materials, setMaterials] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -113,29 +113,25 @@ const RoleMaterials = () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        const [resMaterials, resCategories] = await Promise.all([
-          fetch(`/api/academic/subjects/${selectedSubject}/materials`, {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          fetch(`/api/academic/subjects/${selectedSubject}/materials/categories`)
-        ]);
+        const resMaterials = await fetch(`/api/academic/subjects/${selectedSubject}/materials`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
 
         const dataMaterials = await resMaterials.json();
-        const dataCategories = await resCategories.json();
 
         if (dataMaterials?.success) {
           if (isAdmin) {
-            setMaterials(dataMaterials.materials || []);
+            const materialsList = dataMaterials.materials || [];
+            setMaterials(materialsList);
+            setCategories(Array.from(new Set(materialsList.map((m) => m.category).filter(Boolean))));
           } else {
             const userId = user?._id || user?.id;
             const userMaterials = dataMaterials.materials.filter(m => m.addedBy === userId);
             setMaterials(userMaterials);
+            setCategories(Array.from(new Set(userMaterials.map((m) => m.category).filter(Boolean))));
           }
         }
 
-        if (dataCategories?.success) {
-          setCategories(dataCategories.categories || []);
-        }
       } catch (err) {
         console.error('Failed to load materials:', err);
         setError('Failed to load materials');

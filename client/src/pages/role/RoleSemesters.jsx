@@ -16,6 +16,7 @@ const RoleSemesters = () => {
   const [semesters, setSemesters] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showModal, setShowModal] = useState(false);
@@ -178,10 +179,16 @@ const RoleSemesters = () => {
     setShowModal(true);
   };
 
-  const filteredSemesters = semesters.filter(sem =>
-    sem.semesterNumber.toString().includes(searchTerm) ||
-    sem.academicYear.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredSemesters = semesters.filter((sem) => {
+    const matchesSearch =
+      sem.semesterNumber.toString().includes(searchTerm) ||
+      sem.academicYear.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'active' && sem.isActive) ||
+      (statusFilter === 'inactive' && !sem.isActive);
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <RoleLayout
@@ -241,17 +248,31 @@ const RoleSemesters = () => {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <span className="material-symbols-outlined text-gray-400">search</span>
+          <div className="flex flex-col md:flex-row md:items-center gap-3">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <span className="material-symbols-outlined text-gray-400">search</span>
+              </div>
+              <input
+                className="block w-full h-12 pl-12 pr-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder-gray-500 dark:placeholder-gray-400"
+                placeholder="Search by semester number or academic year..."
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-            <input
-              className="block w-full h-12 pl-12 pr-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder-gray-500 dark:placeholder-gray-400"
-              placeholder="Search by semester number or academic year..."
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+            <div className="min-w-[180px]">
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Status</label>
+              <select
+                className="mt-1 w-full h-11 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-sm font-semibold text-gray-800 dark:text-white px-3"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="all">All</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
           </div>
         </div>
 

@@ -1,6 +1,83 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
-const RegisterPage = () => (
+const RegisterPage = () => {
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    name: '',
+    enrollmentNumber: '',
+    mobile: '',
+    email: '',
+    password: '',
+    securityQuestion: '',
+    securityAnswer: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const validateForm = () => {
+    if (!formData.name.trim()) return 'Full Name is required';
+    if (!formData.enrollmentNumber.trim()) return 'Enrollment Number is required';
+    if (!formData.mobile.trim() || formData.mobile.length !== 10) return 'Valid Mobile Number (10 digits) is required';
+    if (!formData.email.trim() || !formData.email.includes('@')) return 'Valid Email is required';
+    if (!formData.password || formData.password.length < 8) return 'Password must be at least 8 characters';
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) return 'Password must contain at least one special character';
+    if (!formData.securityQuestion.trim()) return 'Security Question is required';
+    if (!formData.securityAnswer.trim()) return 'Security Answer is required';
+    return '';
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await axios.post('/api/auth/register', {
+        name: formData.name,
+        enrollmentNumber: formData.enrollmentNumber,
+        mobile: formData.mobile,
+        email: formData.email,
+        password: formData.password,
+        securityQuestion: formData.securityQuestion,
+        securityAnswer: formData.securityAnswer,
+        role: 'student'
+      });
+
+      if (response.data.success) {
+        setSuccess('Registration successful! Redirecting to login...');
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        setTimeout(() => {
+          navigate('/student/dashboard');
+        }, 2000);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
   <div className="bg-background-light dark:bg-background-dark text-[#111318] dark:text-white min-h-screen flex flex-col mesh-background">
     <header className="fixed top-0 w-full z-50 bg-white/40 dark:bg-white/5 backdrop-blur-xl border-b border-white/20 dark:border-white/10">
       <div className="max-w-[1280px] mx-auto px-6 h-20 flex items-center justify-between">
@@ -62,7 +139,23 @@ const RegisterPage = () => (
             <h2 className="text-[#111318] dark:text-white text-4xl font-black leading-tight tracking-tight">Create Your Student Account</h2>
             <p className="text-[#636c88] dark:text-gray-400 mt-3 text-lg">Join thousands of students already benefiting from SmartAcademics premium features.</p>
           </div>
-          <form className="space-y-8 bg-white dark:bg-gray-900/80 p-10 md:p-12 rounded-2xl shadow-2xl shadow-black/10 border border-gray-100 dark:border-gray-800 backdrop-blur-sm">
+          {error && (
+            <div className="rounded-lg p-4 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 mb-4">
+              <div className="flex gap-2">
+                <span className="material-symbols-outlined text-lg flex-shrink-0">error</span>
+                <span>{error}</span>
+              </div>
+            </div>
+          )}
+          {success && (
+            <div className="rounded-lg p-4 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 mb-4">
+              <div className="flex gap-2">
+                <span className="material-symbols-outlined text-lg flex-shrink-0">check_circle</span>
+                <span>{success}</span>
+              </div>
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-8 bg-white dark:bg-gray-900/80 p-10 md:p-12 rounded-2xl shadow-2xl shadow-black/10 border border-gray-100 dark:border-gray-800 backdrop-blur-sm">
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-2">
                 <span className="material-symbols-outlined text-primary text-xl">person</span>
@@ -70,19 +163,52 @@ const RegisterPage = () => (
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="flex flex-col gap-2 flex-1">
-                  <span className="text-[#111318] dark:text-gray-300 text-sm font-semibold">Full Name</span>
-                  <input className="form-input w-full rounded-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 transition-all" placeholder="e.g. Alexander Hamilton" type="text"/>
+                  <span className="text-[#111318] dark:text-gray-300 text-sm font-semibold">Full Name *</span>
+                  <input 
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    className="form-input w-full rounded-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 transition-all" 
+                    placeholder="e.g. Alexander Hamilton" 
+                    type="text"
+                  />
                 </label>
                 <label className="flex flex-col gap-2 flex-1">
-                  <span className="text-[#111318] dark:text-gray-300 text-sm font-semibold">Enrollment Number</span>
-                  <input className="form-input w-full rounded-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 transition-all" placeholder="SA-2024-XXXX" type="text"/>
+                  <span className="text-[#111318] dark:text-gray-300 text-sm font-semibold">Enrollment Number *</span>
+                  <input 
+                    name="enrollmentNumber"
+                    value={formData.enrollmentNumber}
+                    onChange={handleInputChange}
+                    className="form-input w-full rounded-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 transition-all" 
+                    placeholder="SA-2024-XXXX" 
+                    type="text"
+                  />
                 </label>
               </div>
               <label className="flex flex-col gap-2">
-                <span className="text-[#111318] dark:text-gray-300 text-sm font-semibold">Mobile Number</span>
+                <span className="text-[#111318] dark:text-gray-300 text-sm font-semibold">Email *</span>
+                <input 
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  className="form-input w-full rounded-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 transition-all" 
+                  placeholder="your.email@example.com" 
+                  type="email"
+                />
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-[#111318] dark:text-gray-300 text-sm font-semibold">Mobile Number *</span>
                 <div className="flex">
                   <span className="inline-flex items-center px-4 rounded-l-lg border border-r-0 border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-500 text-sm">+91</span>
-                  <input className="form-input w-full rounded-r-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 transition-all" placeholder="(555) 000-0000" type="tel"/>
+                  <input 
+                    name="mobile"
+                    value={formData.mobile}
+                    onChange={handleInputChange}
+                    className="form-input w-full rounded-r-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 transition-all" 
+                    placeholder="(555) 000-0000" 
+                    type="tel"
+                    maxLength="10"
+                  />
                 </div>
               </label>
             </div>
@@ -93,14 +219,25 @@ const RegisterPage = () => (
                 <h3 className="text-[#111318] dark:text-white text-sm font-bold uppercase tracking-wider">Security Settings</h3>
               </div>
               <label className="flex flex-col gap-2">
-                <span className="text-[#111318] dark:text-gray-300 text-sm font-semibold">Password</span>
+                <span className="text-[#111318] dark:text-gray-300 text-sm font-semibold">Password *</span>
                 <div className="relative">
-                  <input className="form-input w-full rounded-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 pr-12 transition-all" placeholder="••••••••••••" type="password"/>
-                  <button className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary transition-colors" type="button">
-                    <span className="material-symbols-outlined text-xl">visibility</span>
+                  <input 
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className="form-input w-full rounded-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 pr-12 transition-all" 
+                    placeholder="••••••••••••" 
+                    type={showPassword ? 'text' : 'password'}
+                  />
+                  <button 
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary transition-colors" 
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-xl">{showPassword ? 'visibility' : 'visibility_off'}</span>
                   </button>
                 </div>
-                <p className="text-xs text-[#636c88] dark:text-gray-400">Must be at least 8 characters with one special symbol.</p>
+                <p className="text-xs text-[#636c88] dark:text-gray-400">Must be at least 8 characters with one special symbol (!@#$%^&* etc).</p>
               </label>
               <div className="p-4 rounded-lg bg-primary/5 dark:bg-primary/10 border border-primary/10">
                 <div className="flex flex-col gap-3">
@@ -108,15 +245,33 @@ const RegisterPage = () => (
                     <span className="text-[#111318] dark:text-white text-sm font-bold italic underline decoration-primary decoration-2 underline-offset-4">Security Question</span>
                     <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">Required</span>
                   </div>
-                  <p className="text-[#111318] dark:text-gray-200 text-sm font-medium">What is your favourite color?</p>
-                  <input className="form-input w-full rounded-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-white dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 transition-all" placeholder="Enter your secret answer" type="text"/>
+                  <input 
+                    name="securityQuestion"
+                    value={formData.securityQuestion}
+                    onChange={handleInputChange}
+                    className="form-input w-full rounded-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-white dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 transition-all" 
+                    placeholder="e.g. What is your favorite color?" 
+                    type="text"
+                  />
+                  <input 
+                    name="securityAnswer"
+                    value={formData.securityAnswer}
+                    onChange={handleInputChange}
+                    className="form-input w-full rounded-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-white dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 transition-all" 
+                    placeholder="Enter your secret answer" 
+                    type="text"
+                  />
                 </div>
               </div>
             </div>
             <div className="pt-4 space-y-4">
-              <button className="w-full flex items-center justify-center rounded-lg h-14 px-6 bg-primary text-white text-base font-bold hover:bg-primary/90 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-xl shadow-primary/30" type="submit">
-                <span className="mr-2">Register My Account</span>
-                <span className="material-symbols-outlined">arrow_forward</span>
+              <button 
+                disabled={loading}
+                className="w-full flex items-center justify-center rounded-lg h-14 px-6 bg-primary text-white text-base font-bold hover:bg-primary/90 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-xl shadow-primary/30 disabled:opacity-50 disabled:cursor-not-allowed" 
+                type="submit"
+              >
+                <span className="mr-2">{loading ? 'Registering...' : 'Register My Account'}</span>
+                <span className="material-symbols-outlined">{loading ? 'hourglass_empty' : 'arrow_forward'}</span>
               </button>
               <div className="text-center text-sm">
                 <span className="text-[#636c88] dark:text-gray-400">Already have an account?</span>
@@ -169,6 +324,7 @@ const RegisterPage = () => (
       </div>
     </footer>
   </div>
-);
+  );
+};
 
 export default RegisterPage;

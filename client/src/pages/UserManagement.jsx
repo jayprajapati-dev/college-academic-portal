@@ -82,11 +82,11 @@ const UserManagement = () => {
     return date.toISOString().slice(0, 10);
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/login');
-  };
+  }, [navigate]);
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -772,7 +772,7 @@ const UserManagement = () => {
   const canEditPermissions = (user) => isAdminMode && ['admin', 'hod', 'teacher', 'coordinator'].includes(user.role);
   const canToggleAdminAccess = (user) => isAdminMode && ['teacher', 'hod'].includes(user.role);
   const canManageCoordinator = (user) => (isAdminMode || role === 'hod') && ['teacher', 'coordinator'].includes(user.role);
-  const canDeleteUser = (user) => (isAdminMode || role === 'coordinator') && user.role === 'student';
+  const canDeleteUser = () => true;
 
   const adminCandidates = useMemo(() => {
     const term = adminSearch.trim().toLowerCase();
@@ -1602,7 +1602,7 @@ const UserManagement = () => {
       )}
 
       {/* Delete User Modal */}
-      {showDeleteModal && selectedUser && (isAdminMode || role === 'coordinator') && (
+      {showDeleteModal && selectedUser && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-gray-700">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-red-500 to-orange-500">

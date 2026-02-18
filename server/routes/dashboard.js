@@ -80,21 +80,25 @@ router.get('/status', async (req, res) => {
     const totalStorageInMB = (totalStorage / (1024 * 1024)).toFixed(2);
     const totalStorageInGB = (totalStorage / (1024 * 1024 * 1024)).toFixed(3);
 
+    // Get disk capacity limits
+    const diskInfo = getDiskSpace();
+    const storageLimit = diskInfo.capacity;
+    const storageUsedPercent = totalStorage > 0 ? ((totalStorage / storageLimit) * 100).toFixed(8) : '0.00000000';
+    const storageRemaining = storageLimit - totalStorage;
+    const storageRemainingGB = (storageRemaining / (1024 * 1024 * 1024)).toFixed(2);
+    const storageRemainingTB = (storageRemaining / (1024 * 1024 * 1024 * 1024)).toFixed(3);
+
     // Log for debugging
     console.log('📊 Storage Debug:', {
       totalStorageBytes: totalStorage,
       totalStorageKB: totalStorageInKB,
       totalStorageMB: totalStorageInMB,
+      totalStorageGB: totalStorageInGB,
+      storageLimit: storageLimit,
+      storageLimitGB: diskInfo.capacityGB,
+      usedPercent: storageUsedPercent,
       collectionsCount: collectionStats.length
     });
-
-    // Get disk capacity limits
-    const diskInfo = getDiskSpace();
-    const storageLimit = diskInfo.capacity;
-    const storageUsedPercent = totalStorage > 0 ? ((totalStorage / storageLimit) * 100).toFixed(4) : '0.0000';
-    const storageRemaining = storageLimit - totalStorage;
-    const storageRemainingGB = (storageRemaining / (1024 * 1024 * 1024)).toFixed(2);
-    const storageRemainingTB = (storageRemaining / (1024 * 1024 * 1024 * 1024)).toFixed(3);
 
     res.json({
       status: 'success',

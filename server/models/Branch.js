@@ -19,7 +19,6 @@ const branchSchema = new mongoose.Schema({
   semesterId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Semester',
-    required: true,
     index: true
   },
   totalSeats: {

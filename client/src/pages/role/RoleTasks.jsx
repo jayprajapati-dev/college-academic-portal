@@ -123,7 +123,7 @@ const RoleTasks = () => {
         console.error('Error fetching metadata:', error);
       }
     }
-  }, [handleAuthError, token, user]);
+  }, [handleAuthError, role, token, user]);
 
   const fetchTasks = useCallback(async () => {
     try {

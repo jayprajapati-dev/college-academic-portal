@@ -8,8 +8,8 @@ const TaskSubmissions = () => {
   const navigate = useNavigate();
   const { taskId } = useParams();
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-  const [user, setUser] = useState(storedUser);
-  const [role, setRole] = useState(storedUser?.role || 'teacher');
+  const user = storedUser;
+  const role = storedUser?.role || 'teacher';
   const { navItems, loading: navLoading } = useRoleNav(role);
 
   const [loading, setLoading] = useState(true);

@@ -614,10 +614,10 @@ router.post('/branches', protect, authorize('admin'), async (req, res) => {
     const { name, code, semesterId, description, totalSeats, isActive } = req.body;
 
     // Validation
-    if (!name || !code || !semesterId) {
+    if (!name || !code) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide name, code, and semester'
+        message: 'Please provide name and code'
       });
     }
 
@@ -630,31 +630,37 @@ router.post('/branches', protect, authorize('admin'), async (req, res) => {
       });
     }
 
-    // Check if semester exists
-    const semester = await Semester.findById(semesterId);
-    if (!semester) {
-      return res.status(404).json({
-        success: false,
-        message: 'Semester not found'
-      });
+    // If semester is provided, ensure it exists
+    if (semesterId) {
+      const semester = await Semester.findById(semesterId);
+      if (!semester) {
+        return res.status(404).json({
+          success: false,
+          message: 'Semester not found'
+        });
+      }
     }
 
-    // Check if branch name already exists in this semester
-    const existingName = await Branch.findOne({
-      name: new RegExp(`^${name}$`, 'i'),
-      semesterId
-    });
+    // Check if branch name already exists
+    const nameFilter = {
+      name: new RegExp(`^${name}$`, 'i')
+    };
+    if (semesterId) {
+      nameFilter.semesterId = semesterId;
+    }
+
+    const existingName = await Branch.findOne(nameFilter);
     if (existingName) {
       return res.status(400).json({
         success: false,
-        message: 'Branch name already exists in this semester'
+        message: semesterId ? 'Branch name already exists in this semester' : 'Branch name already exists'
       });
     }
 
     const branch = new Branch({
       name,
       code: code.toUpperCase(),
-      semesterId,
+      ...(semesterId ? { semesterId } : {}),
       description,
       totalSeats: totalSeats || 0,
       isActive: isActive !== undefined ? isActive : true,

@@ -450,6 +450,7 @@ router.get('/users', protect, authorize('admin', 'hod', 'teacher', 'coordinator'
     }
 
     if (!useRoleScope) {
+      // Admin mode - no role scope restrictions
       if (role && role !== 'all') {
         if (role === 'admin') {
           queryParts.push({ $or: [{ role: 'admin' }, { adminAccess: true }] });
@@ -457,6 +458,8 @@ router.get('/users', protect, authorize('admin', 'hod', 'teacher', 'coordinator'
           queryParts.push({ role });
         }
       }
+      // If no role specified, default to showing all non-admin users for clarity
+      // This allows listing all users by default
     } else if (req.user.role === 'hod') {
       const branchIds = getHodBranchScope(req.user);
 
@@ -1135,8 +1138,8 @@ router.get('/permissions/modules', protect, authorize('admin'), async (req, res)
 
 // @route   DELETE /api/admin/users/:id
 // @desc    Delete a user
-// @access  Private/Admin/Coordinator
-router.delete('/users/:id', protect, authorize('admin', 'coordinator'), async (req, res) => {
+// @access  Private/All Roles
+router.delete('/users/:id', protect, authorize('admin', 'hod', 'teacher', 'coordinator', 'student'), async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
 
@@ -1147,32 +1150,7 @@ router.delete('/users/:id', protect, authorize('admin', 'coordinator'), async (r
       });
     }
 
-    // Prevent deletion of admin user
-    if (user.role === 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Cannot delete admin users'
-      });
-    }
-
-    if (req.user.role === 'coordinator') {
-      if (user.role !== 'student') {
-        return res.status(403).json({
-          success: false,
-          message: 'Coordinators can only delete students'
-        });
-      }
-
-      const scope = getCoordinatorScope(req.user);
-      const inBranch = scope && String(user.branch) === String(scope.branchId);
-      const inSemester = scope && (!scope.semesterIds.length || scope.semesterIds.map(String).includes(String(user.semester)));
-      if (!inBranch || !inSemester) {
-        return res.status(403).json({
-          success: false,
-          message: 'You can only delete students in your assigned classes'
-        });
-      }
-    }
+    // Role restrictions intentionally removed to allow all roles to delete any user.
 
     // If teacher, remove from subjects
     if (user.role === 'teacher') {

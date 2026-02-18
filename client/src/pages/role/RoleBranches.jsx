@@ -14,10 +14,8 @@ const RoleBranches = () => {
   const isAdmin = role === 'admin';
 
   const [branches, setBranches] = useState([]);
-  const [semesters, setSemesters] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [semesterFilter, setSemesterFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showModal, setShowModal] = useState(false);
@@ -26,7 +24,6 @@ const RoleBranches = () => {
   const [formData, setFormData] = useState({
     name: '',
     code: '',
-    semesterId: '',
     totalSeats: 0,
     description: '',
     isActive: true
@@ -81,28 +78,13 @@ const RoleBranches = () => {
     return false;
   }, [navigate]);
 
-  const fetchSemesters = useCallback(async () => {
-    try {
-      const response = await axios.get('/api/academic/semesters/admin/list?page=1&limit=100', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setSemesters(response.data.semesters || []);
-    } catch (error) {
-      console.error('Error fetching semesters:', error);
-      if (handleAuthError(error)) return;
-    }
-  }, [token, handleAuthError]);
-
-  const fetchBranches = useCallback(async (page = 1, semesterId = '') => {
+  const fetchBranches = useCallback(async (page = 1) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
         page: String(page),
         limit: '10'
       });
-      if (semesterId) {
-        params.append('semesterId', semesterId);
-      }
 
       const response = await axios.get(`/api/academic/branches/admin/list?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -125,12 +107,8 @@ const RoleBranches = () => {
   }, [fetchProfile]);
 
   useEffect(() => {
-    fetchSemesters();
-  }, [fetchSemesters]);
-
-  useEffect(() => {
-    fetchBranches(currentPage, semesterFilter);
-  }, [currentPage, semesterFilter, fetchBranches]);
+    fetchBranches(currentPage);
+  }, [currentPage, fetchBranches]);
 
   const stats = useMemo(() => {
     const total = branches.length;
@@ -160,7 +138,6 @@ const RoleBranches = () => {
     setFormData({
       name: '',
       code: '',
-      semesterId: semesterFilter || '',
       totalSeats: 0,
       description: '',
       isActive: true
@@ -173,7 +150,6 @@ const RoleBranches = () => {
     setFormData({
       name: branch.name || '',
       code: branch.code || '',
-      semesterId: branch.semesterId?._id || '',
       totalSeats: branch.totalSeats || 0,
       description: branch.description || '',
       isActive: branch.isActive !== false
@@ -187,7 +163,7 @@ const RoleBranches = () => {
       await axios.delete(`/api/academic/branches/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      fetchBranches(1, semesterFilter);
+      fetchBranches(1);
       setCurrentPage(1);
     } catch (error) {
       if (!handleAuthError(error)) {
@@ -197,8 +173,8 @@ const RoleBranches = () => {
   };
 
   const handleSave = async () => {
-    if (!formData.name || !formData.code || !formData.semesterId) {
-      alert('Please provide name, code and semester');
+    if (!formData.name || !formData.code) {
+      alert('Please provide name and code');
       return;
     }
 
@@ -213,7 +189,7 @@ const RoleBranches = () => {
         });
       }
       setShowModal(false);
-      fetchBranches(1, semesterFilter);
+      fetchBranches(1);
       setCurrentPage(1);
     } catch (error) {
       if (!handleAuthError(error)) {
@@ -269,36 +245,6 @@ const RoleBranches = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <div className="bg-white dark:bg-gray-900 px-3 py-1.5 rounded-lg border border-[#dce2e5] dark:border-gray-800 shadow-sm">
-              <label className="flex flex-col min-w-[200px]">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary text-sm">calendar_today</span>
-                  <p className="text-[#111518] dark:text-gray-300 text-xs font-bold uppercase tracking-wider">Select Semester</p>
-                </div>
-                <select
-                  className="form-select border-none bg-transparent focus:ring-0 text-[#111518] dark:text-white text-sm font-semibold py-1"
-                  value={semesterFilter}
-                  onChange={(e) => {
-                    setSemesterFilter(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                >
-                  <option value="">All Semesters</option>
-                  {semesters.map((semester) => (
-                    <option key={semester._id} value={semester._id}>
-                      Sem {semester.semesterNumber} ({semester.academicYear})
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <button
-              onClick={handleNewBranch}
-              className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-primary to-orange-500 text-white text-sm font-bold rounded-xl shadow-lg shadow-primary/25 hover:shadow-xl hover:scale-105 active:scale-95 transition-all"
-            >
-              <span className="material-symbols-outlined text-sm">add</span>
-              Add Branch
-            </button>
           </div>
         </div>
 
@@ -339,6 +285,15 @@ const RoleBranches = () => {
               <button className="p-2 text-[#637c88] hover:bg-[#f0f3f4] dark:hover:bg-gray-800 rounded-lg">
                 <span className="material-symbols-outlined">file_download</span>
               </button>
+              {isAdmin && (
+                <button
+                  onClick={handleNewBranch}
+                  className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-primary to-orange-500 text-white text-sm font-bold rounded-xl shadow-lg shadow-primary/25 hover:shadow-xl hover:scale-105 active:scale-95 transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">add</span>
+                  Add Branch
+                </button>
+              )}
             </div>
           </div>
           <div className="overflow-x-auto @container">
@@ -470,27 +425,6 @@ const RoleBranches = () => {
             </div>
             <form className="flex-1 px-6 py-4 space-y-5 overflow-y-auto max-h-[75vh]">
               <div className="flex flex-col gap-2">
-                <label className="text-white text-sm font-medium leading-normal">Semester</label>
-                <div className="relative">
-                  <select
-                    name="semesterId"
-                    value={formData.semesterId}
-                    onChange={handleInputChange}
-                    className="form-input appearance-none flex w-full rounded-lg text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-[#54433b] bg-[#2a241f] h-12 px-4 text-base font-normal leading-normal hover:border-[#6b5f56] transition-colors"
-                  >
-                    <option value="">Select Semester</option>
-                    {semesters.map((semester) => (
-                      <option key={semester._id} value={semester._id}>
-                        Sem {semester.semesterNumber} ({semester.academicYear})
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#b9a69d]">
-                    <span className="material-symbols-outlined">expand_more</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2">
                 <label className="text-white text-sm font-medium leading-normal">Branch Name</label>
                 <input
                   name="name"
@@ -534,7 +468,7 @@ const RoleBranches = () => {
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <label className="text-white text-sm font-medium leading-normal">Description</label>
+                <label className="text-white text-sm font-medium leading-normal">Description (optional)</label>
                 <textarea
                   name="description"
                   value={formData.description}
