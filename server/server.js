@@ -60,7 +60,6 @@ app.use('/api/tasks', require('./routes/task'));
 app.use('/api/notices', require('./routes/notice'));
 app.use('/api/timetable', require('./routes/timetable'));
 app.use('/api/library', require('./routes/library'));
-app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/exams', require('./routes/exam'));
 app.use('/api/permissions', require('./routes/permissions'));
 
@@ -118,7 +117,6 @@ const startServer = async () => {
 │ 📚 Academic API : http://localhost:${PORT}/api/academic     │
 │ 👤 Admin API    : http://localhost:${PORT}/api/admin        │
 │ 📋 Tasks API    : http://localhost:${PORT}/api/tasks        │
-│ 📌 Attendance   : http://localhost:${PORT}/api/attendance   │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐

@@ -64,8 +64,7 @@ router.get('/status', async (req, res) => {
     const sampleData = {
       users: await db.collection('users').findOne().catch(e => null) || { _id: 'N/A', note: 'No data yet' },
       subjects: await db.collection('subjects').findOne().catch(e => null) || { _id: 'N/A', note: 'No data yet' },
-      tasks: await db.collection('tasks').findOne().catch(e => null) || { _id: 'N/A', note: 'No data yet' },
-      attendance: await db.collection('attendance').findOne().catch(e => null) || { _id: 'N/A', note: 'No data yet' }
+      tasks: await db.collection('tasks').findOne().catch(e => null) || { _id: 'N/A', note: 'No data yet' }
     };
 
     // Convert ObjectIds to strings for JSON

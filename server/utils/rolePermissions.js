@@ -8,7 +8,6 @@ const ROLE_DEFAULTS = {
     'library',
     'timetable',
     'notices',
-    'attendance',
     'exams',
     'users',
     'contacts',
@@ -22,7 +21,6 @@ const ROLE_DEFAULTS = {
     'notices',
     'materials',
     'library',
-    'attendance',
     'exams',
     'reports',
     'timetable',
@@ -34,7 +32,6 @@ const ROLE_DEFAULTS = {
     'library',
     'tasks',
     'notices',
-    'attendance',
     'exams',
     'profile',
     'users'
@@ -43,7 +40,6 @@ const ROLE_DEFAULTS = {
     'dashboard',
     'tasks',
     'notices',
-    'attendance',
     'profile',
     'users',
     'activity'

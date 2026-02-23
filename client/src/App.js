@@ -38,7 +38,6 @@ import RoleAcademicStructure from './pages/role/RoleAcademicStructure';
 import RoleSubjects from './pages/role/RoleSubjects';
 import ContactManagement from './pages/admin/ContactManagement';
 import PasswordSetup from './pages/PasswordSetup';
-import AttendanceManagement from './pages/AttendanceManagement';
 import ExamManagement from './pages/ExamManagement';
 import ActivityLog from './pages/ActivityLog';
 
@@ -56,7 +55,6 @@ import StudentTaskView from './pages/student/TaskView';
 import StudentSubjects from './pages/student/StudentSubjects';
 import StudentTaskDetail from './pages/student/TaskDetail';
 import StudentLibrary from './pages/student/StudentLibrary';
-import StudentAttendance from './pages/student/StudentAttendance';
 import StudentExams from './pages/student/StudentExams';
 import TaskSubmissions from './pages/teacher/TaskSubmissions';
 
@@ -88,7 +86,6 @@ function App() {
         <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route path="/student/subjects" element={<StudentSubjects />} />
         <Route path="/student/library" element={<StudentLibrary />} />
-        <Route path="/student/attendance" element={<StudentAttendance />} />
         <Route path="/student/exams" element={<StudentExams />} />
         <Route path="/student/profile" element={<StudentProfile />} />
         <Route path="/student/timetable" element={<StudentTimetableView />} />
@@ -101,14 +98,12 @@ function App() {
         <Route path="/teacher/tasks" element={<RoleTasks />} />
         <Route path="/teacher/tasks/:taskId/submissions" element={<TaskSubmissions />} />
         <Route path="/teacher/library" element={<RoleLibrary />} />
-        <Route path="/teacher/attendance" element={<AttendanceManagement />} />
         <Route path="/teacher/exams" element={<ExamManagement />} />
         <Route path="/coordinator/dashboard" element={<RoleDashboard />} />
         <Route path="/coordinator/profile" element={<RoleProfile />} />
         <Route path="/coordinator/tasks" element={<RoleTasks />} />
         <Route path="/coordinator/tasks/:taskId/submissions" element={<TaskSubmissions />} />
         <Route path="/coordinator/notices" element={<RoleNotices />} />
-        <Route path="/coordinator/attendance" element={<AttendanceManagement />} />
         <Route path="/coordinator/users" element={<UserManagement />} />
         <Route path="/coordinator/activity" element={<ActivityLog />} />
         <Route path="/hod/dashboard" element={<RoleDashboard />} />
@@ -122,7 +117,6 @@ function App() {
         <Route path="/hod/tasks" element={<RoleTasks />} />
         <Route path="/hod/tasks/:taskId/submissions" element={<TaskSubmissions />} />
         <Route path="/hod/library" element={<RoleLibrary />} />
-        <Route path="/hod/attendance" element={<AttendanceManagement />} />
         <Route path="/hod/exams" element={<ExamManagement />} />
         <Route path="/admin/dashboard" element={<RoleDashboard />} />
         <Route path="/admin/profile" element={<RoleProfile />} />
@@ -144,7 +138,6 @@ function App() {
         <Route path="/admin/tasks" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/admin/materials" element={<RoleMaterials />} />
         <Route path="/admin/library" element={<RoleLibrary />} />
-        <Route path="/admin/attendance" element={<AttendanceManagement />} />
         <Route path="/admin/exams" element={<ExamManagement />} />
         <Route path="/hod/subjects" element={<RoleSubjects />} />
         <Route path="/teacher/subjects" element={<RoleSubjects />} />

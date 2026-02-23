@@ -170,17 +170,6 @@
   "please": "Wait for API response"
 }</pre>
             </div>
-
-            <div class="bg-gray-700 rounded p-4">
-                <p class="text-sm text-gray-300 uppercase mb-3 font-bold flex items-center gap-2">
-                    <span class="material-symbols-rounded text-sm">event_available</span>
-                    Attendance Collection
-                </p>
-                <pre id="attendance-data" class="text-xs text-gray-200 overflow-x-auto font-mono bg-gray-900 p-3 rounded h-48 max-h-48">{
-  "status": "Loading data...",
-  "please": "Wait for API response"
-}</pre>
-            </div>
         </div>
     </section>
 
@@ -202,10 +191,6 @@
             <div class="bg-gray-700 rounded p-4 border-l-4 border-purple-500">
                 <p class="text-gray-400 uppercase text-xs">Tasks Management</p>
                 <p class="font-mono text-purple-300 mt-1">/api/tasks</p>
-            </div>
-            <div class="bg-gray-700 rounded p-4 border-l-4 border-pink-500">
-                <p class="text-gray-400 uppercase text-xs">Attendance</p>
-                <p class="font-mono text-pink-300 mt-1">/api/attendance</p>
             </div>
         </div>
     </section>
@@ -385,7 +370,6 @@
                 document.getElementById('users-data').textContent = formatJSON(data.sampleData.users);
                 document.getElementById('subjects-data').textContent = formatJSON(data.sampleData.subjects);
                 document.getElementById('tasks-data').textContent = formatJSON(data.sampleData.tasks);
-                document.getElementById('attendance-data').textContent = formatJSON(data.sampleData.attendance);
             }
 
             // Update last update time

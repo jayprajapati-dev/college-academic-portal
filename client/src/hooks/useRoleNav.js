@@ -10,7 +10,6 @@ const ROLE_NAV = {
     { key: 'library', label: 'Library', to: '/admin/library', icon: 'library_books' },
     { key: 'timetable', label: 'Timetable', to: '/admin/timetable', icon: 'calendar_today' },
     { key: 'notices', label: 'Notice Board', to: '/admin/notices', icon: 'notifications' },
-    { key: 'attendance', label: 'Attendance', to: '/admin/attendance', icon: 'fact_check' },
     { key: 'exams', label: 'Exams', to: '/admin/exams', icon: 'quiz' },
     { key: 'users', label: 'Manage Users', to: '/admin/users', icon: 'group' },
     { key: 'contacts', label: 'Contact Requests', to: '/admin/contacts', icon: 'contact_mail' },
@@ -23,7 +22,6 @@ const ROLE_NAV = {
     { key: 'tasks', label: 'Tasks', to: '/hod/tasks', icon: 'assignment' },
     { key: 'materials', label: 'Materials', to: '/hod/materials', icon: 'menu_book' },
     { key: 'library', label: 'Library', to: '/hod/library', icon: 'library_books' },
-    { key: 'attendance', label: 'Attendance', to: '/hod/attendance', icon: 'fact_check' },
     { key: 'exams', label: 'Exams', to: '/hod/exams', icon: 'quiz' },
     { key: 'reports', label: 'Reports', to: '/hod/reports', icon: 'insights' },
     { key: 'timetable', label: 'Timetable', to: '/hod/timetable', icon: 'calendar_today' },
@@ -35,7 +33,6 @@ const ROLE_NAV = {
     { key: 'library', label: 'Library', to: '/teacher/library', icon: 'library_books' },
     { key: 'tasks', label: 'Tasks', to: '/teacher/tasks', icon: 'assignment' },
     { key: 'notices', label: 'Notices', to: '/teacher/notices', icon: 'notifications' },
-    { key: 'attendance', label: 'Attendance', to: '/teacher/attendance', icon: 'fact_check' },
     { key: 'exams', label: 'Exams', to: '/teacher/exams', icon: 'quiz' },
     { key: 'users', label: 'Manage Users', to: '/teacher/users', icon: 'group' }
   ],
@@ -43,7 +40,6 @@ const ROLE_NAV = {
     { key: 'dashboard', label: 'Dashboard', to: '/coordinator/dashboard', icon: 'space_dashboard' },
     { key: 'tasks', label: 'Tasks', to: '/coordinator/tasks', icon: 'assignment' },
     { key: 'notices', label: 'Notices', to: '/coordinator/notices', icon: 'notifications' },
-    { key: 'attendance', label: 'Attendance', to: '/coordinator/attendance', icon: 'fact_check' },
     { key: 'users', label: 'Students', to: '/coordinator/users', icon: 'group' },
     { key: 'activity', label: 'Activity Log', to: '/coordinator/activity', icon: 'history' }
   ]

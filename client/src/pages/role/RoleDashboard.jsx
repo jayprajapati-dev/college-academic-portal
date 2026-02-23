@@ -540,12 +540,6 @@ const RoleDashboard = () => {
             >
               Manage Tasks
             </button>
-            <button
-              onClick={() => navigate('/coordinator/attendance')}
-              className="px-5 py-3 rounded-2xl border border-white/40 text-sm font-bold hover:bg-white/10 transition"
-            >
-              Mark Attendance
-            </button>
           </div>
         </div>
       </section>
@@ -561,11 +555,6 @@ const RoleDashboard = () => {
             <p className="text-xs uppercase tracking-[0.2em] text-[#6B7280]">Notices</p>
             <p className="text-lg font-bold mt-2">Announcements</p>
             <p className="text-sm text-[#6B7280]">Share updates</p>
-          </button>
-          <button onClick={() => navigate('/coordinator/attendance')} className="group rounded-2xl border border-[#E6E9EF] bg-white p-5 text-left hover:shadow-md transition">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#6B7280]">Attendance</p>
-            <p className="text-lg font-bold mt-2">Sessions</p>
-            <p className="text-sm text-[#6B7280]">Mark and review</p>
           </button>
         </div>
       </Card>
