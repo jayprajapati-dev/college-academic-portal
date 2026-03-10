@@ -1,12 +1,61 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('../models/User');
+const Branch = require('../models/Branch');
+const Semester = require('../models/Semester');
 const { protect } = require('../middleware/auth');
+
+const SECURITY_QUESTIONS = [
+  "What is your mother's maiden name?",
+  'What was the name of your first pet?',
+  'What city were you born in?',
+  'What is your favorite book?',
+  'What is your favorite movie?',
+  'What was the name of your first school?',
+  'What is your favorite food?',
+  'What is your favorite sport?',
+  'What is your favorite color?'
+];
+
+const SECURITY_QUESTION_ALIASES = {
+  color: 'What is your favorite color?',
+  favouritecolor: 'What is your favorite color?',
+  favoritecolor: 'What is your favorite color?',
+  'what is your favourite color?': 'What is your favorite color?',
+  'what is your favorite color?': 'What is your favorite color?',
+  food: 'What is your favorite food?',
+  sport: 'What is your favorite sport?',
+  movie: 'What is your favorite movie?',
+  book: 'What is your favorite book?',
+  city: 'What city were you born in?',
+  pet: 'What was the name of your first pet?',
+  school: 'What was the name of your first school?',
+  maidenname: "What is your mother's maiden name?",
+  "mother's maiden name": "What is your mother's maiden name?"
+};
+
+const normalizeSecurityQuestion = (value) => {
+  if (!value) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+  const lowered = raw.toLowerCase();
+  const compact = lowered.replace(/[^a-z0-9]/g, '');
+
+  if (SECURITY_QUESTIONS.includes(raw)) return raw;
+  if (SECURITY_QUESTION_ALIASES[lowered]) return SECURITY_QUESTION_ALIASES[lowered];
+  if (SECURITY_QUESTION_ALIASES[compact]) return SECURITY_QUESTION_ALIASES[compact];
+
+  const matched = SECURITY_QUESTIONS.find((question) => question.toLowerCase() === lowered);
+  return matched || '';
+};
+
+const getJwtSecret = () => process.env.JWT_SECRET || 'smartacademics-dev-jwt-secret';
 
 // Generate JWT Token
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+  return jwt.sign({ id }, getJwtSecret(), {
     expiresIn: process.env.JWT_EXPIRE || '15m'
   });
 };
@@ -16,13 +65,45 @@ const generateToken = (id) => {
 // @access  Public
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, enrollmentNumber, password, mobile, securityQuestion, securityAnswer } = req.body;
+    const { name, email, enrollmentNumber, password, mobile, securityQuestion, securityAnswer, branch, semester } = req.body;
+    const normalizedName = String(name || '').trim();
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedEnrollment = String(enrollmentNumber || '').trim();
+    const normalizedMobile = String(mobile || '').replace(/\D/g, '').slice(0, 10);
+    const normalizedAnswer = String(securityAnswer || '').trim();
+    const normalizedQuestion = normalizeSecurityQuestion(securityQuestion);
 
     // Validation
-    if (!name || !email || !enrollmentNumber || !password) {
+    if (!normalizedName || !normalizedEmail || !normalizedEnrollment || !password || !branch || !semester) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide all required fields (name, email, enrollmentNumber, password)'
+        message: 'Please provide all required fields (name, email, enrollmentNumber, password, branch, semester)'
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(branch) || !mongoose.Types.ObjectId.isValid(semester)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid branch or semester selected'
+      });
+    }
+
+    const [branchDoc, semesterDoc] = await Promise.all([
+      Branch.findById(branch).select('_id'),
+      Semester.findById(semester).select('_id')
+    ]);
+
+    if (!branchDoc || !semesterDoc) {
+      return res.status(400).json({
+        success: false,
+        message: 'Selected branch or semester does not exist'
+      });
+    }
+
+    if (!normalizedQuestion || !normalizedAnswer) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid security question and answer'
       });
     }
 
@@ -44,7 +125,7 @@ router.post('/register', async (req, res) => {
 
     // Check if user already exists
     const existingUser = await User.findOne({ 
-      $or: [{ email }, { enrollmentNumber }] 
+      $or: [{ email: normalizedEmail }, { enrollmentNumber: normalizedEnrollment }] 
     });
 
     if (existingUser) {
@@ -56,15 +137,18 @@ router.post('/register', async (req, res) => {
 
     // Create user with optional security question and answer
     const user = await User.create({
-      name,
-      email,
-      enrollmentNumber,
+      name: normalizedName,
+      email: normalizedEmail,
+      enrollmentNumber: normalizedEnrollment,
       password,
       role: 'student',
       status: 'active',
-      mobile: mobile || '',
-      securityQuestion: securityQuestion || '',
-      securityAnswer: securityAnswer || ''
+      mobile: normalizedMobile,
+      branch: branchDoc._id,
+      semester: semesterDoc._id,
+      securityQuestion: normalizedQuestion,
+      securityAnswer: normalizedAnswer,
+      profileUpdateRequired: false
     });
 
     // Generate token
@@ -81,11 +165,28 @@ router.post('/register', async (req, res) => {
         enrollmentNumber: user.enrollmentNumber,
         mobile: user.mobile,
         role: user.role,
-        status: user.status
+        status: user.status,
+        branch: user.branch,
+        semester: user.semester,
+        profileUpdateRequired: user.profileUpdateRequired === true
       }
     });
   } catch (error) {
     console.error('Register error:', error);
+    if (error?.code === 11000) {
+      const duplicateField = Object.keys(error.keyPattern || {})[0];
+      const fieldLabel = duplicateField === 'email' ? 'email' : duplicateField === 'enrollmentNumber' ? 'enrollment number' : 'details';
+      return res.status(400).json({
+        success: false,
+        message: `User with this ${fieldLabel} already exists`
+      });
+    }
+    if (error?.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Error in registration',
@@ -179,6 +280,9 @@ router.post('/login', async (req, res) => {
         adminAccess: user.adminAccess === true,
         status: user.status,
         passwordChangeRequired: user.passwordChangeRequired,
+        profileUpdateRequired: user.profileUpdateRequired === true,
+        profileCompletionRequired:
+          user.role === 'student' && (!user.branch || !user.semester || user.profileUpdateRequired === true),
         branch: user.branch,
         semester: user.semester,
         assignedSubjects: user.assignedSubjects || [],
@@ -200,9 +304,10 @@ router.post('/login', async (req, res) => {
 router.post('/first-login', protect, async (req, res) => {
   try {
     const { newPassword, securityQuestion, securityAnswer, caseInsensitiveAnswer } = req.body;
+    const normalizedQuestion = normalizeSecurityQuestion(securityQuestion);
 
     // Validation
-    if (!newPassword || !securityQuestion || !securityAnswer) {
+    if (!newPassword || !normalizedQuestion || !securityAnswer) {
       return res.status(400).json({
         success: false,
         message: 'Please provide all required fields'
@@ -228,7 +333,7 @@ router.post('/first-login', protect, async (req, res) => {
 
     // Update user
     user.password = newPassword;
-    user.securityQuestion = securityQuestion;
+    user.securityQuestion = normalizedQuestion;
     user.securityAnswer = securityAnswer;
     user.caseInsensitiveAnswer = caseInsensitiveAnswer || false;
     user.tempPassword = undefined;
@@ -563,6 +668,7 @@ router.post('/verify-temp-credentials', async (req, res) => {
 router.post('/setup-password', async (req, res) => {
   try {
     const { userId, newPassword, confirmPassword, securityQuestion, securityAnswer } = req.body;
+    const normalizedQuestion = normalizeSecurityQuestion(securityQuestion);
     
     // Get token from header
     const token = req.headers.authorization?.split(' ')[1];
@@ -586,7 +692,7 @@ router.post('/setup-password', async (req, res) => {
     }
 
     // Validation
-    if (!newPassword || !confirmPassword || !securityQuestion || !securityAnswer) {
+    if (!newPassword || !confirmPassword || !normalizedQuestion || !securityAnswer) {
       return res.status(400).json({
         success: false,
         message: 'All fields are required'
@@ -634,7 +740,7 @@ router.post('/setup-password', async (req, res) => {
 
     // Update user
     user.password = newPassword;
-    user.securityQuestion = securityQuestion;
+    user.securityQuestion = normalizedQuestion;
     user.securityAnswer = securityAnswer;
     user.status = 'active';
     user.passwordSetupRequired = false;

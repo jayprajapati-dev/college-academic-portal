@@ -124,18 +124,14 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  profileUpdateRequired: {
+    type: Boolean,
+    default: false
+  },
   securityQuestion: {
     type: String,
-    enum: [
-      "What is your mother's maiden name?",
-      "What was the name of your first pet?",
-      "What city were you born in?",
-      "What is your favorite book?",
-      "What is your favorite movie?",
-      "What was the name of your first school?",
-      "What is your favorite food?",
-      "What is your favorite sport?"
-    ]
+    trim: true,
+    maxlength: 200
   },
   securityAnswer: {
     type: String,

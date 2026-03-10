@@ -30,6 +30,18 @@ const subjectSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  offerings: [{
+    branchId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Branch',
+      required: true
+    },
+    semesterId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Semester',
+      required: true
+    }
+  }],
   faculty: {
     name: String,
     email: String,
@@ -105,6 +117,7 @@ const subjectSchema = new mongoose.Schema({
 
 // Index for efficient queries
 subjectSchema.index({ branchId: 1, semesterId: 1 });
+subjectSchema.index({ 'offerings.branchId': 1, 'offerings.semesterId': 1 });
 subjectSchema.index({ code: 1 });
 
 module.exports = mongoose.model('Subject', subjectSchema);

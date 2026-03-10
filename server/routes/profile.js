@@ -120,7 +120,7 @@ router.put('/me', protect, async (req, res) => {
 // @access  Private
 router.put('/complete-profile', protect, async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, email, mobile, branch, semester } = req.body;
 
     const user = await User.findById(req.user._id)
       .populate('branch semester assignedSubjects assignedHOD coordinator.branch coordinator.semesters');
@@ -135,6 +135,50 @@ router.put('/complete-profile', protect, async (req, res) => {
     // Update name if provided
     if (name) user.name = name;
 
+    if (user.role === 'student') {
+      if (email) user.email = String(email).trim().toLowerCase();
+
+      if (mobile) {
+        if (!/^[0-9]{10}$/.test(String(mobile))) {
+          return res.status(400).json({
+            success: false,
+            message: 'Please provide a valid 10-digit mobile number'
+          });
+        }
+        user.mobile = String(mobile);
+      }
+
+      if (!branch || !semester) {
+        return res.status(400).json({
+          success: false,
+          message: 'Branch and semester are required for students'
+        });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(branch) || !mongoose.Types.ObjectId.isValid(semester)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid branch or semester id'
+        });
+      }
+
+      const [branchDoc, semesterDoc] = await Promise.all([
+        Branch.findById(branch),
+        Semester.findById(semester)
+      ]);
+
+      if (!branchDoc) {
+        return res.status(404).json({ success: false, message: 'Branch not found' });
+      }
+      if (!semesterDoc) {
+        return res.status(404).json({ success: false, message: 'Semester not found' });
+      }
+
+      user.branch = branchDoc._id;
+      user.semester = semesterDoc._id;
+      user.profileUpdateRequired = false;
+    }
+
     await user.save();
 
     res.status(200).json({
@@ -146,6 +190,7 @@ router.put('/complete-profile', protect, async (req, res) => {
         email: user.email,
         mobile: user.mobile,
         role: user.role,
+        profileUpdateRequired: user.profileUpdateRequired === true,
         branch: user.branch,
         semester: user.semester,
         assignedSubjects: user.assignedSubjects,

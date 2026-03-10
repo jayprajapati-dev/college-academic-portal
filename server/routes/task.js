@@ -23,6 +23,44 @@ const getCoordinatorScope = (user) => {
   };
 };
 
+const getHodBranchScope = (user) => ([
+  ...(Array.isArray(user?.branches) ? user.branches : []),
+  user?.branch,
+  user?.department
+].filter(Boolean).map((id) => String(id)));
+
+const canUserAccessSubject = (user, subject) => {
+  if (!user || !subject) return false;
+
+  const subjectBranchId = subject?.branchId?._id || subject?.branchId;
+  const subjectSemesterId = subject?.semesterId?._id || subject?.semesterId;
+  if (!subjectBranchId || !subjectSemesterId) return false;
+
+  if (user.role === 'admin') {
+    return true;
+  }
+
+  if (user.role === 'student') {
+    return String(user.branch) === String(subjectBranchId)
+      && String(user.semester) === String(subjectSemesterId);
+  }
+
+  if (user.role === 'teacher') {
+    return hasAssignedSubject(user, subject._id || subject.id);
+  }
+
+  if (user.role === 'hod') {
+    const branchScope = new Set(getHodBranchScope(user));
+    return branchScope.has(String(subjectBranchId));
+  }
+
+  if (user.role === 'coordinator') {
+    return canCoordinatorManageSubject(user, subject);
+  }
+
+  return false;
+};
+
 const canCoordinatorManageSubject = (user, subject) => {
   if (user?.role !== 'coordinator') return false;
   const scope = getCoordinatorScope(user);
@@ -149,11 +187,15 @@ router.post('/create', protect, authorize('hod', 'teacher', 'coordinator'), asyn
       });
     }
 
-    // Authorization check: only subject teachers can create
-    if (!hasAssignedSubject(req.user, subjectId) && !canCoordinatorManageSubject(req.user, subject)) {
+    // Authorization check by role scope
+    const isTeacherAllowed = req.user.role === 'teacher' && hasAssignedSubject(req.user, subjectId);
+    const isHodAllowed = req.user.role === 'hod' && getHodBranchScope(req.user).includes(String(subject.branchId?._id || subject.branchId));
+    const isCoordinatorAllowed = req.user.role === 'coordinator' && canCoordinatorManageSubject(req.user, subject);
+
+    if (!isTeacherAllowed && !isHodAllowed && !isCoordinatorAllowed) {
       return res.status(403).json({
         success: false,
-        message: 'You can only create tasks for your assigned subjects or coordinator scope'
+        message: 'You can only create tasks within your assigned subject or academic scope'
       });
     }
 
@@ -222,6 +264,21 @@ router.get('/subject/:subjectId', protect, async (req, res) => {
     const { subjectId } = req.params;
     const { page = 1, limit = 10, category, status } = req.query;
 
+    const subjectDoc = await Subject.findById(subjectId).select('_id name code branchId semesterId');
+    if (!subjectDoc) {
+      return res.status(404).json({
+        success: false,
+        message: 'Subject not found'
+      });
+    }
+
+    if (!canUserAccessSubject(req.user, subjectDoc)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to view tasks for this subject'
+      });
+    }
+
     const query = {
       subjectId,
       status: 'active'
@@ -239,7 +296,11 @@ router.get('/subject/:subjectId', protect, async (req, res) => {
       .sort({ createdAt: -1 });
 
     const total = await Task.countDocuments(query);
-    const subject = await Subject.findById(subjectId).select('name code');
+    const subject = {
+      _id: subjectDoc._id,
+      name: subjectDoc.name,
+      code: subjectDoc.code
+    };
 
     // If student, get their status on each task
     if (req.user.role === 'student') {
@@ -382,7 +443,7 @@ router.get('/:id', protect, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id)
       .populate('createdBy', 'name email role')
-      .populate('subjectId', 'name code description')
+      .populate('subjectId', 'name code description branchId semesterId')
       .populate('branchId', 'name code')
       .populate('semesterId', 'name');
 
@@ -390,6 +451,13 @@ router.get('/:id', protect, async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Task not found'
+      });
+    }
+
+    if (!canUserAccessSubject(req.user, task.subjectId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to view this task'
       });
     }
 

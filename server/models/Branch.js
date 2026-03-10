@@ -26,6 +26,18 @@ const branchSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  semesterSeatOverrides: [{
+    semester: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Semester',
+      required: true
+    },
+    totalSeats: {
+      type: Number,
+      required: true,
+      min: 0
+    }
+  }],
   hod: {
     name: String,
     email: String,

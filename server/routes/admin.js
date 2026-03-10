@@ -30,6 +30,19 @@ const getCoordinatorScope = (user) => {
   };
 };
 
+const getTeacherScope = async (user) => {
+  const assigned = Array.isArray(user?.assignedSubjects) ? user.assignedSubjects : [];
+  if (assigned.length === 0) {
+    return { branchIds: [], semesterIds: [] };
+  }
+
+  const subjectDocs = await Subject.find({ _id: { $in: assigned } }).select('branchId semesterId');
+  const branchIds = Array.from(new Set(subjectDocs.map((s) => String(s.branchId)).filter(Boolean)));
+  const semesterIds = Array.from(new Set(subjectDocs.map((s) => String(s.semesterId)).filter(Boolean)));
+
+  return { branchIds, semesterIds };
+};
+
 const logActivity = async (payload) => {
   try {
     await ActivityLog.create(payload);
@@ -632,8 +645,8 @@ router.get('/user/:id', protect, authorize('admin'), async (req, res) => {
 
 // @route   PUT /api/admin/user/:id/status
 // @desc    Activate/Deactivate user
-// @access  Private/Admin/Coordinator
-router.put('/user/:id/status', protect, authorize('admin', 'coordinator'), async (req, res) => {
+// @access  Private/Admin/HOD/Teacher/Coordinator
+router.put('/user/:id/status', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { status } = req.body;
 
@@ -651,6 +664,45 @@ router.put('/user/:id/status', protect, authorize('admin', 'coordinator'), async
         success: false,
         message: 'User not found'
       });
+    }
+
+    if (req.user.role === 'hod') {
+      if (user.role !== 'student') {
+        return res.status(403).json({
+          success: false,
+          message: 'HOD can only update student status'
+        });
+      }
+
+      const branchIds = getHodBranchScope(req.user).map(String);
+      const studentBranchId = String(user.branch || user.department || '');
+      if (!branchIds.includes(studentBranchId)) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only update students in your branch'
+        });
+      }
+    }
+
+    if (req.user.role === 'teacher') {
+      if (user.role !== 'student') {
+        return res.status(403).json({
+          success: false,
+          message: 'Teachers can only update student status'
+        });
+      }
+
+      const teacherScope = await getTeacherScope(req.user);
+      const studentBranchId = String(user.branch || user.department || '');
+      const studentSemesterId = String(user.semester || '');
+      const inBranch = teacherScope.branchIds.includes(studentBranchId);
+      const inSemester = teacherScope.semesterIds.length === 0 || teacherScope.semesterIds.includes(studentSemesterId);
+      if (!inBranch || !inSemester) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only update students in your assigned classes'
+        });
+      }
     }
 
     if (req.user.role === 'coordinator') {
@@ -714,6 +766,216 @@ router.put('/user/:id/status', protect, authorize('admin', 'coordinator'), async
       success: false,
       message: 'Error in updating user status'
     });
+  }
+});
+
+// @route   PUT /api/admin/users/:id/academic-assignment
+// @desc    Update student branch/semester assignment and optional status
+// @access  Private/Admin/HOD/Teacher/Coordinator
+router.put('/users/:id/academic-assignment', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
+  try {
+    const {
+      branchId: rawBranchId,
+      semesterId: rawSemesterId,
+      branch: branchInput,
+      semester: semesterInput,
+      status,
+      profileUpdateRequired
+    } = req.body;
+
+    const branchId = rawBranchId || branchInput;
+    const semesterId = rawSemesterId || semesterInput;
+
+    if (!branchId || !semesterId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Branch and semester are required'
+      });
+    }
+
+    const [student, branchDoc, semesterDoc] = await Promise.all([
+      User.findById(req.params.id),
+      Branch.findById(branchId),
+      Semester.findById(semesterId)
+    ]);
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    if (student.role !== 'student') {
+      return res.status(400).json({ success: false, message: 'Academic assignment is only available for students' });
+    }
+
+    if (!branchDoc || !semesterDoc) {
+      return res.status(404).json({ success: false, message: 'Branch or semester not found' });
+    }
+
+    if (req.user.role === 'hod') {
+      const branchScope = getHodBranchScope(req.user).map((id) => String(id));
+      if (!branchScope.includes(String(student.branch)) || !branchScope.includes(String(branchDoc._id))) {
+        return res.status(403).json({ success: false, message: 'You can only update students in your branch scope' });
+      }
+
+      const allowedSemesters = Array.isArray(req.user.semesters) ? req.user.semesters.map((id) => String(id)) : [];
+      if (allowedSemesters.length > 0 && !allowedSemesters.includes(String(semesterDoc._id))) {
+        return res.status(403).json({ success: false, message: 'Semester is outside your scope' });
+      }
+    }
+
+    if (req.user.role === 'coordinator') {
+      const scope = getCoordinatorScope(req.user);
+      if (!scope || String(scope.branchId) !== String(branchDoc._id) || !scope.semesterIds.map(String).includes(String(semesterDoc._id))) {
+        return res.status(403).json({ success: false, message: 'You can only update students in your assigned branch and semesters' });
+      }
+    }
+
+    if (req.user.role === 'teacher') {
+      const scope = await getTeacherScope(req.user);
+      if (!scope.branchIds.includes(String(branchDoc._id)) || !scope.semesterIds.includes(String(semesterDoc._id))) {
+        return res.status(403).json({ success: false, message: 'You can only update students in your assigned classes' });
+      }
+    }
+
+    student.branch = branchDoc._id;
+    student.semester = semesterDoc._id;
+
+    if (typeof profileUpdateRequired === 'boolean') {
+      student.profileUpdateRequired = profileUpdateRequired;
+    }
+
+    if (status && ['active', 'disabled', 'pending', 'pending_first_login'].includes(status)) {
+      student.status = status;
+    }
+
+    await student.save();
+
+    await logActivity({
+      actorId: req.user._id,
+      actorName: req.user.name,
+      actorRole: req.user.role,
+      action: 'update_student_academic_assignment',
+      targetType: 'User',
+      targetId: student._id,
+      targetLabel: student.name,
+      scope: {
+        branchId: student.branch || null,
+        semesterIds: student.semester ? [student.semester] : []
+      }
+    });
+
+    const updated = await User.findById(student._id)
+      .populate('branch semester')
+      .select('-password -tempPassword -securityAnswer');
+
+    res.status(200).json({
+      success: true,
+      message: 'Student branch/semester updated successfully',
+      data: updated
+    });
+  } catch (error) {
+    console.error('Update student academic assignment error:', error);
+    res.status(500).json({ success: false, message: 'Error updating student branch/semester' });
+  }
+});
+
+// @route   PUT /api/admin/users/:id/profile-update-required
+// @desc    Mark one student to update branch/semester on next login
+// @access  Private/Admin/HOD/Teacher/Coordinator
+router.put('/users/:id/profile-update-required', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
+  try {
+    const { required = true } = req.body;
+
+    const student = await User.findById(req.params.id);
+    if (!student || student.role !== 'student') {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    if (req.user.role === 'hod') {
+      const branchScope = getHodBranchScope(req.user).map((id) => String(id));
+      if (!branchScope.includes(String(student.branch))) {
+        return res.status(403).json({ success: false, message: 'You can only update students in your branch scope' });
+      }
+    }
+
+    if (req.user.role === 'coordinator') {
+      const scope = getCoordinatorScope(req.user);
+      if (!scope || String(scope.branchId) !== String(student.branch) || (scope.semesterIds.length > 0 && !scope.semesterIds.map(String).includes(String(student.semester)))) {
+        return res.status(403).json({ success: false, message: 'You can only update students in your assigned classes' });
+      }
+    }
+
+    if (req.user.role === 'teacher') {
+      const scope = await getTeacherScope(req.user);
+      if (!scope.branchIds.includes(String(student.branch)) || !scope.semesterIds.includes(String(student.semester))) {
+        return res.status(403).json({ success: false, message: 'You can only update students in your assigned classes' });
+      }
+    }
+
+    student.profileUpdateRequired = Boolean(required);
+    await student.save();
+
+    res.status(200).json({
+      success: true,
+      message: required ? 'Student update request sent' : 'Student update requirement removed',
+      data: { id: student._id, profileUpdateRequired: student.profileUpdateRequired }
+    });
+  } catch (error) {
+    console.error('Set profile update required error:', error);
+    res.status(500).json({ success: false, message: 'Error updating profile update requirement' });
+  }
+});
+
+// @route   POST /api/admin/users/profile-update-required/bulk
+// @desc    Mark filtered students to update branch/semester on next login
+// @access  Private/Admin/HOD/Teacher/Coordinator
+router.post('/users/profile-update-required/bulk', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
+  try {
+    const { branchId, semesterId, required = true } = req.body;
+    const query = { role: 'student' };
+
+    if (branchId) query.branch = branchId;
+    if (semesterId) query.semester = semesterId;
+
+    if (req.user.role === 'hod') {
+      const branchScope = getHodBranchScope(req.user).map((id) => String(id));
+      query.branch = query.branch
+        ? query.branch
+        : { $in: branchScope };
+    }
+
+    if (req.user.role === 'coordinator') {
+      const scope = getCoordinatorScope(req.user);
+      if (!scope || !scope.branchId) {
+        return res.status(403).json({ success: false, message: 'Coordinator scope is not configured' });
+      }
+      query.branch = scope.branchId;
+      if (!query.semester && scope.semesterIds.length > 0) {
+        query.semester = { $in: scope.semesterIds };
+      }
+    }
+
+    if (req.user.role === 'teacher') {
+      const scope = await getTeacherScope(req.user);
+      if (scope.branchIds.length === 0) {
+        return res.status(403).json({ success: false, message: 'Teacher scope is not configured' });
+      }
+      query.branch = { $in: scope.branchIds };
+      if (scope.semesterIds.length > 0) {
+        query.semester = { $in: scope.semesterIds };
+      }
+    }
+
+    const result = await User.updateMany(query, { $set: { profileUpdateRequired: Boolean(required) } });
+
+    res.status(200).json({
+      success: true,
+      message: `Updated ${result.modifiedCount || 0} students`,
+      data: { modifiedCount: result.modifiedCount || 0 }
+    });
+  } catch (error) {
+    console.error('Bulk profile update required error:', error);
+    res.status(500).json({ success: false, message: 'Error applying bulk update requirement' });
   }
 });
 

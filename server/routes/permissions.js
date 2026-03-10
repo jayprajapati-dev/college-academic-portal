@@ -6,7 +6,7 @@ const { getRoleDefaults } = require('../utils/rolePermissions');
 
 router.get('/me', protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('role permissions');
+    const user = await User.findById(req.user._id).select('role permissions adminAccess coordinator');
 
     if (!user) {
       return res.status(404).json({
@@ -16,12 +16,34 @@ router.get('/me', protect, async (req, res) => {
     }
 
     const hasCustom = Array.isArray(user.permissions) && user.permissions.length > 0;
-    const wantsAdmin = req.query.mode === 'admin';
+    const requestedMode = String(req.query.mode || '').trim();
     const isAdmin = user.role === 'admin' || user.adminAccess === true;
-    const baseRole = wantsAdmin && isAdmin ? 'admin' : user.role;
-    let allowedModules = wantsAdmin && isAdmin
-      ? getRoleDefaults('admin')
-      : (hasCustom ? user.permissions : getRoleDefaults(baseRole));
+
+    const availableModes = new Set([user.role]);
+    if (isAdmin) {
+      availableModes.add('admin');
+    }
+
+    const coordinatorStatus = user?.coordinator?.status;
+    const coordinatorBaseRole = user?.coordinator?.baseRole;
+    const coordinatorActive = Boolean(user?.coordinator?.branch) && coordinatorStatus !== 'expired';
+
+    if (user.role === 'coordinator' && coordinatorActive && ['teacher', 'hod'].includes(coordinatorBaseRole)) {
+      availableModes.add(coordinatorBaseRole);
+    }
+
+    if (['teacher', 'hod'].includes(user.role) && coordinatorActive) {
+      availableModes.add('coordinator');
+    }
+
+    const baseRole = requestedMode && availableModes.has(requestedMode) ? requestedMode : user.role;
+
+    let allowedModules;
+    if (baseRole === user.role && hasCustom) {
+      allowedModules = user.permissions;
+    } else {
+      allowedModules = getRoleDefaults(baseRole);
+    }
 
     if (baseRole === 'hod' || baseRole === 'teacher' || baseRole === 'coordinator') {
       const moduleSet = new Set(Array.isArray(allowedModules) ? allowedModules : []);
@@ -32,6 +54,8 @@ router.get('/me', protect, async (req, res) => {
     return res.status(200).json({
       success: true,
       role: baseRole,
+      adminAccess: user.adminAccess === true,
+      availableModes: Array.from(availableModes),
       allowedModules
     });
   } catch (error) {

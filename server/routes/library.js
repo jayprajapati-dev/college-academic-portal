@@ -9,6 +9,7 @@ const buildBranchScope = (user) => {
   const branchIds = [];
   if (user.branch) branchIds.push(user.branch);
   if (user.department) branchIds.push(user.department);
+  if (user.coordinator?.branch) branchIds.push(user.coordinator.branch);
   if (Array.isArray(user.branches)) branchIds.push(...user.branches);
 
   return [...new Set(branchIds.map((id) => String(id)))].filter(Boolean);
@@ -61,8 +62,8 @@ router.get('/books/public', async (req, res) => {
   }
 });
 
-// PRIVATE: Get library books (admin/hod/teacher)
-router.get('/books', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+// PRIVATE: Get library books (admin/hod/teacher/coordinator)
+router.get('/books', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { page = 1, limit = 10, subjectId, branchId, semesterId, status, search } = req.query;
 
@@ -132,7 +133,7 @@ router.get('/books', protect, authorize('admin', 'hod', 'teacher'), async (req, 
 });
 
 // PRIVATE: Create library book
-router.post('/books', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+router.post('/books', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { title, author, description, coverUrl, isbn, publisher, edition, subjectId, status } = req.body;
 
@@ -193,7 +194,7 @@ router.post('/books', protect, authorize('admin', 'hod', 'teacher'), async (req,
 });
 
 // PRIVATE: Update library book
-router.put('/books/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+router.put('/books/:id', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -274,7 +275,7 @@ router.put('/books/:id', protect, authorize('admin', 'hod', 'teacher'), async (r
 });
 
 // PRIVATE: Delete library book
-router.delete('/books/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+router.delete('/books/:id', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {

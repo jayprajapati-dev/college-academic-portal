@@ -7,12 +7,27 @@ const Subject = require('../models/Subject');
 const User = require('../models/User');
 const { protect, authorize } = require('../middleware/auth');
 
+const normalizeId = (value) => {
+  if (!value) return null;
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (typeof value === 'object') {
+    if (value._id) return String(value._id);
+    if (value.id) return String(value.id);
+  }
+  return null;
+};
+
+const normalizeIdList = (values) => {
+  if (!Array.isArray(values)) return [];
+  return Array.from(new Set(values.map((value) => normalizeId(value)).filter(Boolean)));
+};
+
 const buildBranchScope = (user) => {
   const branchIds = [];
   if (user.branch) branchIds.push(user.branch);
   if (user.department) branchIds.push(user.department);
   if (Array.isArray(user.branches)) branchIds.push(...user.branches);
-  return [...new Set(branchIds.map((id) => String(id)))].filter(Boolean);
+  return normalizeIdList(branchIds);
 };
 
 const ensureSubjectAccess = async (subjectId, user) => {
@@ -22,8 +37,8 @@ const ensureSubjectAccess = async (subjectId, user) => {
   }
 
   if (user.role === 'teacher') {
-    const assigned = user.assignedSubjects || [];
-    const isAssigned = assigned.map((id) => String(id)).includes(String(subjectId));
+    const assignedIds = normalizeIdList(user.assignedSubjects || []);
+    const isAssigned = assignedIds.includes(String(subjectId));
     if (!isAssigned) {
       return { error: 'You can only manage exams for your assigned subjects' };
     }
@@ -39,7 +54,6 @@ const ensureSubjectAccess = async (subjectId, user) => {
   return { subject };
 };
 
-// GET students for results entry
 router.get('/students', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
     const { subjectId, branchId, semesterId } = req.query;
@@ -82,7 +96,6 @@ router.get('/students', protect, authorize('admin', 'hod', 'teacher'), async (re
   }
 });
 
-// CREATE exam schedule
 router.post('/schedules', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
     const { examName, examType, subjectId, date, startTime, endTime, venue, instructions, status } = req.body;
@@ -123,7 +136,6 @@ router.post('/schedules', protect, authorize('admin', 'hod', 'teacher'), async (
   }
 });
 
-// GET exam schedules
 router.get('/schedules', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
     const { page = 1, limit = 10, subjectId, branchId, semesterId, status } = req.query;
@@ -135,9 +147,21 @@ router.get('/schedules', protect, authorize('admin', 'hod', 'teacher'), async (r
     if (status && status !== 'all') query.status = status;
 
     if (req.user.role === 'teacher') {
-      const assigned = req.user.assignedSubjects || [];
-      const assignedIds = assigned.map((id) => String(id));
-      query.subjectId = query.subjectId ? query.subjectId : { $in: assignedIds };
+      const assignedIds = normalizeIdList(req.user.assignedSubjects || []);
+      if (assignedIds.length === 0) {
+        return res.json({
+          success: true,
+          count: 0,
+          total: 0,
+          pages: 1,
+          currentPage: Number(page),
+          data: []
+        });
+      }
+      if (query.subjectId && !assignedIds.includes(String(query.subjectId))) {
+        return res.status(403).json({ success: false, message: 'You can only access schedules for your assigned subjects' });
+      }
+      query.subjectId = query.subjectId || { $in: assignedIds };
     }
 
     if (req.user.role === 'hod') {
@@ -175,7 +199,6 @@ router.get('/schedules', protect, authorize('admin', 'hod', 'teacher'), async (r
   }
 });
 
-// UPDATE exam schedule
 router.put('/schedules/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -215,7 +238,6 @@ router.put('/schedules/:id', protect, authorize('admin', 'hod', 'teacher'), asyn
   }
 });
 
-// DELETE exam schedule
 router.delete('/schedules/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -243,7 +265,6 @@ router.delete('/schedules/:id', protect, authorize('admin', 'hod', 'teacher'), a
   }
 });
 
-// SAVE results (bulk)
 router.post('/results/bulk', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
     const { examId, subjectId, results = [] } = req.body;
@@ -298,7 +319,6 @@ router.post('/results/bulk', protect, authorize('admin', 'hod', 'teacher'), asyn
   }
 });
 
-// GET results (admin/hod/teacher)
 router.get('/results', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
     const { examId, subjectId, studentId } = req.query;
@@ -309,9 +329,14 @@ router.get('/results', protect, authorize('admin', 'hod', 'teacher'), async (req
     if (studentId) query.studentId = studentId;
 
     if (req.user.role === 'teacher') {
-      const assigned = req.user.assignedSubjects || [];
-      const assignedIds = assigned.map((id) => String(id));
-      query.subjectId = query.subjectId ? query.subjectId : { $in: assignedIds };
+      const assignedIds = normalizeIdList(req.user.assignedSubjects || []);
+      if (assignedIds.length === 0) {
+        return res.json({ success: true, count: 0, data: [] });
+      }
+      if (query.subjectId && !assignedIds.includes(String(query.subjectId))) {
+        return res.status(403).json({ success: false, message: 'You can only access results for your assigned subjects' });
+      }
+      query.subjectId = query.subjectId || { $in: assignedIds };
     }
 
     if (req.user.role === 'hod') {
@@ -336,7 +361,6 @@ router.get('/results', protect, authorize('admin', 'hod', 'teacher'), async (req
   }
 });
 
-// STUDENT: exam schedules
 router.get('/student/schedules', protect, authorize('student'), async (req, res) => {
   try {
     const query = {
@@ -356,7 +380,6 @@ router.get('/student/schedules', protect, authorize('student'), async (req, res)
   }
 });
 
-// STUDENT: exam results
 router.get('/student/results', protect, authorize('student'), async (req, res) => {
   try {
     const results = await ExamResult.find({ studentId: req.user._id })

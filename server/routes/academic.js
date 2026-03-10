@@ -10,6 +10,52 @@ const Subject = require('../models/Subject');
 const User = require('../models/User');
 const { protect, authorize } = require('../middleware/auth');
 
+const getHodBranchScope = (user) => ([
+  ...(Array.isArray(user.branches) ? user.branches : []),
+  user.branch,
+  user.department
+].filter(Boolean).map((id) => String(id)));
+
+const getCoordinatorScope = (user) => {
+  const assignment = user?.coordinator;
+  if (!assignment || assignment.status === 'expired') return null;
+  return {
+    branchId: assignment.branch ? String(assignment.branch) : null,
+    semesterIds: Array.isArray(assignment.semesters) ? assignment.semesters.map((id) => String(id)) : []
+  };
+};
+
+const getTeacherScope = async (user) => {
+  const assigned = Array.isArray(user?.assignedSubjects) ? user.assignedSubjects : [];
+  if (assigned.length === 0) return { branchIds: [], semesterIds: [] };
+
+  const subjectDocs = await Subject.find({ _id: { $in: assigned } }).select('branchId semesterId offerings');
+  const offeringBranchIds = subjectDocs
+    .flatMap((subject) => (Array.isArray(subject.offerings) ? subject.offerings.map((off) => String(off.branchId)) : []))
+    .filter(Boolean);
+  const offeringSemesterIds = subjectDocs
+    .flatMap((subject) => (Array.isArray(subject.offerings) ? subject.offerings.map((off) => String(off.semesterId)) : []))
+    .filter(Boolean);
+  return {
+    branchIds: Array.from(new Set(subjectDocs.map((s) => String(s.branchId)).concat(offeringBranchIds).filter(Boolean))),
+    semesterIds: Array.from(new Set(subjectDocs.map((s) => String(s.semesterId)).concat(offeringSemesterIds).filter(Boolean)))
+  };
+};
+
+const uniqueObjectIds = (values) => {
+  const seen = new Set();
+  const out = [];
+  (Array.isArray(values) ? values : []).forEach((value) => {
+    if (!value) return;
+    const str = String(value);
+    if (!mongoose.Types.ObjectId.isValid(str)) return;
+    if (seen.has(str)) return;
+    seen.add(str);
+    out.push(new mongoose.Types.ObjectId(str));
+  });
+  return out;
+};
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -97,7 +143,7 @@ router.get('/subjects', async (req, res) => {
   try {
     const subjects = await Subject.find()
       .sort({ name: 1 })
-      .select('_id name code description semesterId branchId');
+      .select('_id name code type description semesterId branchId offerings');
 
     res.json({
       success: true,
@@ -132,16 +178,34 @@ router.get('/subjects/hod', protect, authorize('hod', 'admin'), async (req, res)
       return res.json({ success: true, data: [] });
     }
 
-    const query = { branchId: { $in: uniqueBranchIds } };
+    let query = {
+      $or: [
+        { branchId: { $in: uniqueBranchIds } },
+        { 'offerings.branchId': { $in: uniqueBranchIds } }
+      ]
+    };
     if (req.query.semesterId) {
-      query.semesterId = req.query.semesterId;
+      const semesterObjectId = mongoose.Types.ObjectId.isValid(String(req.query.semesterId))
+        ? new mongoose.Types.ObjectId(String(req.query.semesterId))
+        : null;
+
+      query = {
+        $or: [
+          { branchId: { $in: uniqueBranchIds }, semesterId: req.query.semesterId },
+          semesterObjectId
+            ? { offerings: { $elemMatch: { branchId: { $in: uniqueBranchIds }, semesterId: semesterObjectId } } }
+            : { _id: null }
+        ]
+      };
     }
 
     const subjects = await Subject.find(query)
       .sort({ name: 1 })
       .populate('branchId', 'name code')
       .populate('semesterId', 'semesterNumber academicYear')
-      .select('_id name code description semesterId branchId type credits marks isActive');
+      .populate('offerings.branchId', 'name code')
+      .populate('offerings.semesterId', 'semesterNumber academicYear')
+      .select('_id name code description semesterId branchId offerings type credits marks isActive');
 
     res.json({
       success: true,
@@ -171,13 +235,83 @@ router.get('/subjects/coordinator', protect, authorize('coordinator'), async (re
     const semesterIds = Array.isArray(assignment.semesters) ? assignment.semesters : [];
 
     const query = {};
-    if (branchId) query.branchId = branchId;
-    if (semesterIds.length > 0) query.semesterId = { $in: semesterIds };
+    if (branchId && semesterIds.length > 0) {
+      const semesterObjectIds = uniqueObjectIds(semesterIds);
+      query.$or = [
+        { branchId, semesterId: { $in: semesterIds } },
+        { offerings: { $elemMatch: { branchId: mongoose.Types.ObjectId.isValid(String(branchId)) ? new mongoose.Types.ObjectId(String(branchId)) : branchId, semesterId: { $in: semesterObjectIds } } } }
+      ];
+    } else if (branchId) {
+      query.$or = [
+        { branchId },
+        { 'offerings.branchId': branchId }
+      ];
+    } else if (semesterIds.length > 0) {
+      const semesterObjectIds = uniqueObjectIds(semesterIds);
+      query.$or = [
+        { semesterId: { $in: semesterIds } },
+        { 'offerings.semesterId': { $in: semesterObjectIds } }
+      ];
+    }
 
     const subjects = await Subject.find(query)
       .populate('branchId', 'name code')
       .populate('semesterId', 'semesterNumber academicYear')
+      .populate('offerings.branchId', 'name code')
+      .populate('offerings.semesterId', 'semesterNumber academicYear')
       .sort({ name: 1 });
+
+    res.json({
+      success: true,
+      data: subjects
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// @route   GET /api/academic/subjects/student
+// @desc    Get subjects for logged-in student branch/semester
+// @access  Private (Student)
+router.get('/subjects/student', protect, authorize('student'), async (req, res) => {
+  try {
+    const studentBranchRefs = [
+      req.user.branch,
+      req.user.department,
+      ...(Array.isArray(req.user.branches) ? req.user.branches : [])
+    ].filter(Boolean);
+
+    const studentSemesterRefs = [
+      req.user.semester,
+      ...(Array.isArray(req.user.semesters) ? req.user.semesters : [])
+    ].filter(Boolean);
+
+    const branchIds = uniqueObjectIds(studentBranchRefs);
+    const semesterIds = uniqueObjectIds(studentSemesterRefs);
+
+    if (branchIds.length === 0 || semesterIds.length === 0) {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+
+    const subjects = await Subject.find({
+      $or: [
+        { branchId: { $in: branchIds }, semesterId: { $in: semesterIds } },
+        { offerings: { $elemMatch: { branchId: { $in: branchIds }, semesterId: { $in: semesterIds } } } }
+      ],
+      isActive: true
+    })
+      .sort({ name: 1 })
+      .populate('branchId', 'name code')
+      .populate('semesterId', 'semesterNumber academicYear')
+      .populate('offerings.branchId', 'name code')
+      .populate('offerings.semesterId', 'semesterNumber academicYear')
+      .select('_id name code description semesterId branchId offerings type credits isActive');
 
     res.json({
       success: true,
@@ -206,7 +340,9 @@ router.get('/subjects/:id/public', async (req, res) => {
     const subject = await Subject.findById(id)
       .populate('branchId', 'name')
       .populate('semesterId', 'semesterNumber')
-      .select('name code description type credits syllabus faculty marks materials branchId semesterId');
+      .populate('offerings.branchId', 'name code')
+      .populate('offerings.semesterId', 'semesterNumber')
+      .select('name code description type credits syllabus faculty marks materials branchId semesterId offerings');
 
     if (!subject) {
       return res.status(404).json({
@@ -310,9 +446,9 @@ router.get('/branch-stats', protect, authorize('admin', 'hod'), async (req, res)
 // ======================
 
 // @route   GET /api/academic/semesters/admin/list
-// @desc    Get all semesters with pagination (ADMIN)
-// @access  Private/Admin
-router.get('/semesters/admin/list', protect, authorize('admin'), async (req, res) => {
+// @desc    Get all semesters with pagination (ADMIN, HOD)
+// @access  Private/Admin/HOD
+router.get('/semesters/admin/list', protect, authorize('admin', 'hod'), async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -529,7 +665,7 @@ router.delete('/semesters/:id', protect, authorize('admin'), async (req, res) =>
 // @route   GET /api/academic/branches/admin/list
 // @desc    Get all branches with filters (ADMIN)
 // @access  Private/Admin
-router.get('/branches/admin/list', protect, authorize('admin'), async (req, res) => {
+router.get('/branches/admin/list', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
     const { semesterId, isActive } = req.query;
     const page = parseInt(req.query.page) || 1;
@@ -540,6 +676,30 @@ router.get('/branches/admin/list', protect, authorize('admin'), async (req, res)
     if (semesterId) filter.semesterId = semesterId;
     if (isActive !== undefined) filter.isActive = isActive === 'true';
 
+    if (req.user.role === 'hod') {
+      const branchScope = getHodBranchScope(req.user);
+      if (!branchScope.length) {
+        return res.json({ success: true, branches: [], pagination: { page, limit, total: 0, pages: 0 } });
+      }
+      filter._id = { $in: branchScope };
+    }
+
+    if (req.user.role === 'coordinator') {
+      const scope = getCoordinatorScope(req.user);
+      if (!scope || !scope.branchId) {
+        return res.json({ success: true, branches: [], pagination: { page, limit, total: 0, pages: 0 } });
+      }
+      filter._id = scope.branchId;
+    }
+
+    if (req.user.role === 'teacher') {
+      const scope = await getTeacherScope(req.user);
+      if (!scope.branchIds.length) {
+        return res.json({ success: true, branches: [], pagination: { page, limit, total: 0, pages: 0 } });
+      }
+      filter._id = { $in: scope.branchIds };
+    }
+
     const branches = await Branch.find(filter)
       .skip(skip)
       .limit(limit)
@@ -547,11 +707,118 @@ router.get('/branches/admin/list', protect, authorize('admin'), async (req, res)
       .populate('createdBy', 'name email')
       .sort({ name: 1 });
 
+    const branchIds = branches.map((branch) => branch._id);
+    const branchIdStrings = branchIds.map((id) => String(id));
+    const branchCodes = branches.map((branch) => branch.code).filter(Boolean);
+    const branchNames = branches.map((branch) => branch.name).filter(Boolean);
+    const branchLookupValues = [...new Set([...branchIdStrings, ...branchCodes, ...branchNames])];
+    const studentCounts = branchIds.length > 0
+      ? await User.aggregate([
+          {
+            $match: {
+              role: 'student',
+              $or: [
+                { branch: { $in: branchIds } },
+                { department: { $in: branchIds } },
+                { branches: { $in: branchIds } },
+                {
+                  $expr: {
+                    $in: [{ $toString: '$branch' }, branchLookupValues]
+                  }
+                },
+                {
+                  $expr: {
+                    $in: [{ $toString: '$department' }, branchLookupValues]
+                  }
+                },
+                {
+                  $expr: {
+                    $gt: [
+                      {
+                        $size: {
+                          $setIntersection: [
+                            {
+                              $map: {
+                                input: { $ifNull: ['$branches', []] },
+                                as: 'branchRef',
+                                in: { $toString: '$$branchRef' }
+                              }
+                            },
+                            branchLookupValues
+                          ]
+                        }
+                      },
+                      0
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            $project: {
+              targetBranch: {
+                $ifNull: [
+                  '$branch',
+                  {
+                    $ifNull: [
+                      '$department',
+                      {
+                        $cond: [
+                          { $gt: [{ $size: { $ifNull: ['$branches', []] } }, 0] },
+                          { $arrayElemAt: ['$branches', 0] },
+                          {
+                            $ifNull: ['$branch', '$department']
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            $match: {
+              $expr: {
+                $in: [{ $toString: '$targetBranch' }, branchIdStrings]
+              }
+            }
+          },
+          {
+            $group: {
+              _id: { $toString: '$targetBranch' },
+              count: { $sum: 1 }
+            }
+          }
+        ])
+      : [];
+
+    const countMap = new Map(studentCounts.map((item) => [String(item._id), item.count]));
+
+    const enrichedBranches = branches.map((branchDoc) => {
+      const branch = branchDoc.toObject();
+      const enrolledStudents = countMap.get(String(branch._id)) || 0;
+      const overrideSeat = Array.isArray(branch.semesterSeatOverrides)
+        ? branch.semesterSeatOverrides.find((item) => String(item.semester) === String(branch.semesterId?._id || branch.semesterId))
+        : null;
+      const totalSeats = Number(overrideSeat?.totalSeats ?? branch.totalSeats ?? 0);
+      const availableSeats = Math.max(totalSeats - enrolledStudents, 0);
+      const capacityPercent = totalSeats > 0 ? Math.min(100, Math.round((enrolledStudents / totalSeats) * 100)) : 0;
+
+      return {
+        ...branch,
+        enrolledStudents,
+        availableSeats,
+        capacityPercent
+      };
+    });
+
     const total = await Branch.countDocuments(filter);
 
     res.json({
       success: true,
-      branches,
+      branches: enrichedBranches,
       pagination: {
         page,
         limit,
@@ -585,17 +852,59 @@ router.get('/branches/:id', protect, authorize('admin'), async (req, res) => {
 
     // Get subjects and students count
     const subjects = await Subject.find({ branchId: branch._id });
-    const students = await User.countDocuments({
-      role: 'student',
-      branch: branch._id
-    });
+    const branchLookupValues = [String(branch._id), branch.code, branch.name].filter(Boolean);
+
+    const studentCountAgg = await User.aggregate([
+      { $match: { role: 'student' } },
+      {
+        $addFields: {
+          branchRefStr: { $toString: '$branch' },
+          departmentRefStr: { $toString: '$department' },
+          branchListRefStr: {
+            $map: {
+              input: { $ifNull: ['$branches', []] },
+              as: 'branchRef',
+              in: { $toString: '$$branchRef' }
+            }
+          }
+        }
+      },
+      {
+        $match: {
+          $or: [
+            { branchRefStr: { $in: branchLookupValues } },
+            { departmentRefStr: { $in: branchLookupValues } },
+            {
+              $expr: {
+                $gt: [
+                  {
+                    $size: {
+                      $setIntersection: ['$branchListRefStr', branchLookupValues]
+                    }
+                  },
+                  0
+                ]
+              }
+            }
+          ]
+        }
+      },
+      { $count: 'count' }
+    ]);
+
+    const students = studentCountAgg[0]?.count || 0;
+
+    const totalSeats = Number(branch.totalSeats || 0);
+    const availableSeats = Math.max(totalSeats - students, 0);
 
     res.json({
       success: true,
       branch,
       stats: {
         subjectCount: subjects.length,
-        studentCount: students
+        studentCount: students,
+        availableSeats,
+        capacityPercent: totalSeats > 0 ? Math.min(100, Math.round((students / totalSeats) * 100)) : 0
       }
     });
   } catch (error) {
@@ -603,6 +912,231 @@ router.get('/branches/:id', protect, authorize('admin'), async (req, res) => {
       success: false,
       message: error.message
     });
+  }
+});
+
+// @route   GET /api/academic/branches/:id/students
+// @desc    Get students assigned to a branch
+// @access  Private/Admin/HOD/Teacher/Coordinator
+router.get('/branches/:id/students', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
+  try {
+    const { semesterId } = req.query;
+    const branch = await Branch.findById(req.params.id).populate('semesterId', 'semesterNumber academicYear');
+
+    if (!branch) {
+      return res.status(404).json({
+        success: false,
+        message: 'Branch not found'
+      });
+    }
+
+    if (req.user.role === 'hod') {
+      const scope = getHodBranchScope(req.user);
+      if (!scope.includes(String(branch._id))) {
+        return res.status(403).json({ success: false, message: 'Not allowed for this branch' });
+      }
+    }
+
+    if (req.user.role === 'coordinator') {
+      const scope = getCoordinatorScope(req.user);
+      if (!scope || String(scope.branchId) !== String(branch._id)) {
+        return res.status(403).json({ success: false, message: 'Not allowed for this branch' });
+      }
+      if (semesterId && scope.semesterIds.length > 0 && !scope.semesterIds.includes(String(semesterId))) {
+        return res.status(403).json({ success: false, message: 'Not allowed for this semester' });
+      }
+    }
+
+    if (req.user.role === 'teacher') {
+      const scope = await getTeacherScope(req.user);
+      if (!scope.branchIds.includes(String(branch._id))) {
+        return res.status(403).json({ success: false, message: 'Not allowed for this branch' });
+      }
+      if (semesterId && scope.semesterIds.length > 0 && !scope.semesterIds.includes(String(semesterId))) {
+        return res.status(403).json({ success: false, message: 'Not allowed for this semester' });
+      }
+    }
+
+    const branchLookupValues = [String(branch._id), branch.code, branch.name].filter(Boolean);
+
+    const students = await User.aggregate([
+      { $match: { role: 'student' } },
+      {
+        $addFields: {
+          branchRefStr: { $toString: '$branch' },
+          departmentRefStr: { $toString: '$department' },
+          branchListRefStr: {
+            $map: {
+              input: { $ifNull: ['$branches', []] },
+              as: 'branchRef',
+              in: { $toString: '$$branchRef' }
+            }
+          }
+        }
+      },
+      {
+        $match: {
+          $or: [
+            { branchRefStr: { $in: branchLookupValues } },
+            { departmentRefStr: { $in: branchLookupValues } },
+            {
+              $expr: {
+                $gt: [
+                  {
+                    $size: {
+                      $setIntersection: ['$branchListRefStr', branchLookupValues]
+                    }
+                  },
+                  0
+                ]
+              }
+            }
+          ]
+        }
+      },
+      ...(semesterId ? [{
+        $match: {
+          $expr: {
+            $eq: [{ $toString: '$semester' }, String(semesterId)]
+          }
+        }
+      }] : []),
+      {
+        $project: {
+          name: 1,
+          email: 1,
+          enrollmentNumber: 1,
+          mobile: 1,
+          status: 1,
+          semester: 1,
+          profileUpdateRequired: 1,
+          createdAt: 1
+        }
+      },
+      { $sort: { name: 1 } }
+    ]);
+
+    await User.populate(students, { path: 'semester', select: 'semesterNumber academicYear' });
+
+    const overrideSeat = Array.isArray(branch.semesterSeatOverrides)
+      ? branch.semesterSeatOverrides.find((item) => String(item.semester) === String(semesterId || branch.semesterId?._id || branch.semesterId))
+      : null;
+    const totalSeats = Number(overrideSeat?.totalSeats ?? branch.totalSeats ?? 0);
+    const enrolledStudents = students.length;
+    const availableSeats = Math.max(totalSeats - enrolledStudents, 0);
+
+    res.json({
+      success: true,
+      branch,
+      stats: {
+        totalSeats,
+        enrolledStudents,
+        availableSeats,
+        capacityPercent: totalSeats > 0 ? Math.min(100, Math.round((enrolledStudents / totalSeats) * 100)) : 0
+      },
+      students
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// @route   PUT /api/academic/branches/:id/semester-capacity
+// @desc    Set branch seat capacity for specific semester
+// @access  Private/Admin/HOD
+router.put('/branches/:id/semester-capacity', protect, authorize('admin', 'hod'), async (req, res) => {
+  try {
+    const { semesterId, totalSeats } = req.body;
+
+    if (!semesterId || totalSeats === undefined) {
+      return res.status(400).json({ success: false, message: 'semesterId and totalSeats are required' });
+    }
+
+    const branch = await Branch.findById(req.params.id);
+    if (!branch) {
+      return res.status(404).json({ success: false, message: 'Branch not found' });
+    }
+
+    if (req.user.role === 'hod') {
+      const scope = getHodBranchScope(req.user);
+      if (!scope.includes(String(branch._id))) {
+        return res.status(403).json({ success: false, message: 'Not allowed to modify this branch capacity' });
+      }
+    }
+
+    const parsedSeats = Math.max(0, Number(totalSeats));
+    const existingIdx = (branch.semesterSeatOverrides || []).findIndex((item) => String(item.semester) === String(semesterId));
+
+    if (existingIdx >= 0) {
+      branch.semesterSeatOverrides[existingIdx].totalSeats = parsedSeats;
+    } else {
+      branch.semesterSeatOverrides.push({ semester: semesterId, totalSeats: parsedSeats });
+    }
+
+    await branch.save();
+
+    res.json({
+      success: true,
+      message: 'Semester capacity updated successfully',
+      data: {
+        branchId: branch._id,
+        semesterId,
+        totalSeats: parsedSeats
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/academic/branches/:branchId/students/:studentId
+// @desc    Update student assignment/status from branch view
+// @access  Private/Admin/HOD/Teacher/Coordinator
+router.put('/branches/:branchId/students/:studentId', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
+  try {
+    const { branchId, studentId } = req.params;
+    const { semesterId, status } = req.body;
+
+    const student = await User.findById(studentId);
+    if (!student || student.role !== 'student') {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    if (String(student.branch) !== String(branchId) && String(student.department) !== String(branchId)) {
+      return res.status(400).json({ success: false, message: 'Student is not assigned to this branch' });
+    }
+
+    if (req.user.role === 'hod') {
+      const scope = getHodBranchScope(req.user);
+      if (!scope.includes(String(branchId))) {
+        return res.status(403).json({ success: false, message: 'Not allowed for this branch' });
+      }
+    }
+
+    if (req.user.role === 'coordinator') {
+      const scope = getCoordinatorScope(req.user);
+      if (!scope || String(scope.branchId) !== String(branchId)) {
+        return res.status(403).json({ success: false, message: 'Not allowed for this branch' });
+      }
+    }
+
+    if (req.user.role === 'teacher') {
+      const scope = await getTeacherScope(req.user);
+      if (!scope.branchIds.includes(String(branchId))) {
+        return res.status(403).json({ success: false, message: 'Not allowed for this branch' });
+      }
+    }
+
+    if (semesterId) student.semester = semesterId;
+    if (status && ['active', 'disabled', 'pending'].includes(status)) student.status = status;
+    await student.save();
+
+    res.json({ success: true, message: 'Student updated successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
@@ -778,7 +1312,12 @@ router.delete('/branches/:id', protect, authorize('admin'), async (req, res) => 
     }
 
     // Delete all subjects in this branch
-    await Subject.deleteMany({ branchId: branch._id });
+    await Subject.deleteMany({
+      $or: [
+        { branchId: branch._id },
+        { 'offerings.branchId': branch._id }
+      ]
+    });
 
     await Branch.findByIdAndDelete(req.params.id);
 
@@ -799,26 +1338,97 @@ router.delete('/branches/:id', protect, authorize('admin'), async (req, res) => 
 // ======================
 
 // @route   GET /api/academic/subjects/admin/list
-// @desc    Get all subjects with filters (ADMIN)
-// @access  Private/Admin
-router.get('/subjects/admin/list', protect, authorize('admin'), async (req, res) => {
+// @desc    Get all subjects with filters (ADMIN, HOD)
+// @access  Private/Admin/HOD
+router.get('/subjects/admin/list', protect, authorize('admin', 'hod'), async (req, res) => {
   try {
     const { branchId, semesterId, type, isActive } = req.query;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
+    // Check HOD scope first
+    let hodBranchIds = [];
+    if (req.user.role === 'hod') {
+      const hodBranchScope = getHodBranchScope(req.user);
+      if (!hodBranchScope.length) {
+        return res.json({ success: true, subjects: [], pagination: { page, limit, total: 0, pages: 0 } });
+      }
+      hodBranchIds = hodBranchScope.map(id => new mongoose.Types.ObjectId(String(id)));
+    }
+
     const filter = {};
-    if (branchId) filter.branchId = branchId;
-    if (semesterId) filter.semesterId = semesterId;
+    
+    if (branchId && semesterId) {
+      const semesterObjectId = mongoose.Types.ObjectId.isValid(String(semesterId))
+        ? new mongoose.Types.ObjectId(String(semesterId))
+        : null;
+      const branchObjectId = mongoose.Types.ObjectId.isValid(String(branchId))
+        ? new mongoose.Types.ObjectId(String(branchId))
+        : null;
+
+      filter.$or = [
+        { branchId, semesterId },
+        semesterObjectId && branchObjectId
+          ? { offerings: { $elemMatch: { branchId: branchObjectId, semesterId: semesterObjectId } } }
+          : { _id: null }
+      ];
+    } else if (branchId) {
+      const branchObjectId = mongoose.Types.ObjectId.isValid(String(branchId))
+        ? new mongoose.Types.ObjectId(String(branchId))
+        : null;
+      filter.$or = [
+        { branchId },
+        branchObjectId ? { 'offerings.branchId': branchObjectId } : { _id: null }
+      ];
+    } else if (semesterId) {
+      const semesterObjectId = mongoose.Types.ObjectId.isValid(String(semesterId))
+        ? new mongoose.Types.ObjectId(String(semesterId))
+        : null;
+      filter.$or = [
+        { semesterId },
+        semesterObjectId ? { 'offerings.semesterId': semesterObjectId } : { _id: null }
+      ];
+    }
+    
     if (type) filter.type = type;
     if (isActive !== undefined) filter.isActive = isActive === 'true';
+
+    // Apply HOD branch scope if applicable
+    if (req.user.role === 'hod' && hodBranchIds.length > 0) {
+      const hodBranchFilter = {
+        $or: [
+          { branchId: { $in: hodBranchIds } },
+          { 'offerings.branchId': { $in: hodBranchIds } }
+        ]
+      };
+      
+      if (filter.$or) {
+        // If there's already an $or clause, wrap both with $and
+        filter.$and = [
+          { $or: filter.$or },
+          hodBranchFilter
+        ];
+        delete filter.$or;
+      } else if (Object.keys(filter).length > 0) {
+        // If there are other filters, combine them
+        filter.$and = [
+          filter,
+          hodBranchFilter
+        ];
+      } else {
+        // No other filters, just use HOD filter
+        Object.assign(filter, hodBranchFilter);
+      }
+    }
 
     const subjects = await Subject.find(filter)
       .skip(skip)
       .limit(limit)
       .populate('branchId', 'name code')
       .populate('semesterId', 'semesterNumber academicYear')
+      .populate('offerings.branchId', 'name code')
+      .populate('offerings.semesterId', 'semesterNumber academicYear')
       .populate('createdBy', 'name email')
       .sort({ code: 1 });
 
@@ -850,6 +1460,8 @@ router.get('/subjects/:id', protect, authorize('admin'), async (req, res) => {
     const subject = await Subject.findById(req.params.id)
       .populate('branchId', 'name code')
       .populate('semesterId', 'semesterNumber academicYear')
+      .populate('offerings.branchId', 'name code')
+      .populate('offerings.semesterId', 'semesterNumber academicYear')
       .populate('createdBy', 'name email');
 
     if (!subject) {
@@ -883,17 +1495,37 @@ router.post('/subjects', protect, authorize('admin', 'hod'), async (req, res) =>
       credits,
       branchId,
       semesterId,
+      offerings,
       description,
       syllabus,
       marks,
       isActive
     } = req.body;
 
+    const normalizedOfferings = Array.isArray(offerings)
+      ? offerings
+        .map((item) => ({
+          branchId: item?.branchId ? String(item.branchId) : '',
+          semesterId: item?.semesterId ? String(item.semesterId) : ''
+        }))
+        .filter((item) => item.branchId && item.semesterId)
+      : [];
+
+    if (normalizedOfferings.length === 0 && branchId && semesterId) {
+      normalizedOfferings.push({ branchId: String(branchId), semesterId: String(semesterId) });
+    }
+
+    const dedupOfferingsMap = new Map();
+    normalizedOfferings.forEach((item) => {
+      dedupOfferingsMap.set(`${item.branchId}:${item.semesterId}`, item);
+    });
+    const uniqueOfferings = Array.from(dedupOfferingsMap.values());
+
     // Validation
-    if (!name || !code || !type || !branchId || !semesterId) {
+    if (!name || !code || !type || uniqueOfferings.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide name, code, type, branch, and semester'
+        message: 'Please provide name, code, type, and at least one branch-semester mapping'
       });
     }
 
@@ -914,29 +1546,34 @@ router.post('/subjects', protect, authorize('admin', 'hod'), async (req, res) =>
         branchIds.push(...req.user.branches.map((id) => String(id)));
       }
 
-      if (branchIds.length === 0 || !branchIds.includes(String(branchId))) {
+      const hasUnauthorizedBranch = uniqueOfferings.some((item) => !branchIds.includes(String(item.branchId)));
+      if (branchIds.length === 0 || hasUnauthorizedBranch) {
         return res.status(403).json({
           success: false,
-          message: 'Not authorized to create subjects for this branch'
+          message: 'Not authorized to create subjects for one or more selected branches'
         });
       }
     }
 
-    // Check if branch exists
-    const branch = await Branch.findById(branchId);
-    if (!branch) {
+    const branchIdsToCheck = Array.from(new Set(uniqueOfferings.map((item) => item.branchId)));
+    const semesterIdsToCheck = Array.from(new Set(uniqueOfferings.map((item) => item.semesterId)));
+
+    const [branchCount, semesterCount] = await Promise.all([
+      Branch.countDocuments({ _id: { $in: branchIdsToCheck } }),
+      Semester.countDocuments({ _id: { $in: semesterIdsToCheck } })
+    ]);
+
+    if (branchCount !== branchIdsToCheck.length) {
       return res.status(404).json({
         success: false,
-        message: 'Branch not found'
+        message: 'One or more selected branches were not found'
       });
     }
 
-    // Check if semester exists
-    const semester = await Semester.findById(semesterId);
-    if (!semester) {
+    if (semesterCount !== semesterIdsToCheck.length) {
       return res.status(404).json({
         success: false,
-        message: 'Semester not found'
+        message: 'One or more selected semesters were not found'
       });
     }
 
@@ -960,13 +1597,16 @@ router.post('/subjects', protect, authorize('admin', 'hod'), async (req, res) =>
       }
     }
 
+    const firstOffering = uniqueOfferings[0];
+
     const subject = new Subject({
       name,
       code: code.toUpperCase(),
       type,
       credits: credits || 0,
-      branchId,
-      semesterId,
+      branchId: firstOffering.branchId,
+      semesterId: firstOffering.semesterId,
+      offerings: uniqueOfferings,
       description,
       syllabus,
       marks: marks || {
@@ -1004,6 +1644,9 @@ router.put('/subjects/:id', protect, authorize('admin', 'hod', 'teacher'), async
       code,
       type,
       credits,
+      branchId,
+      semesterId,
+      offerings,
       description,
       syllabus,
       marks,
@@ -1055,6 +1698,84 @@ router.put('/subjects/:id', protect, authorize('admin', 'hod', 'teacher'), async
       }
     }
 
+    let normalizedOfferings = Array.isArray(offerings)
+      ? offerings
+        .map((item) => ({
+          branchId: item?.branchId ? String(item.branchId) : '',
+          semesterId: item?.semesterId ? String(item.semesterId) : ''
+        }))
+        .filter((item) => item.branchId && item.semesterId)
+      : [];
+
+    if (normalizedOfferings.length === 0 && branchId && semesterId) {
+      normalizedOfferings.push({ branchId: String(branchId), semesterId: String(semesterId) });
+    }
+
+    if (normalizedOfferings.length === 0) {
+      normalizedOfferings = Array.isArray(subject.offerings) && subject.offerings.length > 0
+        ? subject.offerings.map((item) => ({
+          branchId: String(item.branchId),
+          semesterId: String(item.semesterId)
+        }))
+        : [{ branchId: String(subject.branchId), semesterId: String(subject.semesterId) }];
+    }
+
+    const dedupOfferings = new Map();
+    normalizedOfferings.forEach((item) => {
+      dedupOfferings.set(`${item.branchId}:${item.semesterId}`, item);
+    });
+    let uniqueOfferings = Array.from(dedupOfferings.values());
+
+    if (req.user.role === 'teacher') {
+      uniqueOfferings = Array.isArray(subject.offerings) && subject.offerings.length > 0
+        ? subject.offerings.map((item) => ({
+          branchId: String(item.branchId),
+          semesterId: String(item.semesterId)
+        }))
+        : [{ branchId: String(subject.branchId), semesterId: String(subject.semesterId) }];
+    }
+
+    if (req.user.role === 'hod') {
+      const branchIds = [];
+      if (req.user.branch) branchIds.push(String(req.user.branch));
+      if (req.user.department) branchIds.push(String(req.user.department));
+      if (Array.isArray(req.user.branches) && req.user.branches.length > 0) {
+        branchIds.push(...req.user.branches.map((id) => String(id)));
+      }
+
+      const hasUnauthorizedBranch = uniqueOfferings.some((item) => !branchIds.includes(String(item.branchId)));
+      if (branchIds.length === 0 || hasUnauthorizedBranch) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to assign one or more selected branches'
+        });
+      }
+    }
+
+    const branchIdsToCheck = Array.from(new Set(uniqueOfferings.map((item) => item.branchId)));
+    const semesterIdsToCheck = Array.from(new Set(uniqueOfferings.map((item) => item.semesterId)));
+
+    const [branchCount, semesterCount] = await Promise.all([
+      Branch.countDocuments({ _id: { $in: branchIdsToCheck } }),
+      Semester.countDocuments({ _id: { $in: semesterIdsToCheck } })
+    ]);
+
+    if (branchCount !== branchIdsToCheck.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'One or more selected branches were not found'
+      });
+    }
+
+    if (semesterCount !== semesterIdsToCheck.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'One or more selected semesters were not found'
+      });
+    }
+
+    const firstOffering = uniqueOfferings[0];
+
     // Check if new code exists (if changed)
     if (code && code !== subject.code) {
       const existingSubject = await Subject.findOne({ code });
@@ -1073,6 +1794,9 @@ router.put('/subjects/:id', protect, authorize('admin', 'hod', 'teacher'), async
         code: code ? code.toUpperCase() : subject.code,
         type: type || subject.type,
         credits: credits !== undefined ? credits : subject.credits,
+        branchId: firstOffering.branchId,
+        semesterId: firstOffering.semesterId,
+        offerings: uniqueOfferings,
         description: description || subject.description,
         syllabus: syllabus || subject.syllabus,
         marks: marks || subject.marks,
@@ -1161,36 +1885,147 @@ router.delete('/subjects/:id', protect, authorize('admin', 'hod', 'teacher'), as
 });
 
 // @route   GET /api/academic/structure
-// @desc    Get complete academic hierarchy
-// @access  Private/Admin
-router.get('/structure', protect, authorize('admin'), async (req, res) => {
+// @desc    Get academic hierarchy (full for admin, scoped for staff)
+// @access  Private/Admin/HOD/Teacher/Coordinator
+router.get('/structure', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
-    const semesters = await Semester.find()
-      .sort({ semesterNumber: 1 });
+    const toUniqueStrings = (values) => Array.from(new Set((Array.isArray(values) ? values : [])
+      .filter(Boolean)
+      .map((value) => String(value))));
 
-    const structure = await Promise.all(
-      semesters.map(async (semester) => {
-        const branches = await Branch.find({ semesterId: semester._id })
-          .sort({ name: 1 });
+    let semesters = [];
+    let branches = [];
+    let subjects = [];
 
-        const branchesWithSubjects = await Promise.all(
-          branches.map(async (branch) => {
-            const subjects = await Subject.find({ branchId: branch._id })
-              .select('name code type marks credits');
+    if (req.user.role === 'admin') {
+      [semesters, branches, subjects] = await Promise.all([
+        Semester.find().sort({ semesterNumber: 1 }),
+        Branch.find().sort({ name: 1 }),
+        Subject.find({ isActive: true })
+          .select('name code type marks credits branchId semesterId')
+          .sort({ name: 1 })
+      ]);
+    } else {
+      let scopedBranchIds = [];
+      let scopedSemesterIds = [];
 
-            return {
-              ...branch.toObject(),
-              subjects
-            };
-          })
-        );
+      if (req.user.role === 'hod') {
+        scopedBranchIds = toUniqueStrings(getHodBranchScope(req.user));
+      }
 
-        return {
-          ...semester.toObject(),
-          branches: branchesWithSubjects
+      if (req.user.role === 'teacher') {
+        const scope = await getTeacherScope(req.user);
+        scopedBranchIds = toUniqueStrings(scope.branchIds);
+        scopedSemesterIds = toUniqueStrings(scope.semesterIds);
+      }
+
+      if (req.user.role === 'coordinator') {
+        const scope = getCoordinatorScope(req.user);
+        if (!scope || !scope.branchId) {
+          return res.json({ success: true, structure: [] });
+        }
+        scopedBranchIds = toUniqueStrings([scope.branchId]);
+        scopedSemesterIds = toUniqueStrings(scope.semesterIds);
+      }
+
+      if (scopedBranchIds.length === 0) {
+        return res.json({ success: true, structure: [] });
+      }
+
+      const subjectQuery = {
+        isActive: true,
+        branchId: { $in: uniqueObjectIds(scopedBranchIds) }
+      };
+
+      if (scopedSemesterIds.length > 0) {
+        subjectQuery.semesterId = { $in: uniqueObjectIds(scopedSemesterIds) };
+      }
+
+      subjects = await Subject.find(subjectQuery)
+        .select('name code type marks credits branchId semesterId')
+        .sort({ name: 1 });
+
+      const effectiveBranchIds = uniqueObjectIds(toUniqueStrings([
+        ...scopedBranchIds,
+        ...subjects.map((subject) => subject.branchId)
+      ]));
+
+      branches = effectiveBranchIds.length > 0
+        ? await Branch.find({ _id: { $in: effectiveBranchIds } }).sort({ name: 1 })
+        : [];
+
+      const effectiveSemesterIds = uniqueObjectIds(toUniqueStrings([
+        ...scopedSemesterIds,
+        ...branches.map((branch) => branch.semesterId),
+        ...subjects.map((subject) => subject.semesterId)
+      ]));
+
+      semesters = effectiveSemesterIds.length > 0
+        ? await Semester.find({ _id: { $in: effectiveSemesterIds } }).sort({ semesterNumber: 1 })
+        : [];
+    }
+
+    const semesterMap = new Map();
+    semesters.forEach((semester) => {
+      semesterMap.set(String(semester._id), {
+        ...semester.toObject(),
+        branches: []
+      });
+    });
+
+    const branchMap = new Map(branches.map((branch) => [String(branch._id), branch]));
+    const semesterBranchMap = new Map();
+
+    const ensureBranchInSemester = (semesterId, branchId) => {
+      const semKey = String(semesterId);
+      const brKey = String(branchId);
+      const semesterNode = semesterMap.get(semKey);
+      const branchNode = branchMap.get(brKey);
+
+      if (!semesterNode || !branchNode) return null;
+
+      const branchBucketKey = `${semKey}:${brKey}`;
+      if (!semesterBranchMap.has(branchBucketKey)) {
+        const entry = {
+          ...branchNode.toObject(),
+          subjects: []
         };
-      })
-    );
+        semesterNode.branches.push(entry);
+        semesterBranchMap.set(branchBucketKey, entry);
+      }
+
+      return semesterBranchMap.get(branchBucketKey);
+    };
+
+    branches.forEach((branch) => {
+      if (branch.semesterId) {
+        ensureBranchInSemester(branch.semesterId, branch._id);
+      }
+    });
+
+    subjects.forEach((subject) => {
+      if (!subject.branchId || !subject.semesterId) return;
+      const targetBranch = ensureBranchInSemester(subject.semesterId, subject.branchId);
+      if (!targetBranch) return;
+
+      targetBranch.subjects.push({
+        _id: subject._id,
+        name: subject.name,
+        code: subject.code,
+        type: subject.type,
+        marks: subject.marks,
+        credits: subject.credits
+      });
+    });
+
+    const structure = semesters.map((semester) => {
+      const semNode = semesterMap.get(String(semester._id));
+      semNode.branches.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+      semNode.branches.forEach((branch) => {
+        branch.subjects.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+      });
+      return semNode;
+    });
 
     res.json({
       success: true,
@@ -1207,6 +2042,91 @@ router.get('/structure', protect, authorize('admin'), async (req, res) => {
 // ======================
 // MATERIALS ROUTES
 // ======================
+
+// ======================
+// SYLLABUS ROUTES
+// ======================
+
+// @route   GET /api/academic/subjects/:id/syllabus
+// @desc    Get syllabus link for a subject
+// @access  Private
+router.get('/subjects/:id/syllabus', protect, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid subject id' });
+    }
+
+    const subject = await Subject.findById(id).select('name code syllabus');
+    if (!subject) {
+      return res.status(404).json({ success: false, message: 'Subject not found' });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        subjectId: subject._id,
+        subjectName: subject.name,
+        subjectCode: subject.code,
+        syllabus: subject.syllabus || ''
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   PUT /api/academic/subjects/:id/syllabus
+// @desc    Update syllabus PDF link for a subject
+// @access  Private/Authorized
+router.put('/subjects/:id/syllabus', protect, authorize('teacher', 'hod', 'admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { syllabus } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid subject id' });
+    }
+
+    const subject = await Subject.findById(id);
+    if (!subject) {
+      return res.status(404).json({ success: false, message: 'Subject not found' });
+    }
+
+    const nextSyllabus = (syllabus || '').trim();
+
+    if (nextSyllabus) {
+      try {
+        const parsed = new URL(nextSyllabus);
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          return res.status(400).json({ success: false, message: 'Only HTTP/HTTPS links are allowed' });
+        }
+      } catch (_) {
+        return res.status(400).json({ success: false, message: 'Please provide a valid syllabus URL' });
+      }
+
+      // Keep syllabus restricted to PDF links.
+      if (!/\.pdf($|\?)/i.test(nextSyllabus)) {
+        return res.status(400).json({ success: false, message: 'Only PDF links are allowed for syllabus' });
+      }
+    }
+
+    subject.syllabus = nextSyllabus || null;
+    await subject.save();
+
+    res.json({
+      success: true,
+      message: 'Syllabus updated successfully',
+      data: {
+        subjectId: subject._id,
+        syllabus: subject.syllabus || ''
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 // @route   POST /api/academic/subjects/:id/materials
 // @desc    Upload study material for a subject

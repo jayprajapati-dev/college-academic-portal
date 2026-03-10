@@ -61,6 +61,7 @@ app.use('/api/notices', require('./routes/notice'));
 app.use('/api/timetable', require('./routes/timetable'));
 app.use('/api/library', require('./routes/library'));
 app.use('/api/exams', require('./routes/exam'));
+app.use('/api/projects', require('./routes/project'));
 app.use('/api/permissions', require('./routes/permissions'));
 
 // Error Handler Middleware
@@ -80,7 +81,7 @@ app.use((req, res) => {
 const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   await connectDB();
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     // Professional startup message with ASCII art
     console.clear();
     console.log(`
@@ -136,6 +137,21 @@ const startServer = async () => {
     
     startTaskReminderScheduler();
     startCoordinatorScheduler();
+  });
+
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`\n❌ Port ${PORT} is already in use.`);
+      console.error('   Another backend instance is probably running.');
+      console.error('   Stop it, then start again.');
+      if (process.platform === 'win32') {
+        console.error(`   Tip (Windows): netstat -ano | findstr :${PORT}`);
+        console.error('   Then: taskkill /PID <PID> /F\n');
+      }
+      process.exit(1);
+    }
+
+    throw error;
   });
 };
 
