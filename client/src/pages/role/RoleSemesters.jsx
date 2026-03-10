@@ -200,61 +200,65 @@ const RoleSemesters = () => {
       panelLabel={panelLabel}
       profileLinks={[]}
     >
-      <div className="space-y-6">
+      <div className="space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black text-gray-900 dark:text-white flex items-center gap-3">
-              <span className="material-symbols-outlined text-4xl text-primary">calendar_month</span>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-3xl md:text-[34px] text-primary">calendar_month</span>
               Semester Management
             </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1 font-medium">
+            <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1 font-medium">
               Manage academic terms, schedules, and semester configurations
             </p>
           </div>
           <button
             onClick={handleNewSemester}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-orange-500 hover:to-primary text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 active:scale-95"
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary to-orange-500 hover:to-primary text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-primary/20 hover:shadow-lg"
           >
-            <span className="material-symbols-outlined text-xl">add_circle</span>
+            <span className="material-symbols-outlined text-lg">add_circle</span>
             Add New Semester
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatsCard
             icon="calendar_today"
             label="Total Semesters"
             value={stats.total}
             bgColor="bg-gradient-to-br from-blue-500 to-blue-600"
+            compact
           />
           <StatsCard
             icon="check_circle"
             label="Active Semesters"
             value={stats.active}
             bgColor="bg-gradient-to-br from-green-500 to-green-600"
+            compact
           />
           <StatsCard
             icon="pending_actions"
             label="Inactive"
             value={stats.total - stats.active}
             bgColor="bg-gradient-to-br from-gray-500 to-gray-600"
+            compact
           />
           <StatsCard
             icon="percent"
             label="Completion Rate"
             value={stats.total > 0 ? `${Math.round((stats.active / stats.total) * 100)}%` : '0%'}
             bgColor="bg-gradient-to-br from-purple-500 to-purple-600"
+            compact
           />
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-3.5 md:p-4 border border-gray-100 dark:border-gray-700 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center gap-3">
             <div className="relative flex-1">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <span className="material-symbols-outlined text-gray-400">search</span>
               </div>
               <input
-                className="block w-full h-12 pl-12 pr-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder-gray-500 dark:placeholder-gray-400"
+                className="block w-full h-11 pl-11 pr-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder-gray-500 dark:placeholder-gray-400"
                 placeholder="Search by semester number or academic year..."
                 type="text"
                 value={searchTerm}
@@ -264,7 +268,7 @@ const RoleSemesters = () => {
             <div className="min-w-[180px]">
               <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Status</label>
               <select
-                className="mt-1 w-full h-11 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-sm font-semibold text-gray-800 dark:text-white px-3"
+                className="mt-1 w-full h-10 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-sm font-semibold text-gray-800 dark:text-white px-3"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
@@ -277,9 +281,9 @@ const RoleSemesters = () => {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center justify-between gap-4">
+          <div className="p-4 md:p-5 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="font-bold text-xl text-gray-900 dark:text-white flex items-center gap-2">
+              <h3 className="font-bold text-lg md:text-xl text-gray-900 dark:text-white flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">table_view</span>
                 Semester Records
               </h3>
@@ -288,14 +292,14 @@ const RoleSemesters = () => {
               </p>
             </div>
             <div className="flex gap-2">
-              <button className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-400 transition-colors" title="Filter">
+              <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-400 transition-colors" title="Filter">
                 <span className="material-symbols-outlined">filter_list</span>
               </button>
-              <button className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-400 transition-colors" title="Export">
+              <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-400 transition-colors" title="Export">
                 <span className="material-symbols-outlined">download</span>
               </button>
               <button
-                className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-400 transition-colors"
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-400 transition-colors"
                 title="Refresh"
                 onClick={() => fetchSemesters(currentPage)}
               >
@@ -307,19 +311,19 @@ const RoleSemesters = () => {
             <table className="w-full text-left border-collapse">
               <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
                 <tr>
-                  <th className="px-6 py-4 text-xs font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">Semester</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">Academic Year</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">Start Date</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">End Date</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider text-center">Branches</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider text-center">Status</th>
-                  <th className="px-6 py-4 text-xs font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider text-right">Actions</th>
+                  <th className="px-4 py-3 text-xs font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">Semester</th>
+                  <th className="px-4 py-3 text-xs font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">Academic Year</th>
+                  <th className="px-4 py-3 text-xs font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">Start Date</th>
+                  <th className="px-4 py-3 text-xs font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">End Date</th>
+                  <th className="px-4 py-3 text-xs font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider text-center">Branches</th>
+                  <th className="px-4 py-3 text-xs font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider text-center">Status</th>
+                  <th className="px-4 py-3 text-xs font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {loading ? (
                   <tr>
-                    <td colSpan="7" className="px-6 py-12 text-center">
+                    <td colSpan="7" className="px-4 py-10 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full"></div>
                         <p className="text-gray-600 dark:text-gray-400 font-semibold">Loading semesters...</p>
@@ -328,7 +332,7 @@ const RoleSemesters = () => {
                   </tr>
                 ) : filteredSemesters.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-6 py-12 text-center">
+                    <td colSpan="7" className="px-4 py-10 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <span className="material-symbols-outlined text-6xl text-gray-400">search_off</span>
                         <p className="text-gray-600 dark:text-gray-400 font-semibold">No semesters found</p>
@@ -338,25 +342,25 @@ const RoleSemesters = () => {
                 ) : (
                   filteredSemesters.map((semester) => (
                     <tr key={semester._id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group">
-                      <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">
+                      <td className="px-4 py-3.5 font-bold text-gray-900 dark:text-white">
                         <span className="flex items-center gap-2">
                           <span className="material-symbols-outlined text-primary">calendar_today</span>
                           Sem {semester.semesterNumber}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-gray-700 dark:text-gray-300 font-medium">{semester.academicYear}</td>
-                      <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
+                      <td className="px-4 py-3.5 text-gray-700 dark:text-gray-300 font-medium">{semester.academicYear}</td>
+                      <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">
                         {semester.startDate ? new Date(semester.startDate).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : '-'}
                       </td>
-                      <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
+                      <td className="px-4 py-3.5 text-gray-600 dark:text-gray-400">
                         {semester.endDate ? new Date(semester.endDate).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : '-'}
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-4 py-3.5 text-center">
                         <span className="inline-flex items-center justify-center h-8 px-3 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-bold">
                           - Branches
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-4 py-3.5 text-center">
                         <span
                           className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-[11px] font-black uppercase tracking-wide ${
                             semester.isActive
@@ -368,17 +372,17 @@ const RoleSemesters = () => {
                           {semester.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => handleEdit(semester)}
-                            className="text-primary hover:text-primary/80 font-bold text-sm transition-colors px-3 py-1 rounded hover:bg-primary/10"
+                            className="text-primary hover:text-primary/80 font-bold text-xs md:text-sm transition-colors px-2.5 py-1 rounded hover:bg-primary/10"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleDelete(semester._id)}
-                            className="text-red-600 hover:text-red-500 font-bold text-sm transition-colors px-3 py-1 rounded hover:bg-red-500/10"
+                            className="text-red-600 hover:text-red-500 font-bold text-xs md:text-sm transition-colors px-2.5 py-1 rounded hover:bg-red-500/10"
                           >
                             Delete
                           </button>
@@ -393,11 +397,11 @@ const RoleSemesters = () => {
         </div>
 
         {totalPages > 1 && (
-          <div className="mt-8 flex justify-center gap-2">
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
             <button
               onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50"
             >
               ◄ Previous
             </button>
@@ -405,7 +409,7 @@ const RoleSemesters = () => {
               <button
                 key={page}
                 onClick={() => setCurrentPage(page)}
-                className={`px-4 py-2 rounded-lg ${
+                className={`px-3 py-2 text-sm rounded-lg ${
                   currentPage === page
                     ? 'bg-gradient-to-r from-primary to-[#ff6b3d] text-white'
                     : 'border border-gray-300 hover:bg-gray-100'
@@ -417,7 +421,7 @@ const RoleSemesters = () => {
             <button
               onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50"
             >
               Next ►
             </button>
@@ -425,8 +429,8 @@ const RoleSemesters = () => {
         )}
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background-dark/60 backdrop-blur-[2px] p-4">
-          <div className="w-full max-w-[500px] bg-white dark:bg-[#1a0f0b] rounded-xl shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-background-dark/60 backdrop-blur-[2px] p-2 sm:p-4 overflow-y-auto">
+          <div className="w-full max-w-[500px] max-h-[92vh] bg-white dark:bg-[#1a0f0b] rounded-xl shadow-2xl overflow-hidden flex flex-col">
             <div className="px-6 py-4 border-b border-[#f4f1f0] dark:border-[#3a2a24] flex items-center justify-between">
               <h2 className="text-xl font-bold text-[#181311] dark:text-white">
                 {editingSemester ? 'Edit Semester' : 'Add New Semester'}
@@ -439,8 +443,8 @@ const RoleSemesters = () => {
               </button>
             </div>
 
-            <div className="p-6 flex flex-col gap-6">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 sm:p-5 flex flex-col gap-4 overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-semibold text-[#181311] dark:text-white">Semester Number *</label>
                   <div className="relative">
@@ -472,7 +476,7 @@ const RoleSemesters = () => {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">
                   <label className="text-sm font-semibold text-[#181311] dark:text-white">Start Date</label>
                   <input
@@ -494,9 +498,9 @@ const RoleSemesters = () => {
                   />
                 </div>
               </div>
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2.5">
                 <label className="text-sm font-semibold text-[#181311] dark:text-white">Status</label>
-                <div className="flex gap-6">
+                <div className="flex flex-wrap gap-4">
                   <label className="flex items-center gap-2 cursor-pointer group">
                     <input
                       className="w-5 h-5 text-primary border-[#e6dedb] dark:border-[#3a2a24] focus:ring-primary bg-white dark:bg-[#2d1e18]"
@@ -523,16 +527,16 @@ const RoleSemesters = () => {
               </div>
             </div>
 
-            <div className="px-6 py-6 border-t border-[#f4f1f0] dark:border-[#3a2a24] flex justify-end gap-3 bg-[#f4f1f0] dark:bg-[#2d1e18]">
+            <div className="px-4 sm:px-6 py-4 sm:py-5 border-t border-[#f4f1f0] dark:border-[#3a2a24] flex flex-col sm:flex-row sm:justify-end gap-3 bg-[#f4f1f0] dark:bg-[#2d1e18]">
               <button
                 onClick={() => setShowModal(false)}
-                className="px-6 py-2.5 rounded-xl text-sm font-bold text-[#181311] dark:text-white bg-white/70 dark:bg-[#2d1e18] hover:bg-[#e6dedb] dark:hover:bg-[#3a2a24] transition-colors"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-sm font-bold text-[#181311] dark:text-white bg-white/70 dark:bg-[#2d1e18] hover:bg-[#e6dedb] dark:hover:bg-[#3a2a24] transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
-                className="px-8 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-primary to-orange-500 shadow-lg shadow-primary/25 hover:shadow-xl hover:scale-105 active:scale-95 transition-all"
+                className="w-full sm:w-auto px-8 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-primary to-orange-500 shadow-lg shadow-primary/25 hover:shadow-xl hover:scale-105 active:scale-95 transition-all"
               >
                 Save Semester
               </button>

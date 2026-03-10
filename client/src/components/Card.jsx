@@ -45,23 +45,43 @@ const Card = ({
 };
 
 // Stats Card Component
-export const StatsCard = ({ icon, title, label, value, trend = null, color = 'blue', bgColor = null }) => {
+export const StatsCard = ({ icon, title, label, value, trend = null, color = 'blue', bgColor = null, compact = false, singleLine = false }) => {
   // Support both 'title' and 'label' props for backward compatibility
   const displayTitle = label || title;
   
   // If bgColor is provided (new API), use it directly
   if (bgColor) {
+    if (singleLine) {
+      return (
+        <div className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow ${compact ? 'p-3.5' : 'p-4'}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center min-w-0 gap-2.5">
+              <div className={`${bgColor} text-white rounded-lg ${compact ? 'p-2' : 'p-2.5'}`}>
+                <span className={`material-symbols-outlined ${compact ? 'text-lg' : 'text-xl'}`}>{icon}</span>
+              </div>
+              <p className={`${compact ? 'text-[11px]' : 'text-xs'} font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wide truncate`}>
+                {displayTitle}
+              </p>
+            </div>
+            <p className={`${compact ? 'text-lg md:text-xl' : 'text-2xl'} font-black text-gray-900 dark:text-white leading-none shrink-0`}>
+              {value}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center gap-4">
-          <div className={`${bgColor} text-white p-4 rounded-lg`}>
-            <span className="material-symbols-outlined text-3xl">{icon}</span>
+      <div className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow ${compact ? 'p-4' : 'p-6'}`}>
+        <div className={`flex items-center ${compact ? 'gap-3' : 'gap-4'}`}>
+          <div className={`${bgColor} text-white rounded-lg ${compact ? 'p-2.5' : 'p-4'}`}>
+            <span className={`material-symbols-outlined ${compact ? 'text-xl' : 'text-3xl'}`}>{icon}</span>
           </div>
           <div>
-            <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            <p className={`${compact ? 'text-[11px]' : 'text-sm'} font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>
               {displayTitle}
             </p>
-            <p className="text-3xl font-black text-gray-900 dark:text-white mt-1">
+            <p className={`${compact ? 'text-xl md:text-2xl' : 'text-3xl'} font-black text-gray-900 dark:text-white mt-1`}>
               {value}
             </p>
           </div>
@@ -80,9 +100,9 @@ export const StatsCard = ({ icon, title, label, value, trend = null, color = 'bl
   };
 
   return (
-    <Card padding={false} className="p-6">
-      <div className="flex justify-between items-start mb-4">
-        <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
+    <Card padding={false} className={compact ? 'p-4' : 'p-6'}>
+      <div className={`flex justify-between items-start ${compact ? 'mb-3' : 'mb-4'}`}>
+        <div className={`${compact ? 'p-1.5' : 'p-2'} rounded-lg ${colorClasses[color]}`}>
           <span className="material-symbols-outlined">{icon}</span>
         </div>
         {trend && (
@@ -95,8 +115,8 @@ export const StatsCard = ({ icon, title, label, value, trend = null, color = 'bl
           </span>
         )}
       </div>
-      <p className="text-[#6B7280] text-sm font-medium">{displayTitle}</p>
-      <p className="text-3xl font-black text-[#111318] mt-1">{value}</p>
+      <p className={`${compact ? 'text-xs' : 'text-sm'} text-[#6B7280] font-medium`}>{displayTitle}</p>
+      <p className={`${compact ? 'text-2xl' : 'text-3xl'} font-black text-[#111318] mt-1`}>{value}</p>
     </Card>
   );
 };

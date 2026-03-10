@@ -102,9 +102,9 @@ const StudentTimetableView = () => {
 
     if (dayClasses.length === 0) {
       return (
-        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-          <p className="text-lg">No classes scheduled for {selectedDay}</p>
-          <p className="text-sm mt-2">Enjoy your free time! 🎉</p>
+        <div className="text-center py-12 text-gray-500">
+          <p className="text-lg font-semibold">No classes scheduled for {selectedDay}</p>
+          <p className="text-sm mt-2">Enjoy your free time.</p>
         </div>
       );
     }
@@ -118,14 +118,14 @@ const StudentTimetableView = () => {
               setSelectedSchedule(schedule);
               setShowDetailModal(true);
             }}
-            className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900 dark:to-indigo-900 p-5 rounded-lg cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-blue-600"
+            className="bg-gradient-to-r from-[#EFF6FF] to-[#EEF2FF] p-5 rounded-2xl cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-[#2563EB]"
           >
             <div className="flex items-center justify-between mb-3">
               <div>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <p className="text-2xl font-bold text-gray-900">
                   {schedule.startTime}
                 </p>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
+                <p className="text-sm text-gray-600">
                   → {schedule.endTime}
                 </p>
               </div>
@@ -144,11 +144,11 @@ const StudentTimetableView = () => {
 
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-gray-900 dark:text-white">
+                <span className="font-semibold text-gray-900">
                   {schedule.subjectId?.name}
                 </span>
               </div>
-              <div className="flex items-center gap-4 text-sm text-gray-700 dark:text-gray-300">
+              <div className="flex items-center gap-4 text-sm text-gray-700">
                 <span>📍 Room {schedule.roomNo}</span>
                 <span>👨‍🏫 {schedule.teacherId?.name}</span>
               </div>
@@ -165,14 +165,14 @@ const StudentTimetableView = () => {
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-blue-600 dark:bg-blue-900">
-              <th className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-left font-semibold text-white">
+            <tr className="bg-[#2563EB]">
+              <th className="border border-gray-300 px-4 py-3 text-left font-semibold text-white">
                 Time
               </th>
               {days.map(day => (
                 <th
                   key={day}
-                  className="border border-gray-300 dark:border-gray-600 px-4 py-3 text-left font-semibold text-white"
+                  className="border border-gray-300 px-4 py-3 text-left font-semibold text-white"
                 >
                   {day}
                 </th>
@@ -185,8 +185,8 @@ const StudentTimetableView = () => {
               .map((timeSlot, idx) => {
                 const [startTime, endTime] = timeSlot.split('-');
                 return (
-                  <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="border border-gray-300 dark:border-gray-600 px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap bg-gray-50 dark:bg-gray-800">
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="border border-gray-300 px-4 py-3 font-medium text-gray-900 whitespace-nowrap bg-gray-50">
                       {startTime}<br />{endTime}
                     </td>
                     {days.map(day => {
@@ -200,7 +200,7 @@ const StudentTimetableView = () => {
                       return (
                         <td
                           key={day}
-                          className="border border-gray-300 dark:border-gray-600 px-4 py-3"
+                          className="border border-gray-300 px-4 py-3"
                         >
                           {classAtSlot ? (
                             <div
@@ -208,20 +208,20 @@ const StudentTimetableView = () => {
                                 setSelectedSchedule(classAtSlot);
                                 setShowDetailModal(true);
                               }}
-                              className="bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-800 dark:to-blue-900 p-3 rounded cursor-pointer hover:shadow-md transition"
+                              className="bg-gradient-to-br from-blue-100 to-blue-200 p-3 rounded cursor-pointer hover:shadow-md transition"
                             >
-                              <p className="text-xs font-bold text-gray-900 dark:text-white">
+                              <p className="text-xs font-bold text-gray-900">
                                 {classAtSlot.subjectId?.name}
                               </p>
-                              <p className="text-xs text-gray-700 dark:text-gray-300 mt-1">
+                              <p className="text-xs text-gray-700 mt-1">
                                 {classAtSlot.lectureType}
                               </p>
-                              <p className="text-xs text-gray-700 dark:text-gray-300">
+                              <p className="text-xs text-gray-700">
                                 Room {classAtSlot.roomNo}
                               </p>
                             </div>
                           ) : (
-                            <span className="text-gray-400 dark:text-gray-500 text-xs">-</span>
+                            <span className="text-gray-400 text-xs">-</span>
                           )}
                         </td>
                       );
@@ -239,28 +239,53 @@ const StudentTimetableView = () => {
     <StudentLayout title="My Timetable" onLogout={handleLogout} userName={user?.name || 'Student'}>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-            📅 My Class Timetable
-          </h1>
-          {user && (semesterDisplay || branchDisplay) && (
-            <p className="text-gray-600 dark:text-gray-400">
-              {semesterDisplay}{semesterDisplay && branchDisplay ? ' • ' : ''}{branchDisplay}
-            </p>
-          )}
-        </div>
+        <section className="rounded-3xl bg-gradient-to-r from-[#0f172a] via-[#1e40af] to-[#0284c7] text-white p-6 md:p-7">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-sky-100">Schedule Hub</p>
+              <h1 className="text-2xl md:text-3xl font-black mt-1">My Class Timetable</h1>
+              <p className="text-sm text-sky-100 mt-1">
+                {semesterDisplay || branchDisplay
+                  ? `${semesterDisplay || ''}${semesterDisplay && branchDisplay ? ' • ' : ''}${branchDisplay || ''}`
+                  : 'Track your day, full schedule, and subject-wise classes.'}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs font-semibold">
+              <span className="px-3 py-1 rounded-full bg-white/15">Classes: {timetable.length}</span>
+              <span className="px-3 py-1 rounded-full bg-white/15">Subjects: {subjects.length}</span>
+            </div>
+          </div>
+        </section>
+
+        {timetable.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+              <p className="text-xs text-[#6B7280]">Total Classes</p>
+              <p className="text-2xl font-black text-[#1D4ED8] mt-1">{timetable.length}</p>
+            </div>
+            <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+              <p className="text-xs text-[#6B7280]">Teaching Days</p>
+              <p className="text-2xl font-black text-[#4338ca] mt-1">
+                {days.filter(day => groupedByDay[day]?.length > 0).length}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+              <p className="text-xs text-[#6B7280]">Unique Subjects</p>
+              <p className="text-2xl font-black text-[#0f766e] mt-1">{subjects.length}</p>
+            </div>
+          </div>
+        )}
 
         {timetable.length === 0 ? (
-          <Card className="bg-white dark:bg-gray-800 p-8 text-center">
-            <p className="text-gray-500 dark:text-gray-400 text-lg">
+          <Card className="bg-white p-8 text-center border border-[#E5E7EB]">
+            <p className="text-gray-500 text-lg">
               No timetable scheduled yet
             </p>
           </Card>
         ) : (
           <>
             {/* View Toggle & Filters */}
-            <Card className="bg-white dark:bg-gray-800 p-6">
+            <Card className="bg-white p-6 border border-[#E5E7EB]">
               <div className="flex flex-col gap-4 mb-6">
                 <div className="flex gap-3 flex-wrap">
                   <button
@@ -272,7 +297,7 @@ const StudentTimetableView = () => {
                     className={`px-4 py-2 rounded-lg font-medium transition ${
                       !showFullTable && !showSubjectTimetable
                         ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white'
+                        : 'bg-gray-100 text-gray-800 border border-[#E5E7EB]'
                     }`}
                   >
                     📍 Day View
@@ -285,7 +310,7 @@ const StudentTimetableView = () => {
                     className={`px-4 py-2 rounded-lg font-medium transition ${
                       showFullTable && !showSubjectTimetable
                         ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white'
+                        : 'bg-gray-100 text-gray-800 border border-[#E5E7EB]'
                     }`}
                   >
                     📊 Full Schedule
@@ -295,7 +320,7 @@ const StudentTimetableView = () => {
                 {/* Day selector for day view */}
                 {!showFullTable && !showSubjectTimetable && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
                       Select Day:
                     </label>
                     <div className="flex gap-2 flex-wrap">
@@ -306,7 +331,7 @@ const StudentTimetableView = () => {
                           className={`px-4 py-2 rounded-lg font-medium transition ${
                             selectedDay === day
                               ? 'bg-blue-600 text-white'
-                              : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600'
+                              : 'bg-gray-100 text-gray-800 border border-[#E5E7EB] hover:bg-gray-200'
                           }`}
                         >
                           {day.slice(0, 3)}
@@ -325,19 +350,19 @@ const StudentTimetableView = () => {
                 subjectName={selectedSubject.name}
               />
             ) : showFullTable ? (
-              <Card className="bg-white dark:bg-gray-800 p-6">
+              <Card className="bg-white p-6 border border-[#E5E7EB]">
                 <FullTableView />
               </Card>
             ) : (
-              <Card className="bg-white dark:bg-gray-800 p-6">
+              <Card className="bg-white p-6 border border-[#E5E7EB]">
                 <DayView />
               </Card>
             )}
 
             {/* Subject Timetables Section */}
             {subjects.length > 0 && (
-              <Card className="bg-white dark:bg-gray-800 p-6">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              <Card className="bg-white p-6 border border-[#E5E7EB]">
+                <h3 className="text-xl font-bold text-gray-900 mb-4">
                   📚 Subject-wise Timetables
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -352,18 +377,18 @@ const StudentTimetableView = () => {
                           setSelectedSubject(subject);
                           setShowSubjectTimetable(true);
                         }}
-                        className="bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-900 dark:to-blue-900 p-4 rounded-lg cursor-pointer hover:shadow-lg transition-shadow border border-indigo-200 dark:border-indigo-700"
+                        className="bg-gradient-to-br from-indigo-50 to-blue-50 p-4 rounded-2xl cursor-pointer hover:shadow-lg transition-shadow border border-indigo-200"
                       >
-                        <p className="font-semibold text-gray-900 dark:text-white mb-2">
+                        <p className="font-semibold text-gray-900 mb-2">
                           {subject.name}
                         </p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                        <p className="text-sm text-gray-600 mb-3">
                           Code: {subject.code}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500">
+                        <p className="text-xs text-gray-500">
                           {subjectClasses.length} classes this week
                         </p>
-                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                        <p className="text-xs text-blue-600 mt-2">
                           Click to view timetable →
                         </p>
                       </div>
@@ -387,68 +412,68 @@ const StudentTimetableView = () => {
               </h2>
 
               <div className="space-y-4">
-                <div className="bg-blue-50 dark:bg-blue-900 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Subject</p>
-                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Subject</p>
+                  <p className="text-xl font-bold text-gray-900">
                     {selectedSchedule.subjectId?.name}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Time</p>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-600">Time</p>
+                    <p className="text-lg font-bold text-gray-900">
                       {selectedSchedule.startTime}
                     </p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                    <p className="text-xs text-gray-600">
                       to {selectedSchedule.endTime}
                     </p>
                   </div>
 
-                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Day</p>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-600">Day</p>
+                    <p className="text-lg font-bold text-gray-900">
                       {selectedSchedule.dayOfWeek}
                     </p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Room</p>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-600">Room</p>
+                    <p className="text-lg font-bold text-gray-900">
                       {selectedSchedule.roomNo}
                     </p>
                   </div>
 
-                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Type</p>
-                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-600">Type</p>
+                    <p className="text-lg font-bold text-gray-900">
                       {selectedSchedule.lectureType}
                     </p>
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900 dark:to-pink-900 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Teacher</p>
-                  <p className="text-lg font-bold text-gray-900 dark:text-white">
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Teacher</p>
+                  <p className="text-lg font-bold text-gray-900">
                     {selectedSchedule.teacherId?.name}
                   </p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                  <p className="text-sm text-gray-600 mt-2">
                     {selectedSchedule.teacherId?.email}
                   </p>
                 </div>
 
                 {selectedSchedule.notes && (
-                  <div className="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-lg">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Notes</p>
-                    <p className="text-gray-900 dark:text-white">{selectedSchedule.notes}</p>
+                  <div className="bg-yellow-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-600">Notes</p>
+                    <p className="text-gray-900">{selectedSchedule.notes}</p>
                   </div>
                 )}
 
-                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Duration</p>
-                  <p className="text-lg font-bold text-gray-900 dark:text-white">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Duration</p>
+                  <p className="text-lg font-bold text-gray-900">
                     {selectedSchedule.duration} minutes
                   </p>
                 </div>

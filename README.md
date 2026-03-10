@@ -1,9 +1,9 @@
 # Smart College Academic Portal
 
-Smart College Academic Portal is a full-stack academic management system that consolidates subject details, tasks, notices, attendance, timetables, and library resources. It supports Admin, HOD, Teacher, and Student roles with scoped access and consistent workflows.
+Smart College Academic Portal is a full-stack academic management system that consolidates subject details, tasks, notices, timetables, and library resources. It supports Admin, HOD, Teacher, and Student roles with scoped access and consistent workflows.
 
 ## Overview
-Academic information is often fragmented across notice boards, PDFs, and messages. This project provides a single portal where students and staff can access real-time academic updates, manage tasks, and track attendance in one place.
+Academic information is often fragmented across notice boards, PDFs, and messages. This project provides a single portal where students and staff can access real-time academic updates and manage academic workflows in one place.
 
 ## Key Capabilities
 - Role-based authentication and access control
@@ -11,21 +11,20 @@ Academic information is often fragmented across notice boards, PDFs, and message
 - Subject hub with exam type and marks distribution
 - Tasks with student submissions and status tracking
 - Notice board with role-based targeting
-- Attendance marking and student view
 - Timetable and library browsing
 - Notifications and reminders
+- Note: Attendance is intentionally out-of-scope in this repository and maintained as a separate project.
 
 ## Modules and Screens (What the Website Includes)
 - Public landing page with branch/semester/subject explorer
 - Authentication: register, login, first-login (staff), password reset
 - Admin panel: users, roles, branches, semesters, subjects
-- HOD panel: branch-scoped users, notices, tasks, attendance
-- Teacher panel: subject tasks, notices, attendance, submissions
+- HOD panel: branch-scoped users, notices, tasks
+- Teacher panel: subject tasks, notices, submissions
 - Student hub: subject details, exam type, marks breakdown
 - Materials library: notes, papers, and learning resources
 - Tasks: assignments list, submission, and status tracking
 - Notices: role-targeted announcements
-- Attendance: session marking and student view
 - Timetable: weekly schedule view
 - Library: subject-wise book catalog
 - Notifications center: reminders and updates
@@ -33,8 +32,8 @@ Academic information is often fragmented across notice boards, PDFs, and message
 ## Roles
 - Admin: system configuration and user management
 - HOD: branch-level management and reporting
-- Teacher: subject-level tasks, notices, and attendance
-- Student: view subjects, tasks, notices, attendance, and materials
+- Teacher: subject-level tasks and notices
+- Student: view subjects, tasks, notices, and materials
 
 ## User Journeys
 Student:
@@ -42,13 +41,13 @@ Student:
 - Register and login
 - View subject hub (exam type + marks)
 - Check tasks, submit work, track status
-- Read notices, view attendance, check timetable
+- Read notices, check timetable
 
 Teacher:
 - Login and open teacher dashboard
 - Create tasks and set due dates
 - Post notices to target students
-- Mark attendance and review submissions
+- Review submissions and task status
 
 Admin:
 - Login and manage academic structure
@@ -57,7 +56,7 @@ Admin:
 
 HOD:
 - Login and manage branch-scoped users
-- Post notices, create tasks, and review attendance
+- Post notices and create tasks
 
 ## Feature Matrix (Role vs Capability)
 | Capability | Admin | HOD | Teacher | Student |
@@ -67,8 +66,6 @@ HOD:
 | Create tasks | No | Yes | Yes | No |
 | Submit tasks | No | No | No | Yes |
 | Post notices | Yes | Yes | Yes | No |
-| Mark attendance | No | Yes | Yes | No |
-| View attendance | Yes | Yes | Yes | Yes |
 | View subject hub | Yes | Yes | Yes | Yes |
 | View library and materials | Yes | Yes | Yes | Yes |
 
@@ -79,13 +76,12 @@ HOD:
 - Authentication: JWT tokens with role-based authorization
 
 ## Data Model Summary
-Key collections: users, subjects, tasks, notices, attendance, timetables, librarybooks, notifications, branches, semesters.
+Key collections: users, subjects, tasks, notices, timetables, librarybooks, notifications, branches, semesters.
 
 Key relationships:
 - users -> branches/semesters/subjects
 - subjects -> branches/semesters
 - tasks -> subjects + recipients
-- attendances -> subjects + students
 
 ## Project Structure
 ```
@@ -160,7 +156,6 @@ Frontend (client/)
 - Subject hub (exam type and marks)
 - Task creation and submission
 - Notice creation and viewing
-- Attendance marking and student view
 - Timetable and library
 
 ## Project Status
@@ -169,7 +164,7 @@ Frontend (client/)
 
 ## Testing
 - Manual QA checklist: docs/09-Testing-Checklist.md
-- Focus areas: login flow, tasks, notices, attendance, subject hub
+- Focus areas: login flow, tasks, notices, timetable, subject hub
 
 ## API Snapshot
 Example request:

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, Input, LoadingSpinner, Modal, RoleLayout } from '../../components';
@@ -52,8 +52,18 @@ const RoleTimetable = () => {
   const [saving, setSaving] = useState(false);
 
   const token = localStorage.getItem('token');
+  const canCreateTimetable = isAdmin || isHod;
   const panelLabel = isAdmin ? 'Admin Panel' : isHod ? 'HOD Panel' : 'Teacher Panel';
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  const timetableStats = useMemo(() => {
+    const total = timetables.length;
+    const theory = timetables.filter((t) => t.lectureType === 'Theory').length;
+    const practical = timetables.filter((t) => t.lectureType === 'Practical' || t.lectureType === 'Lab').length;
+    const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    const todayCount = timetables.filter((t) => t.dayOfWeek === todayName).length;
+    return { total, theory, practical, todayCount };
+  }, [timetables]);
 
   const getId = (value) => (typeof value === 'string' ? value : value?._id || '');
   const getLabel = (value) => {
@@ -408,33 +418,69 @@ const RoleTimetable = () => {
       profileLinks={isAdmin ? [] : [{ label: 'Profile', to: `/${role}/profile` }]}
     >
       <div className="space-y-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Timetable Management</h2>
-            {user && (
-              <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
-                {getLabel(user.branch || user.department)} {user.name ? `- ${user.name}` : ''}
+        <section className="rounded-3xl bg-gradient-to-r from-[#1f2937] via-[#1e40af] to-[#0f766e] text-white p-6 md:p-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-sky-100">Schedule Control</p>
+              <h1 className="text-3xl md:text-4xl font-black mt-2">Timetable Management</h1>
+              <p className="text-sky-100 mt-2 text-sm md:text-base">
+                Plan classes, assign faculty, and keep weekly schedule execution consistent.
               </p>
-            )}
+              {user && (
+                <p className="text-xs text-sky-100 mt-3">
+                  {getLabel(user.branch || user.department)} {user.name ? `- ${user.name}` : ''}
+                </p>
+              )}
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+                <span className="px-3 py-1 rounded-full bg-white/15">Total Slots: {timetableStats.total}</span>
+                <span className="px-3 py-1 rounded-full bg-white/15">Theory: {timetableStats.theory}</span>
+                <span className="px-3 py-1 rounded-full bg-white/15">Practical/Lab: {timetableStats.practical}</span>
+                <span className="px-3 py-1 rounded-full bg-white/15">Today: {timetableStats.todayCount}</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-start lg:items-end gap-1">
+              <Button
+                onClick={() => {
+                  if (!canCreateTimetable) return;
+                  setShowCreateModal(true);
+                  if (isHod && user) {
+                    setFormData((prev) => ({
+                      ...prev,
+                      semesterId: getId(user.semester) || prev.semesterId,
+                      branchId: getId(user.branch) || prev.branchId,
+                      teacherId: user._id
+                    }));
+                  }
+                }}
+                disabled={!canCreateTimetable}
+                className="bg-white !text-[#0f172a] hover:bg-[#F1F5F9] disabled:bg-white/60 disabled:!text-[#475569]"
+              >
+                + Create Timetable Entry
+              </Button>
+              {!canCreateTimetable && (
+                <p className="text-[11px] text-sky-100">Only Admin/HOD can create timetable entries</p>
+              )}
+            </div>
           </div>
-          {(isAdmin || isHod) && (
-            <Button
-              onClick={() => {
-                setShowCreateModal(true);
-                if (isHod && user) {
-                  setFormData((prev) => ({
-                    ...prev,
-                    semesterId: getId(user.semester) || prev.semesterId,
-                    branchId: getId(user.branch) || prev.branchId,
-                    teacherId: user._id
-                  }));
-                }
-              }}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              + Create Timetable Entry
-            </Button>
-          )}
+        </section>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">Total Entries</p>
+            <p className="text-2xl font-black text-[#111827] mt-1">{timetableStats.total}</p>
+          </div>
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">Today</p>
+            <p className="text-2xl font-black text-blue-600 mt-1">{timetableStats.todayCount}</p>
+          </div>
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">Theory</p>
+            <p className="text-2xl font-black text-emerald-600 mt-1">{timetableStats.theory}</p>
+          </div>
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">Practical/Lab</p>
+            <p className="text-2xl font-black text-purple-600 mt-1">{timetableStats.practical}</p>
+          </div>
         </div>
 
         <Card className="bg-white dark:bg-gray-800 p-6">
@@ -593,28 +639,28 @@ const RoleTimetable = () => {
 
       {showCreateModal && (isAdmin || isHod) && (
         <Modal onClose={() => setShowCreateModal(false)} isOpen={true}>
-          <div className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
+          <div className="w-full max-w-2xl bg-white dark:bg-[#1a0f0b] rounded-2xl shadow-xl border border-[#e6dedb] dark:border-[#3a2a24] p-4 sm:p-6">
             <div className="flex items-start justify-between gap-4 mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Create Timetable Entry</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Fill in class details and schedule</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-[#181311] dark:text-white">Create Timetable Entry</h2>
+                <p className="text-sm text-[#896b61] dark:text-[#c4b0a9] mt-1">Fill in class details and schedule</p>
               </div>
-              <div className="shrink-0 rounded-xl bg-blue-50 dark:bg-blue-900/40 px-3 py-2 text-blue-700 dark:text-blue-300 text-xs font-semibold">
+              <div className="shrink-0 rounded-xl bg-primary/10 px-3 py-2 text-primary text-xs font-semibold">
                 Timetable
               </div>
             </div>
 
             {isAdmin ? (
               <div className="space-y-6">
-                <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Academic Details</h3>
+                <div className="rounded-xl border border-[#e6dedb] dark:border-[#3a2a24] bg-[#fffdfc] dark:bg-[#211511] p-3.5 sm:p-4">
+                  <h3 className="text-sm font-semibold text-[#181311] dark:text-white mb-4">Academic Details</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">Semester *</label>
+                      <label className="block text-sm font-bold text-[#181311] dark:text-white mb-1.5">Semester *</label>
                       <select
                         value={formData.semesterId}
                         onChange={(e) => setFormData(prev => ({ ...prev, semesterId: e.target.value }))}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                       >
                         <option value="" className="text-gray-900 bg-white">Select Semester</option>
                         {semesters.map(s => (
@@ -626,11 +672,11 @@ const RoleTimetable = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">Branch *</label>
+                      <label className="block text-sm font-bold text-[#181311] dark:text-white mb-1.5">Branch *</label>
                       <select
                         value={formData.branchId}
                         onChange={(e) => setFormData(prev => ({ ...prev, branchId: e.target.value }))}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                       >
                         <option value="" className="text-gray-900 bg-white">Select Branch</option>
                         {branches.map(b => (
@@ -641,15 +687,15 @@ const RoleTimetable = () => {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Class Details</h3>
+                <div className="rounded-xl border border-[#e6dedb] dark:border-[#3a2a24] bg-[#fffdfc] dark:bg-[#211511] p-3.5 sm:p-4">
+                  <h3 className="text-sm font-semibold text-[#181311] dark:text-white mb-4">Class Details</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">Subject *</label>
+                      <label className="block text-sm font-bold text-[#181311] dark:text-white mb-1.5">Subject *</label>
                       <select
                         value={formData.subjectId}
                         onChange={(e) => setFormData(prev => ({ ...prev, subjectId: e.target.value }))}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                       >
                         <option value="" className="text-gray-900 bg-white">Select Subject</option>
                         {subjects.map(s => (
@@ -659,11 +705,11 @@ const RoleTimetable = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">Teacher *</label>
+                      <label className="block text-sm font-bold text-[#181311] dark:text-white mb-1.5">Teacher *</label>
                       <select
                         value={formData.teacherId}
                         onChange={(e) => setFormData(prev => ({ ...prev, teacherId: e.target.value }))}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                       >
                         <option value="" className="text-gray-900 bg-white">Select Teacher</option>
                         {teachers.map(t => (
@@ -677,15 +723,15 @@ const RoleTimetable = () => {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Schedule</h3>
+                <div className="rounded-xl border border-[#e6dedb] dark:border-[#3a2a24] bg-[#fffdfc] dark:bg-[#211511] p-3.5 sm:p-4">
+                  <h3 className="text-sm font-semibold text-[#181311] dark:text-white mb-4">Schedule</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">Day *</label>
+                      <label className="block text-sm font-bold text-[#181311] dark:text-white mb-1.5">Day *</label>
                       <select
                         value={formData.dayOfWeek}
                         onChange={(e) => setFormData(prev => ({ ...prev, dayOfWeek: e.target.value }))}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                       >
                         {days.map(day => (
                           <option key={day} value={day} className="text-gray-900 bg-white">{day}</option>
@@ -694,7 +740,7 @@ const RoleTimetable = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">Room Number *</label>
+                      <label className="block text-sm font-bold text-[#181311] dark:text-white mb-1.5">Room Number *</label>
                       <Input
                         value={formData.roomNo}
                         onChange={(e) => setFormData(prev => ({ ...prev, roomNo: e.target.value }))}
@@ -705,7 +751,7 @@ const RoleTimetable = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     <div>
-                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">Start Time *</label>
+                      <label className="block text-sm font-bold text-[#181311] dark:text-white mb-1.5">Start Time *</label>
                       <Input
                         type="time"
                         value={formData.startTime}
@@ -714,7 +760,7 @@ const RoleTimetable = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">End Time *</label>
+                      <label className="block text-sm font-bold text-[#181311] dark:text-white mb-1.5">End Time *</label>
                       <Input
                         type="time"
                         value={formData.endTime}
@@ -725,11 +771,11 @@ const RoleTimetable = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Lecture Type</label>
+                  <label className="block text-sm font-medium text-[#181311] dark:text-white mb-1.5">Lecture Type</label>
                   <select
                     value={formData.lectureType}
                     onChange={(e) => setFormData(prev => ({ ...prev, lectureType: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                   >
                     <option value="Theory">Theory</option>
                     <option value="Practical">Practical</option>
@@ -739,24 +785,24 @@ const RoleTimetable = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Notes</label>
+                  <label className="block text-sm font-medium text-[#181311] dark:text-white mb-1.5">Notes</label>
                   <textarea
                     value={formData.notes}
                     onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                     placeholder="Optional notes"
                     rows="3"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3.5 py-2.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                   />
                 </div>
               </div>
             ) : (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subject *</label>
+                  <label className="block text-sm font-medium text-[#181311] dark:text-white mb-1.5">Subject *</label>
                   <select
                     value={formData.subjectId}
                     onChange={(e) => setFormData(prev => ({ ...prev, subjectId: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                   >
                     <option value="">Select Subject</option>
                     {subjects.map(s => (
@@ -765,9 +811,9 @@ const RoleTimetable = () => {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Room Number *</label>
+                    <label className="block text-sm font-medium text-[#181311] dark:text-white mb-1.5">Room Number *</label>
                     <Input
                       value={formData.roomNo}
                       onChange={(e) => setFormData(prev => ({ ...prev, roomNo: e.target.value }))}
@@ -776,11 +822,11 @@ const RoleTimetable = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Day *</label>
+                    <label className="block text-sm font-medium text-[#181311] dark:text-white mb-1.5">Day *</label>
                     <select
                       value={formData.dayOfWeek}
                       onChange={(e) => setFormData(prev => ({ ...prev, dayOfWeek: e.target.value }))}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                     >
                       {days.map(day => (
                         <option key={day} value={day}>{day}</option>
@@ -789,9 +835,9 @@ const RoleTimetable = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Start Time *</label>
+                    <label className="block text-sm font-medium text-[#181311] dark:text-white mb-1.5">Start Time *</label>
                     <Input
                       type="time"
                       value={formData.startTime}
@@ -800,7 +846,7 @@ const RoleTimetable = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">End Time *</label>
+                    <label className="block text-sm font-medium text-[#181311] dark:text-white mb-1.5">End Time *</label>
                     <Input
                       type="time"
                       value={formData.endTime}
@@ -810,11 +856,11 @@ const RoleTimetable = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Lecture Type</label>
+                  <label className="block text-sm font-medium text-[#181311] dark:text-white mb-1.5">Lecture Type</label>
                   <select
                     value={formData.lectureType}
                     onChange={(e) => setFormData(prev => ({ ...prev, lectureType: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                   >
                     <option value="Theory">Theory</option>
                     <option value="Practical">Practical</option>
@@ -824,30 +870,31 @@ const RoleTimetable = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Notes</label>
+                  <label className="block text-sm font-medium text-[#181311] dark:text-white mb-1.5">Notes</label>
                   <textarea
                     value={formData.notes}
                     onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                     placeholder="Optional notes"
                     rows="3"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3.5 py-2.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                   />
                 </div>
               </div>
             )}
 
-            <div className="mt-6 flex gap-3 justify-end">
+            <div className="mt-6 flex flex-col-reverse sm:flex-row gap-3 justify-end">
               <Button
                 variant="secondary"
                 onClick={() => setShowCreateModal(false)}
                 disabled={saving}
+                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleCreateTimetable}
                 disabled={saving}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="w-full sm:w-auto bg-gradient-to-r from-primary to-orange-500 hover:opacity-95"
               >
                 {saving ? 'Creating...' : 'Create Entry'}
               </Button>

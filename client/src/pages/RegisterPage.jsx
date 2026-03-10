@@ -1,6 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+
+const SECURITY_QUESTIONS = [
+  "What is your mother's maiden name?",
+  'What was the name of your first pet?',
+  'What city were you born in?',
+  'What is your favorite book?',
+  'What is your favorite movie?',
+  'What was the name of your first school?',
+  'What is your favorite food?',
+  'What is your favorite sport?',
+  'What is your favorite color?'
+];
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -9,14 +21,47 @@ const RegisterPage = () => {
     enrollmentNumber: '',
     mobile: '',
     email: '',
+    branch: '',
+    semester: '',
     password: '',
     securityQuestion: '',
     securityAnswer: ''
   });
+  const [branches, setBranches] = useState([]);
+  const [semesters, setSemesters] = useState([]);
+  const [metaLoading, setMetaLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadMetadata = async () => {
+      try {
+        setMetaLoading(true);
+        const [branchRes, semesterRes] = await Promise.all([
+          axios.get('/api/academic/branches'),
+          axios.get('/api/academic/semesters')
+        ]);
+
+        if (!isMounted) return;
+        setBranches(Array.isArray(branchRes.data?.data) ? branchRes.data.data : []);
+        setSemesters(Array.isArray(semesterRes.data?.data) ? semesterRes.data.data : []);
+      } catch (metaError) {
+        if (!isMounted) return;
+        setError(metaError?.response?.data?.message || 'Unable to load branch/semester options');
+      } finally {
+        if (isMounted) setMetaLoading(false);
+      }
+    };
+
+    loadMetadata();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -31,6 +76,8 @@ const RegisterPage = () => {
     if (!formData.enrollmentNumber.trim()) return 'Enrollment Number is required';
     if (!formData.mobile.trim() || formData.mobile.length !== 10) return 'Valid Mobile Number (10 digits) is required';
     if (!formData.email.trim() || !formData.email.includes('@')) return 'Valid Email is required';
+    if (!formData.branch) return 'Branch is required';
+    if (!formData.semester) return 'Semester is required';
     if (!formData.password || formData.password.length < 8) return 'Password must be at least 8 characters';
     if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) return 'Password must contain at least one special character';
     if (!formData.securityQuestion.trim()) return 'Security Question is required';
@@ -56,6 +103,8 @@ const RegisterPage = () => {
         enrollmentNumber: formData.enrollmentNumber,
         mobile: formData.mobile,
         email: formData.email,
+        branch: formData.branch,
+        semester: formData.semester,
         password: formData.password,
         securityQuestion: formData.securityQuestion,
         securityAnswer: formData.securityAnswer,
@@ -185,6 +234,43 @@ const RegisterPage = () => {
                   />
                 </label>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex flex-col gap-2">
+                  <span className="text-[#111318] dark:text-gray-300 text-sm font-semibold">Branch *</span>
+                  <select
+                    name="branch"
+                    value={formData.branch}
+                    onChange={handleInputChange}
+                    disabled={metaLoading}
+                    className="form-input w-full rounded-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 transition-all disabled:opacity-60"
+                  >
+                    <option value="">{metaLoading ? 'Loading branches...' : 'Select branch'}</option>
+                    {branches.map((branch) => (
+                      <option key={branch._id} value={branch._id}>
+                        {branch.name} {branch.code ? `(${branch.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-[#111318] dark:text-gray-300 text-sm font-semibold">Semester *</span>
+                  <select
+                    name="semester"
+                    value={formData.semester}
+                    onChange={handleInputChange}
+                    disabled={metaLoading}
+                    className="form-input w-full rounded-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 transition-all disabled:opacity-60"
+                  >
+                    <option value="">{metaLoading ? 'Loading semesters...' : 'Select semester'}</option>
+                    {semesters.map((semester) => (
+                      <option key={semester._id} value={semester._id}>
+                        Semester {semester.semesterNumber || ''}{semester.name ? ` - ${semester.name}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <label className="flex flex-col gap-2">
                 <span className="text-[#111318] dark:text-gray-300 text-sm font-semibold">Email *</span>
                 <input 
@@ -245,14 +331,17 @@ const RegisterPage = () => {
                     <span className="text-[#111318] dark:text-white text-sm font-bold italic underline decoration-primary decoration-2 underline-offset-4">Security Question</span>
                     <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">Required</span>
                   </div>
-                  <input 
+                  <select
                     name="securityQuestion"
                     value={formData.securityQuestion}
                     onChange={handleInputChange}
-                    className="form-input w-full rounded-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-white dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 transition-all" 
-                    placeholder="e.g. What is your favorite color?" 
-                    type="text"
-                  />
+                    className="form-input w-full rounded-lg text-[#111318] dark:text-white border-gray-200 dark:border-gray-700 bg-white dark:bg-background-dark focus:border-primary focus:ring-1 focus:ring-primary h-12 px-4 transition-all"
+                  >
+                    <option value="">Select a security question</option>
+                    {SECURITY_QUESTIONS.map((question) => (
+                      <option key={question} value={question}>{question}</option>
+                    ))}
+                  </select>
                   <input 
                     name="securityAnswer"
                     value={formData.securityAnswer}

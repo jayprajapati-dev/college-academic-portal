@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button, Card, Input, LoadingSpinner, Modal, Pagination, RoleLayout } from '../../components';
@@ -13,6 +13,7 @@ const RoleLibrary = () => {
   const isAdmin = role === 'admin';
   const isHod = role === 'hod';
   const isTeacher = role === 'teacher';
+  const isCoordinator = role === 'coordinator';
 
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,8 +48,22 @@ const RoleLibrary = () => {
     status: 'active'
   });
 
+  const bookStats = useMemo(() => {
+    const total = books.length;
+    const active = books.filter((b) => b.status === 'active').length;
+    const inactive = books.filter((b) => b.status === 'inactive').length;
+    const uniqueSubjects = new Set(books.map((b) => b.subjectId?._id).filter(Boolean)).size;
+    return { total, active, inactive, uniqueSubjects };
+  }, [books]);
+
   const token = localStorage.getItem('token');
-  const panelLabel = isAdmin ? 'Admin Panel' : isHod ? 'HOD Panel' : 'Teacher Panel';
+  const panelLabel = isAdmin
+    ? 'Admin Panel'
+    : isHod
+      ? 'HOD Panel'
+      : isCoordinator
+        ? 'Coordinator Panel'
+        : 'Teacher Panel';
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -100,6 +115,8 @@ const RoleLibrary = () => {
 
       if (isHod) {
         requests.push(axios.get('/api/academic/subjects/hod', { headers: { Authorization: `Bearer ${token}` } }));
+      } else if (isCoordinator) {
+        requests.push(axios.get('/api/academic/subjects/coordinator', { headers: { Authorization: `Bearer ${token}` } }));
       } else if (isTeacher) {
         if (!user?._id) return;
         requests.push(axios.get(`/api/academic/teacher/${user._id}/subjects`, { headers: { Authorization: `Bearer ${token}` } }));
@@ -114,7 +131,7 @@ const RoleLibrary = () => {
 
       if (semestersRes?.data?.success) setSemesters(semestersRes.data.data || []);
 
-      if (isHod) {
+      if (isHod || isCoordinator) {
         if (subjectsRes?.data?.success) setSubjects(subjectsRes.data.data || []);
       } else if (isTeacher) {
         if (subjectsRes?.data?.success) setSubjects(subjectsRes.data.subjects || []);
@@ -127,7 +144,7 @@ const RoleLibrary = () => {
         console.error('Error fetching metadata:', error);
       }
     }
-  }, [handleAuthError, isHod, isTeacher, token, user]);
+  }, [handleAuthError, isCoordinator, isHod, isTeacher, token, user]);
 
   const fetchBooks = useCallback(async () => {
     try {
@@ -312,35 +329,64 @@ const RoleLibrary = () => {
       profileLinks={isAdmin ? [] : [{ label: 'Profile', to: `/${role}/profile` }]}
     >
       <div className="space-y-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-black text-gray-900 dark:text-white flex items-center gap-3">
-              <span className="material-symbols-outlined text-4xl text-emerald-500">library_books</span>
-              Library Management
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1 font-medium">
-              Curate subject-based library resources for students
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Input
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search books"
-            />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+        <section className="rounded-3xl bg-gradient-to-r from-[#14532d] via-[#047857] to-[#0f766e] text-white p-6 md:p-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-emerald-100">Knowledge Desk</p>
+              <h1 className="text-3xl md:text-4xl font-black mt-2">Library Management</h1>
+              <p className="text-emerald-100 mt-2 text-sm md:text-base">
+                Curate and maintain subject resources with proper status and metadata.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+                <span className="px-3 py-1 rounded-full bg-white/15">Total: {bookStats.total}</span>
+                <span className="px-3 py-1 rounded-full bg-white/15">Active: {bookStats.active}</span>
+                <span className="px-3 py-1 rounded-full bg-white/15">Inactive: {bookStats.inactive}</span>
+                <span className="px-3 py-1 rounded-full bg-white/15">Subjects: {bookStats.uniqueSubjects}</span>
+              </div>
+            </div>
+            <Button
+              onClick={openCreateModal}
+              className="bg-gradient-to-r from-[#059669] to-[#047857] text-white border border-emerald-200/70 hover:border-emerald-100 hover:from-[#047857] hover:to-[#065f46] shadow-lg shadow-emerald-700/30"
             >
-              <option value="all">All</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-            <Button onClick={openCreateModal} className="bg-emerald-600 hover:bg-emerald-700">
               + Add Book
             </Button>
           </div>
+        </section>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">All Books</p>
+            <p className="text-2xl font-black text-[#111827] mt-1">{bookStats.total}</p>
+          </div>
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">Active</p>
+            <p className="text-2xl font-black text-emerald-600 mt-1">{bookStats.active}</p>
+          </div>
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">Inactive</p>
+            <p className="text-2xl font-black text-amber-600 mt-1">{bookStats.inactive}</p>
+          </div>
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">Covered Subjects</p>
+            <p className="text-2xl font-black text-blue-600 mt-1">{bookStats.uniqueSubjects}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <Input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search books"
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
+          >
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
         </div>
 
         <Card>
@@ -463,87 +509,117 @@ const RoleLibrary = () => {
         title={editingBook ? 'Edit Library Book' : 'Add Library Book'}
       >
         <div className="space-y-4">
-          <Input
-            label="Title *"
-            value={formData.title}
-            onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-            placeholder="Enter book title"
-          />
-          <Input
-            label="Author"
-            value={formData.author}
-            onChange={(e) => setFormData((prev) => ({ ...prev, author: e.target.value }))}
-            placeholder="Enter author name"
-          />
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Subject *</label>
-            <select
-              value={formData.subjectId}
-              onChange={(e) => setFormData((prev) => ({ ...prev, subjectId: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white"
-            >
-              <option value="">Select subject</option>
-              {subjects.map((subject) => (
-                <option key={subject._id} value={subject._id}>
-                  {subject.name} ({subject.code || 'N/A'})
-                </option>
-              ))}
-            </select>
+          <div className="rounded-xl border border-emerald-100 bg-gradient-to-r from-emerald-50 to-green-50 px-4 py-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Library Entry</p>
+            <p className="text-sm text-emerald-900 mt-1">Fill key metadata so students can quickly find and use the right book.</p>
           </div>
-          <Input
-            label="Cover Image URL"
-            value={formData.coverUrl}
-            onChange={(e) => setFormData((prev) => ({ ...prev, coverUrl: e.target.value }))}
-            placeholder="https://"
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="ISBN"
-              value={formData.isbn}
-              onChange={(e) => setFormData((prev) => ({ ...prev, isbn: e.target.value }))}
-              placeholder="ISBN number"
-            />
-            <Input
-              label="Edition"
-              value={formData.edition}
-              onChange={(e) => setFormData((prev) => ({ ...prev, edition: e.target.value }))}
-              placeholder="Edition"
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Publisher"
-              value={formData.publisher}
-              onChange={(e) => setFormData((prev) => ({ ...prev, publisher: e.target.value }))}
-              placeholder="Publisher name"
-            />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Title *</label>
+              <input
+                value={formData.title}
+                onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter book title"
+                className="w-full h-10 px-3.5 border border-gray-300 rounded-lg bg-white text-sm text-gray-900"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Author</label>
+              <input
+                value={formData.author}
+                onChange={(e) => setFormData((prev) => ({ ...prev, author: e.target.value }))}
+                placeholder="Enter author name"
+                className="w-full h-10 px-3.5 border border-gray-300 rounded-lg bg-white text-sm text-gray-900"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Subject *</label>
+              <select
+                value={formData.subjectId}
+                onChange={(e) => setFormData((prev) => ({ ...prev, subjectId: e.target.value }))}
+                className="w-full h-10 px-3.5 border border-gray-300 rounded-lg bg-white text-sm text-gray-900"
+              >
+                <option value="">Select subject</option>
+                {subjects.map((subject) => (
+                  <option key={subject._id} value={subject._id}>
+                    {subject.name} ({subject.code || 'N/A'})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Status</label>
               <select
                 value={formData.status}
                 onChange={(e) => setFormData((prev) => ({ ...prev, status: e.target.value }))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white"
+                className="w-full h-10 px-3.5 border border-gray-300 rounded-lg bg-white text-sm text-gray-900"
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
             </div>
           </div>
+
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Cover Image URL</label>
+            <input
+              value={formData.coverUrl}
+              onChange={(e) => setFormData((prev) => ({ ...prev, coverUrl: e.target.value }))}
+              placeholder="https://"
+              className="w-full h-10 px-3.5 border border-gray-300 rounded-lg bg-white text-sm text-gray-900"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">ISBN</label>
+              <input
+                value={formData.isbn}
+                onChange={(e) => setFormData((prev) => ({ ...prev, isbn: e.target.value }))}
+                placeholder="ISBN number"
+                className="w-full h-10 px-3.5 border border-gray-300 rounded-lg bg-white text-sm text-gray-900"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Edition</label>
+              <input
+                value={formData.edition}
+                onChange={(e) => setFormData((prev) => ({ ...prev, edition: e.target.value }))}
+                placeholder="Edition"
+                className="w-full h-10 px-3.5 border border-gray-300 rounded-lg bg-white text-sm text-gray-900"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Publisher</label>
+              <input
+                value={formData.publisher}
+                onChange={(e) => setFormData((prev) => ({ ...prev, publisher: e.target.value }))}
+                placeholder="Publisher name"
+                className="w-full h-10 px-3.5 border border-gray-300 rounded-lg bg-white text-sm text-gray-900"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Description</label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-              rows={4}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg resize-none"
+              rows={3}
+              className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg resize-none bg-white text-sm text-gray-900"
               placeholder="Short description"
             />
           </div>
-          <div className="flex justify-end gap-3 pt-4">
-            <Button variant="secondary" onClick={() => setShowModal(false)}>
+
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 pt-3">
+            <Button variant="secondary" onClick={() => setShowModal(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button onClick={handleSaveBook} disabled={saving}>
+            <Button onClick={handleSaveBook} disabled={saving} className="w-full sm:w-auto bg-gradient-to-r from-[#059669] to-[#047857] border border-emerald-200/70 text-white hover:from-[#047857] hover:to-[#065f46]">
               {saving ? 'Saving...' : 'Save Book'}
             </Button>
           </div>

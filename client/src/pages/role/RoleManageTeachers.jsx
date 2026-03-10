@@ -262,14 +262,14 @@ const RoleManageTeachers = () => {
       navLoading={navLoading}
       panelLabel="HOD Panel"
     >
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-5">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black text-gray-900 flex items-center gap-3">
-              <span className="material-symbols-outlined text-4xl text-teal-500">group</span>
+            <h1 className="text-2xl md:text-[1.65rem] font-black text-gray-900 flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-3xl text-teal-500">group</span>
               Manage Teachers
             </h1>
-            <p className="text-gray-600 mt-1 font-medium">
+            <p className="text-sm text-gray-600 mt-1 font-medium">
               View and track teachers in your assigned branches
             </p>
           </div>
@@ -278,32 +278,32 @@ const RoleManageTeachers = () => {
               resetForm();
               setShowAddModal(true);
             }}
-            className="px-6 py-3 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 text-white font-semibold shadow-lg shadow-teal-500/20 hover:opacity-90"
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 text-white text-sm font-semibold shadow-lg shadow-teal-500/20 hover:opacity-90"
           >
             + Add Teacher
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatsCard icon="group" label="Total Teachers" value={stats.total} bgColor="bg-gradient-to-br from-sky-500 to-blue-600" />
-          <StatsCard icon="check_circle" label="Active" value={stats.active} bgColor="bg-gradient-to-br from-emerald-500 to-green-600" />
-          <StatsCard icon="schedule" label="Pending" value={stats.pending} bgColor="bg-gradient-to-br from-amber-500 to-orange-600" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <StatsCard icon="group" label="Total Teachers" value={stats.total} bgColor="bg-gradient-to-br from-sky-500 to-blue-600" compact singleLine />
+          <StatsCard icon="check_circle" label="Active" value={stats.active} bgColor="bg-gradient-to-br from-emerald-500 to-green-600" compact singleLine />
+          <StatsCard icon="schedule" label="Pending" value={stats.pending} bgColor="bg-gradient-to-br from-amber-500 to-orange-600" compact singleLine />
         </div>
 
         <Card>
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-3">
             <div className="relative flex-1">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xl">search</span>
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">search</span>
               <input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search by name, email, or mobile"
-                className="w-full pl-10 h-11 rounded-xl border border-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full pl-9 pr-3 h-10 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
             <button
               onClick={fetchTeachers}
-              className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
+              className="px-4 py-2 rounded-xl border border-gray-300 text-sm text-gray-700 font-semibold hover:bg-gray-50"
             >
               Refresh
             </button>
@@ -318,41 +318,41 @@ const RoleManageTeachers = () => {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Teacher</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Contact</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Branch</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Subjects</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-600 uppercase tracking-wide">Teacher</th>
+                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-600 uppercase tracking-wide">Contact</th>
+                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-600 uppercase tracking-wide">Branch</th>
+                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-600 uppercase tracking-wide">Subjects</th>
+                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-600 uppercase tracking-wide">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {filteredTeachers.map((teacher) => (
                     <tr key={teacher._id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 text-white font-bold flex items-center justify-center">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 text-white text-sm font-bold flex items-center justify-center shrink-0">
                             {teacher.name?.charAt(0).toUpperCase()}
                           </div>
-                          <div>
-                            <p className="font-semibold text-gray-900">{teacher.name}</p>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm text-gray-900 truncate">{teacher.name}</p>
                             <p className="text-xs text-gray-500">ID: {teacher._id?.slice(0, 8)}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        <p>{teacher.email}</p>
+                      <td className="px-4 py-3 text-xs text-gray-600">
+                        <p className="truncate max-w-[220px]">{teacher.email}</p>
                         <p>{teacher.mobile || 'N/A'}</p>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-4 py-3 text-sm text-gray-600">
                         {teacher.branch?.name || teacher.department?.name || 'N/A'}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-4 py-3 text-sm text-gray-600">
                         {Array.isArray(teacher.assignedSubjects)
                           ? teacher.assignedSubjects.length
                           : 0}
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
                           teacher.status === 'active'
                             ? 'bg-emerald-50 text-emerald-700'
                             : teacher.status === 'pending'
@@ -373,11 +373,11 @@ const RoleManageTeachers = () => {
 
       {showAddModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-200">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+            <div className="p-4 md:p-5 border-b border-gray-200 flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Add Teacher</h2>
-                <p className="text-sm text-gray-500">Create a teacher account for your branches</p>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Add Teacher</h2>
+                <p className="text-xs md:text-sm text-gray-500">Create a teacher account for your branches</p>
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
@@ -387,7 +387,7 @@ const RoleManageTeachers = () => {
               </button>
             </div>
 
-            <form onSubmit={handleCreateTeacher} className="p-6 space-y-6">
+            <form onSubmit={handleCreateTeacher} className="p-4 md:p-5 space-y-4">
               {formError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
                   {formError}
@@ -399,33 +399,33 @@ const RoleManageTeachers = () => {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Full Name *</label>
                   <input
                     name="name"
                     value={formData.name}
                     onChange={handleFormChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg"
                     placeholder="Teacher name"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Mobile *</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mobile *</label>
                   <input
                     name="mobile"
                     value={formData.mobile}
                     onChange={handleFormChange}
                     maxLength={10}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg"
                     placeholder="10-digit mobile"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Branches *</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Branches *</label>
                   <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
                     {branches.map((branch) => (
                       <label key={branch._id} className="flex items-center gap-2 text-sm">
@@ -443,7 +443,7 @@ const RoleManageTeachers = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Semesters *</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Semesters *</label>
                   <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
                     {semesters.map((semester) => (
                       <label key={semester._id} className="flex items-center gap-2 text-sm">
@@ -463,7 +463,7 @@ const RoleManageTeachers = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Subjects (optional)</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Subjects (optional)</label>
                 <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
                   {filteredSubjects.map((subject) => (
                     <label key={subject._id} className="flex items-center gap-2 text-sm">
@@ -481,18 +481,18 @@ const RoleManageTeachers = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3">
+              <div className="flex justify-end gap-2.5 pt-1">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700"
+                  className="px-3.5 py-2 text-sm rounded-lg border border-gray-300 text-gray-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={formLoading}
-                  className="px-5 py-2 rounded-lg bg-teal-600 text-white font-semibold hover:opacity-90"
+                  className="px-4 py-2 text-sm rounded-lg bg-teal-600 text-white font-semibold hover:opacity-90"
                 >
                   {formLoading ? 'Saving...' : 'Create Teacher'}
                 </button>

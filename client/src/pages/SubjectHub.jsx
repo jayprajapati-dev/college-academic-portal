@@ -15,6 +15,8 @@ const SubjectHub = () => {
   const [tasks, setTasks] = useState([]);
   const [notices, setNotices] = useState([]);
   const [books, setBooks] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [subjectAccessDenied, setSubjectAccessDenied] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -38,6 +40,8 @@ const SubjectHub = () => {
           setMaterials([]);
           setTasks([]);
           setNotices([]);
+          setProjects([]);
+          setSubjectAccessDenied(false);
         }
 
         const bookRes = await fetch(`/api/library/books/public?subjectId=${id}`);
@@ -47,36 +51,56 @@ const SubjectHub = () => {
         }
 
         if (token) {
-          const [materialsRes, tasksRes, noticesRes] = await Promise.allSettled([
-            fetch(`/api/academic/subjects/${id}/materials`, {
-              headers: { Authorization: `Bearer ${token}` }
-            }),
-            fetch(`/api/tasks/subject/${id}?page=1&limit=4`, {
-              headers: { Authorization: `Bearer ${token}` }
-            }),
-            fetch('/api/notices/board?page=1&limit=4&sortBy=newest', {
-              headers: { Authorization: `Bearer ${token}` }
-            })
-          ]);
+          const materialsRes = await fetch(`/api/academic/subjects/${id}/materials`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
 
-          if (materialsRes.status === 'fulfilled') {
-            const materialsData = await materialsRes.value.json();
+          if (materialsRes.ok) {
+            const materialsData = await materialsRes.json();
             if (isMounted && Array.isArray(materialsData?.materials)) {
               setMaterials(materialsData.materials);
             }
           }
 
-          if (tasksRes.status === 'fulfilled') {
-            const tasksData = await tasksRes.value.json();
-            if (isMounted && Array.isArray(tasksData?.data)) {
-              setTasks(tasksData.data);
-            }
-          }
+          const tasksRes = await fetch(`/api/tasks/subject/${id}?page=1&limit=4`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
 
-          if (noticesRes.status === 'fulfilled') {
-            const noticesData = await noticesRes.value.json();
-            if (isMounted && Array.isArray(noticesData?.data)) {
-              setNotices(noticesData.data);
+          if (!tasksRes.ok && (tasksRes.status === 401 || tasksRes.status === 403)) {
+            if (isMounted) {
+              setSubjectAccessDenied(true);
+              setTasks([]);
+              setNotices([]);
+            }
+          } else if (tasksRes.ok) {
+            const tasksData = await tasksRes.json();
+            if (isMounted) {
+              setSubjectAccessDenied(false);
+              if (Array.isArray(tasksData?.data)) {
+                setTasks(tasksData.data);
+              }
+            }
+
+            const noticesRes = await fetch('/api/notices/board?page=1&limit=4&sortBy=newest', {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (noticesRes.ok) {
+              const noticesData = await noticesRes.json();
+              if (isMounted && Array.isArray(noticesData?.data)) {
+                setNotices(noticesData.data);
+              }
+            }
+
+            const projectsRes = await fetch(`/api/projects/subject/${id}?page=1&limit=4&status=all`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (projectsRes.ok) {
+              const projectsData = await projectsRes.json();
+              if (isMounted && Array.isArray(projectsData?.data)) {
+                setProjects(projectsData.data);
+              }
             }
           }
         }
@@ -98,6 +122,7 @@ const SubjectHub = () => {
   const taskPreview = useMemo(() => tasks.slice(0, 4), [tasks]);
   const noticePreview = useMemo(() => notices.slice(0, 4), [notices]);
   const libraryPreview = useMemo(() => books.slice(0, 4), [books]);
+  const projectPreview = useMemo(() => projects.slice(0, 4), [projects]);
 
   const handleJump = (sectionId) => {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
@@ -175,11 +200,27 @@ const SubjectHub = () => {
                 </div>
               </div>
               <div className="mt-6 flex flex-wrap gap-3">
-                <button onClick={() => handleJump('tasks')} className="px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-sm font-semibold hover:border-primary/40">Tasks</button>
-                <button onClick={() => handleJump('notices')} className="px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-sm font-semibold hover:border-primary/40">Notices</button>
                 <button onClick={() => handleJump('library')} className="px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-sm font-semibold hover:border-primary/40">Library</button>
-                <button onClick={() => handleJump('projects')} className="px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-sm font-semibold hover:border-primary/40">Projects</button>
+                {isLoggedIn && !subjectAccessDenied && (
+                  <>
+                    <button onClick={() => handleJump('tasks')} className="px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-sm font-semibold hover:border-primary/40">Tasks</button>
+                    <button onClick={() => handleJump('notices')} className="px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-sm font-semibold hover:border-primary/40">Notices</button>
+                    <button onClick={() => handleJump('projects')} className="px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-sm font-semibold hover:border-primary/40">Projects</button>
+                  </>
+                )}
               </div>
+
+              {!isLoggedIn && (
+                <div className="mt-4 p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-white/5 text-sm text-gray-600 dark:text-gray-400">
+                  Public view only shows subject details, marks and library. Login to access Tasks, Notices and Projects.
+                </div>
+              )}
+
+              {isLoggedIn && subjectAccessDenied && (
+                <div className="mt-4 p-4 rounded-xl border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-sm text-amber-800 dark:text-amber-200">
+                  You do not have access to subject modules for this subject. Only scoped users can view Tasks, Notices and Projects.
+                </div>
+              )}
 
               {/* Exam Type & Marks Section */}
               <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -247,18 +288,33 @@ const SubjectHub = () => {
                       </div>
                     )}
                   </div>
-                  {subject?.marks?.passingMarks > 0 && (
-                    <div className="mt-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                      <p className="text-sm text-amber-800 dark:text-amber-200">
-                        <span className="font-bold">Passing Marks:</span> {subject.marks.passingMarks}
-                      </p>
-                    </div>
-                  )}
                 </div>
               )}
             </section>
 
             <section id="materials" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-3xl p-8 shadow-sm">
+              <div className="mb-6 p-5 rounded-2xl border border-[#dcdee5] dark:border-white/10 bg-gray-50 dark:bg-white/5">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <h3 className="text-xl font-bold">Syllabus</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Official syllabus PDF for this subject.</p>
+                  </div>
+                  {subject?.syllabus ? (
+                    <a
+                      href={subject.syllabus}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90"
+                    >
+                      <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
+                      Open Syllabus PDF
+                    </a>
+                  ) : (
+                    <span className="text-sm text-gray-500">Syllabus not uploaded yet.</span>
+                  )}
+                </div>
+              </div>
+
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                 <div>
                   <h2 className="text-2xl font-bold">Materials</h2>
@@ -319,6 +375,7 @@ const SubjectHub = () => {
               )}
             </section>
 
+            {isLoggedIn && !subjectAccessDenied && (
             <section id="tasks" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-3xl p-8 shadow-sm">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                 <div>
@@ -363,7 +420,9 @@ const SubjectHub = () => {
                 </div>
               )}
             </section>
+            )}
 
+            {isLoggedIn && !subjectAccessDenied && (
             <section id="notices" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-3xl p-8 shadow-sm">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                 <div>
@@ -399,6 +458,7 @@ const SubjectHub = () => {
                 </div>
               )}
             </section>
+            )}
 
             <section id="library" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-3xl p-8 shadow-sm">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
@@ -430,6 +490,7 @@ const SubjectHub = () => {
               )}
             </section>
 
+            {isLoggedIn && !subjectAccessDenied && (
             <section id="projects" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-3xl p-8 shadow-sm">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                 <div>
@@ -437,14 +498,41 @@ const SubjectHub = () => {
                   <p className="text-sm text-gray-600 dark:text-gray-400">Capstones, mini-projects, and lab work.</p>
                 </div>
                 <button
-                  onClick={() => navigate(`/subjects/${id}/tasks`)}
+                  onClick={() => navigate(`/subjects/${id}/projects`)}
                   className="px-4 py-2 rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10"
                 >
-                  View Project Tasks
+                  View All Projects
                 </button>
               </div>
-              <div className="text-center py-10 text-gray-500">Project workspace is coming soon.</div>
+              {projectPreview.length === 0 ? (
+                <div className="text-center py-10 text-gray-500">No projects available for this subject.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {projectPreview.map((project) => (
+                    <div key={project._id} className="p-4 rounded-xl border border-[#dcdee5] dark:border-white/10 bg-gray-50 dark:bg-white/5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-gray-900 dark:text-white">{project.title}</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{project.category || 'Project'}</p>
+                        </div>
+                        {project.status && (
+                          <span className="text-xs font-semibold px-2 py-1 rounded-full bg-primary/10 text-primary capitalize">
+                            {project.status}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 line-clamp-2">
+                        {project.description || 'No description available.'}
+                      </p>
+                      {project.dueDate && (
+                        <p className="text-xs text-gray-500 mt-3">Due: {new Date(project.dueDate).toLocaleDateString()}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
+            )}
           </>
         )}
       </div>

@@ -1,10 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { LandingFrame } from '../components';
+import useLandingAuth from '../hooks/useLandingAuth';
 
 const CompleteProfilePage = () => {
   const navigate = useNavigate();
+  const { isLoggedIn, currentUser, userProfile, notifications } = useLandingAuth();
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [branches, setBranches] = useState([]);
+  const [semesters, setSemesters] = useState([]);
+  const [message, setMessage] = useState({ type: '', text: '' });
   const [profileData, setProfileData] = useState({
     name: '',
     email: '',
@@ -16,17 +23,36 @@ const CompleteProfilePage = () => {
     hod: ''
   });
 
-  useEffect(() => {
-    fetchProfile();
+  const fetchAcademicMeta = useCallback(async () => {
+    try {
+      const [branchesRes, semestersRes] = await Promise.all([
+        fetch('/api/academic/branches'),
+        fetch('/api/academic/semesters')
+      ]);
+
+      const [branchesData, semestersData] = await Promise.all([
+        branchesRes.json(),
+        semestersRes.json()
+      ]);
+
+      if (branchesData?.success) setBranches(branchesData.data || []);
+      if (semestersData?.success) setSemesters(semestersData.data || []);
+    } catch (error) {
+      console.error('Error loading branches/semesters:', error);
+    }
   }, []);
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
-      
-      const response = await fetch('http://localhost:5000/api/profile/me', {
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      const response = await fetch('/api/profile/me', {
         headers: {
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`
         }
       });
 
@@ -38,231 +64,299 @@ const CompleteProfilePage = () => {
           email: data.data.email || '',
           mobile: data.data.mobile || '',
           role: data.data.role || '',
-          branch: data.data.branch?.name || 'Not Assigned',
-          semester: data.data.semester?.name || 'Not Assigned',
-          subjects: data.data.assignedSubjects?.map(s => s.name) || [],
+          branch: data.data.branch?._id || data.data.branch || '',
+          semester: data.data.semester?._id || data.data.semester || '',
+          subjects: data.data.assignedSubjects?.map((s) => s.name) || [],
           hod: data.data.assignedHOD?.name || 'Not Assigned'
         });
       } else {
-        alert('Error loading profile');
+        setMessage({ type: 'error', text: 'Unable to load profile details.' });
       }
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error connecting to server');
+      console.error('Error loading profile:', error);
+      setMessage({ type: 'error', text: 'Error connecting to server.' });
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    const load = async () => {
+      await Promise.all([fetchProfile(), fetchAcademicMeta()]);
+    };
+    load();
+  }, [fetchAcademicMeta, fetchProfile]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setProfileData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setProfileData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setMessage({ type: '', text: '' });
     setSubmitting(true);
 
     try {
       const token = localStorage.getItem('token');
-      
-      const response = await fetch('http://localhost:5000/api/profile/complete-profile', {
+
+      if (profileData.role === 'student' && (!profileData.branch || !profileData.semester)) {
+        setMessage({ type: 'error', text: 'Please select branch and semester to continue.' });
+        setSubmitting(false);
+        return;
+      }
+
+      const response = await fetch('/api/profile/complete-profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          name: profileData.name
+          name: profileData.name,
+          email: profileData.email,
+          mobile: profileData.mobile,
+          branch: profileData.branch,
+          semester: profileData.semester
         })
       });
 
       const data = await response.json();
 
       if (data.success) {
-        alert('Profile completed successfully!');
-        // Navigate to appropriate dashboard based on role
+        const existingUser = JSON.parse(localStorage.getItem('user') || '{}');
+        localStorage.setItem('user', JSON.stringify({
+          ...existingUser,
+          name: data?.data?.name || profileData.name,
+          email: data?.data?.email || profileData.email,
+          mobile: data?.data?.mobile || profileData.mobile,
+          branch: data?.data?.branch || profileData.branch,
+          semester: data?.data?.semester || profileData.semester,
+          profileUpdateRequired: false,
+          profileCompletionRequired: false
+        }));
+
         const dashboardMap = {
-          'student': '/student/dashboard',
-          'teacher': '/teacher/dashboard',
-          'hod': '/hod/dashboard',
-          'admin': '/admin/dashboard'
+          student: '/student/dashboard',
+          teacher: '/teacher/dashboard',
+          hod: '/hod/dashboard',
+          admin: '/admin/dashboard',
+          coordinator: '/coordinator/dashboard'
         };
+
         navigate(dashboardMap[profileData.role] || '/');
       } else {
-        alert(data.message || 'Error completing profile');
+        setMessage({ type: 'error', text: data.message || 'Unable to complete profile.' });
       }
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error connecting to server');
+      console.error('Error submitting profile:', error);
+      setMessage({ type: 'error', text: 'Error connecting to server.' });
     } finally {
       setSubmitting(false);
     }
   };
 
+  const roleLabel = useMemo(() => {
+    if (!profileData.role) return 'N/A';
+    return String(profileData.role).toUpperCase();
+  }, [profileData.role]);
+
+  const formatSemesterOptionLabel = (semester) => {
+    const semesterPart = semester?.name || (semester?.semesterNumber ? `Sem ${semester.semesterNumber}` : 'Semester');
+    const yearPart = semester?.academicYear ? ` (${semester.academicYear})` : '';
+    return `${semesterPart}${yearPart}`;
+  };
+
+  const showStudentAcademicSelects = profileData.role === 'student';
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#194ce6] mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading profile...</p>
+      <LandingFrame
+        isLoggedIn={isLoggedIn}
+        currentUser={currentUser}
+        userProfile={userProfile}
+        notifications={notifications}
+      >
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-20 min-h-[70vh] flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-14 w-14 border-b-2 border-[#194ce6] mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading profile details...</p>
+          </div>
         </div>
-      </div>
+      </LandingFrame>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-3xl">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <div className="p-1.5 rounded-lg bg-gradient-to-r from-[#194ce6] to-purple-500">
-              <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Complete Your Profile</h1>
-          <p className="text-gray-600">Review your information and complete setup</p>
-        </div>
+    <LandingFrame
+      isLoggedIn={isLoggedIn}
+      currentUser={currentUser}
+      userProfile={userProfile}
+      notifications={notifications}
+    >
+      <section className="max-w-[1180px] mx-auto px-4 sm:px-6 py-10 md:py-14">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6">
+          <aside className="lg:col-span-4 rounded-2xl bg-gradient-to-br from-[#1e3a8a] via-[#2563eb] to-[#0891b2] text-white p-5 md:p-6">
+            <p className="text-[11px] uppercase tracking-[0.2em] text-blue-100">Profile Setup</p>
+            <h1 className="text-2xl md:text-3xl font-black mt-2">Complete Your Profile</h1>
+            <p className="text-sm text-blue-100 mt-2">
+              Finish this step once to access your dashboard with the right branch and semester mapping.
+            </p>
 
-        {/* Main Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Editable Section */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">
-                Personal Information (Editable)
-              </h3>
-              
-              {/* Name */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={profileData.name}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#194ce6] focus:border-transparent outline-none transition"
-                  placeholder="Enter your full name"
-                  required
-                />
+            <div className="mt-5 space-y-3 text-sm">
+              <div className="rounded-xl bg-white/10 px-3.5 py-3">
+                <p className="text-[11px] text-blue-100 uppercase tracking-wide">Role</p>
+                <p className="font-bold mt-1">{roleLabel}</p>
               </div>
-
-              {/* Email (if student) */}
-              {profileData.role === 'student' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={profileData.email}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#194ce6] focus:border-transparent outline-none transition"
-                    placeholder="Enter your email"
-                  />
+              {profileData.mobile && (
+                <div className="rounded-xl bg-white/10 px-3.5 py-3">
+                  <p className="text-[11px] text-blue-100 uppercase tracking-wide">Mobile</p>
+                  <p className="font-bold mt-1">{profileData.mobile}</p>
+                </div>
+              )}
+              {profileData.role === 'teacher' && (
+                <div className="rounded-xl bg-white/10 px-3.5 py-3">
+                  <p className="text-[11px] text-blue-100 uppercase tracking-wide">Assigned HOD</p>
+                  <p className="font-bold mt-1">{profileData.hod || 'N/A'}</p>
                 </div>
               )}
             </div>
+          </aside>
 
-            {/* Read-only Section */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b border-gray-200">
-                System Information (Auto-assigned)
-              </h3>
-              
+          <div className="lg:col-span-8 rounded-2xl bg-white border border-[#E6E9EF] shadow-sm p-5 md:p-6">
+            <div className="mb-5 pb-4 border-b border-[#EDF0F5]">
+              <h2 className="text-xl md:text-2xl font-black text-[#111318]">Profile Details</h2>
+              <p className="text-sm text-[#6B7280] mt-1">Editable fields are enabled below. System-assigned fields are read only.</p>
+            </div>
+
+            {message.text && (
+              <div
+                className={`mb-4 rounded-xl px-4 py-3 text-sm ${
+                  message.type === 'error'
+                    ? 'bg-rose-50 border border-rose-200 text-rose-700'
+                    : 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                }`}
+              >
+                {message.text}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Mobile */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Mobile Number
+                  <label className="block text-sm font-semibold text-[#374151] mb-1.5">
+                    Full Name <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
-                    value={profileData.mobile}
-                    disabled
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                    name="name"
+                    value={profileData.name}
+                    onChange={handleChange}
+                    className="w-full px-3.5 py-2.5 border border-[#D7DCE5] rounded-lg focus:ring-2 focus:ring-[#194ce6]/20 focus:border-[#194ce6] outline-none transition"
+                    placeholder="Enter your full name"
+                    required
                   />
                 </div>
 
-                {/* Role */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Role
-                  </label>
-                  <input
-                    type="text"
-                    value={profileData.role.toUpperCase()}
-                    disabled
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
-                  />
-                </div>
-
-                {/* Branch */}
-                {profileData.branch && (
+                {profileData.role === 'student' ? (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Branch
-                    </label>
+                    <label className="block text-sm font-semibold text-[#374151] mb-1.5">Email</label>
                     <input
-                      type="text"
-                      value={profileData.branch}
-                      disabled
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                      type="email"
+                      name="email"
+                      value={profileData.email}
+                      onChange={handleChange}
+                      className="w-full px-3.5 py-2.5 border border-[#D7DCE5] rounded-lg focus:ring-2 focus:ring-[#194ce6]/20 focus:border-[#194ce6] outline-none transition"
+                      placeholder="Enter your email"
                     />
                   </div>
-                )}
-
-                {/* Semester */}
-                {profileData.semester && (
+                ) : (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Semester
-                    </label>
+                    <label className="block text-sm font-semibold text-[#374151] mb-1.5">Email</label>
                     <input
                       type="text"
-                      value={profileData.semester}
+                      value={profileData.email || 'N/A'}
                       disabled
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
-                    />
-                  </div>
-                )}
-
-                {/* HOD */}
-                {profileData.role === 'teacher' && profileData.hod && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Assigned HOD
-                    </label>
-                    <input
-                      type="text"
-                      value={profileData.hod}
-                      disabled
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                      className="w-full px-3.5 py-2.5 border border-[#E2E8F0] rounded-lg bg-[#F8FAFC] text-[#64748B]"
                     />
                   </div>
                 )}
               </div>
 
-              {/* Assigned Subjects */}
+              {showStudentAcademicSelects ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-[#374151] mb-1.5">
+                      Select Branch <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      name="branch"
+                      value={profileData.branch || ''}
+                      onChange={handleChange}
+                      className="w-full px-3.5 py-2.5 border border-[#D7DCE5] rounded-lg bg-white focus:ring-2 focus:ring-[#194ce6]/20 focus:border-[#194ce6] outline-none transition"
+                      required
+                    >
+                      <option value="">Select branch</option>
+                      {branches.map((branch) => (
+                        <option key={branch._id} value={branch._id}>
+                          {branch.name} ({branch.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-[#374151] mb-1.5">
+                      Select Semester <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      name="semester"
+                      value={profileData.semester || ''}
+                      onChange={handleChange}
+                      className="w-full px-3.5 py-2.5 border border-[#D7DCE5] rounded-lg bg-white focus:ring-2 focus:ring-[#194ce6]/20 focus:border-[#194ce6] outline-none transition"
+                      required
+                    >
+                      <option value="">Select semester</option>
+                      {semesters.map((semester) => (
+                        <option key={semester._id} value={semester._id}>
+                          {formatSemesterOptionLabel(semester)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-[#374151] mb-1.5">Branch</label>
+                    <input
+                      type="text"
+                      value={profileData.branch?.name || profileData.branch || 'Not Assigned'}
+                      disabled
+                      className="w-full px-3.5 py-2.5 border border-[#E2E8F0] rounded-lg bg-[#F8FAFC] text-[#64748B]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-[#374151] mb-1.5">Semester</label>
+                    <input
+                      type="text"
+                      value={profileData.semester?.name || profileData.semester || 'Not Assigned'}
+                      disabled
+                      className="w-full px-3.5 py-2.5 border border-[#E2E8F0] rounded-lg bg-[#F8FAFC] text-[#64748B]"
+                    />
+                  </div>
+                </div>
+              )}
+
               {profileData.subjects.length > 0 && (
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Assigned Subjects
-                  </label>
+                <div>
+                  <label className="block text-sm font-semibold text-[#374151] mb-2">Assigned Subjects</label>
                   <div className="flex flex-wrap gap-2">
                     {profileData.subjects.map((subject, index) => (
                       <span
                         key={index}
-                        className="px-3 py-1 bg-gradient-to-r from-[#194ce6] to-purple-500 text-white text-sm rounded-full"
+                        className="px-3 py-1 bg-gradient-to-r from-[#194ce6] to-[#4f46e5] text-white text-xs font-semibold rounded-full"
                       >
                         {subject}
                       </span>
@@ -270,44 +364,26 @@ const CompleteProfilePage = () => {
                   </div>
                 </div>
               )}
-            </div>
 
-            {/* Info Box */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-start space-x-3">
-                <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-                <div>
-                  <p className="text-sm text-blue-800 font-medium">Note:</p>
-                  <p className="text-sm text-blue-700 mt-1">
-                    System-assigned fields (grey background) cannot be modified. Contact your administrator if any information is incorrect.
-                  </p>
-                </div>
+              <div className="rounded-xl bg-blue-50 border border-blue-200 p-3.5">
+                <p className="text-sm font-semibold text-blue-800">Important</p>
+                <p className="text-xs sm:text-sm text-blue-700 mt-1">
+                  System fields are maintained by administration. If details look incorrect, contact your admin/HOD.
+                </p>
               </div>
-            </div>
 
-            {/* Submit Button */}
-            <div className="pt-4">
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full bg-gradient-to-r from-[#194ce6] to-purple-500 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-gradient-to-r from-[#194ce6] to-[#4f46e5] text-white py-3 rounded-lg text-sm font-bold hover:shadow-md transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {submitting ? 'Completing Profile...' : 'Complete Profile & Continue'}
+                {submitting ? 'Saving Profile...' : 'Complete Profile & Continue'}
               </button>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
-
-        {/* Footer */}
-        <div className="text-center mt-6">
-          <p className="text-xs text-gray-500">
-            v4.2.0 Profile Setup | Smart College Academic Portal
-          </p>
-        </div>
-      </div>
-    </div>
+      </section>
+    </LandingFrame>
   );
 };
 

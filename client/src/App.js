@@ -17,6 +17,7 @@ import TermsPage from './pages/TermsPage';
 import DisclaimerPage from './pages/DisclaimerPage';
 import SubjectMaterialsPublic from './pages/SubjectMaterialsPublic';
 import SubjectHub from './pages/SubjectHub';
+import SubjectProjects from './pages/SubjectProjects';
 import NoticeBoard from './pages/NoticeBoard';
 import RoleDashboard from './pages/role/RoleDashboard';
 import RoleMaterials from './pages/role/RoleMaterials';
@@ -36,6 +37,7 @@ import UserManagement from './pages/UserManagement';
 import SubjectMaterialsManagement from './pages/SubjectMaterialsManagement';
 import RoleAcademicStructure from './pages/role/RoleAcademicStructure';
 import RoleSubjects from './pages/role/RoleSubjects';
+import RoleProjects from './pages/role/RoleProjects';
 import ContactManagement from './pages/admin/ContactManagement';
 import PasswordSetup from './pages/PasswordSetup';
 import ExamManagement from './pages/ExamManagement';
@@ -43,6 +45,7 @@ import ActivityLog from './pages/ActivityLog';
 
 // Import HOD pages
 import AddTeacher from './pages/hod/AddTeacher';
+import RoleHODSubjects from './pages/role/RoleHODSubjects';
 import BranchReports from './pages/hod/BranchReports';
 
 // Import Admin pages
@@ -57,10 +60,16 @@ import StudentTaskDetail from './pages/student/TaskDetail';
 import StudentLibrary from './pages/student/StudentLibrary';
 import StudentExams from './pages/student/StudentExams';
 import TaskSubmissions from './pages/teacher/TaskSubmissions';
+import RoleExamsViewOnly from './pages/role/RoleExamsViewOnly';
 
 function App() {
   return (
-    <Router>
+    <Router
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true
+      }}
+    >
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
@@ -75,6 +84,7 @@ function App() {
         <Route path="/disclaimer" element={<DisclaimerPage />} />
         <Route path="/subjects/:id" element={<SubjectHub />} />
         <Route path="/subjects/:id/materials" element={<SubjectMaterialsPublic />} />
+        <Route path="/subjects/:subjectId/projects" element={<SubjectProjects />} />
         <Route path="/notices" element={<NoticeBoard />} />
         
         {/* First Login & Profile Setup */}
@@ -98,10 +108,12 @@ function App() {
         <Route path="/teacher/tasks" element={<RoleTasks />} />
         <Route path="/teacher/tasks/:taskId/submissions" element={<TaskSubmissions />} />
         <Route path="/teacher/library" element={<RoleLibrary />} />
-        <Route path="/teacher/exams" element={<ExamManagement />} />
+        <Route path="/teacher/projects" element={<RoleProjects />} />
+        <Route path="/teacher/exams" element={<RoleExamsViewOnly />} />
         <Route path="/coordinator/dashboard" element={<RoleDashboard />} />
         <Route path="/coordinator/profile" element={<RoleProfile />} />
         <Route path="/coordinator/tasks" element={<RoleTasks />} />
+        <Route path="/coordinator/projects" element={<RoleProjects />} />
         <Route path="/coordinator/tasks/:taskId/submissions" element={<TaskSubmissions />} />
         <Route path="/coordinator/notices" element={<RoleNotices />} />
         <Route path="/coordinator/users" element={<UserManagement />} />
@@ -117,6 +129,7 @@ function App() {
         <Route path="/hod/tasks" element={<RoleTasks />} />
         <Route path="/hod/tasks/:taskId/submissions" element={<TaskSubmissions />} />
         <Route path="/hod/library" element={<RoleLibrary />} />
+        <Route path="/hod/projects" element={<RoleProjects />} />
         <Route path="/hod/exams" element={<ExamManagement />} />
         <Route path="/admin/dashboard" element={<RoleDashboard />} />
         <Route path="/admin/profile" element={<RoleProfile />} />
@@ -137,9 +150,10 @@ function App() {
         <Route path="/admin/notices" element={<RoleNotices />} />
         <Route path="/admin/tasks" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/admin/materials" element={<RoleMaterials />} />
-        <Route path="/admin/library" element={<RoleLibrary />} />
+        <Route path="/admin/library" element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="/admin/projects" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/admin/exams" element={<ExamManagement />} />
-        <Route path="/hod/subjects" element={<RoleSubjects />} />
+        <Route path="/hod/subjects" element={<RoleHODSubjects />} />
         <Route path="/teacher/subjects" element={<RoleSubjects />} />
         <Route path="/hod/academic-structure" element={<RoleAcademicStructure />} />
         <Route path="/teacher/academic-structure" element={<RoleAcademicStructure />} />

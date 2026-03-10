@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Card, Input, RoleLayout, StatsCard } from '../../components';
+import { Card, RoleLayout, StatsCard } from '../../components';
 import useRoleNav from '../../hooks/useRoleNav';
 
 const RoleAcademicStructure = () => {
@@ -187,75 +187,83 @@ const RoleAcademicStructure = () => {
       panelLabel={panelLabel}
       profileLinks={role === 'admin' ? [] : [{ label: 'Profile', to: `/${role}/profile` }]}
     >
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <h2 className="text-3xl font-black text-gray-900 dark:text-white flex items-center gap-3">
-              <span className="material-symbols-outlined text-4xl text-primary">account_tree</span>
+      <div className="flex flex-col gap-4 sm:gap-5">
+        <div className="rounded-2xl border border-indigo-100 dark:border-indigo-900/40 bg-gradient-to-r from-indigo-50 via-blue-50 to-cyan-50 dark:from-gray-800 dark:via-gray-800 dark:to-gray-700 p-4 sm:p-5">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5 sm:gap-4">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white flex items-center gap-2.5 sm:gap-3">
+                <span className="material-symbols-outlined text-3xl sm:text-4xl text-primary">account_tree</span>
               Academic Structure
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mt-1 font-medium">
-              View the institutional hierarchy in one place.
-            </p>
-            {role !== 'admin' && (
-              <p className="text-xs text-amber-700 bg-amber-50 inline-flex mt-2 px-3 py-1 rounded-full">
-                Editing is handled in Subjects for your assigned scope.
+              </h2>
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mt-1 font-medium">
+                View semesters, branches, and subjects quickly.
               </p>
-            )}
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-            <div className="w-full sm:w-80">
-              <Input
-                placeholder="Search semesters, branches, or subjects..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                icon="search"
-              />
+              {role !== 'admin' && (
+                <p className="text-xs text-amber-700 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-300 inline-flex mt-2 px-3 py-1 rounded-full border border-amber-200 dark:border-amber-700/50">
+                  Editing is handled in Subjects for your assigned scope.
+                </p>
+              )}
             </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={expandAll}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold"
-              >
-                Expand All
-              </button>
-              <button
-                type="button"
-                onClick={collapseAll}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold"
-              >
-                Collapse All
-              </button>
+            <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+              <div className="relative w-full sm:w-80 lg:w-[320px]">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M8.5 3a5.5 5.5 0 014.358 8.858l3.142 3.142a1 1 0 01-1.414 1.414l-3.142-3.142A5.5 5.5 0 118.5 3zm-3.5 5.5a3.5 3.5 0 117 0 3.5 3.5 0 01-7 0z" clipRule="evenodd" />
+                  </svg>
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search semesters, branches, or subjects..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white/90 dark:bg-gray-800/90 pl-9 pr-3 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/35 focus:border-primary"
+                />
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={expandAll}
+                  className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm font-semibold bg-white/80 dark:bg-gray-800/80 whitespace-nowrap w-full sm:w-auto"
+                >
+                  Expand All
+                </button>
+                <button
+                  type="button"
+                  onClick={collapseAll}
+                  className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm font-semibold bg-white/80 dark:bg-gray-800/80 whitespace-nowrap w-full sm:w-auto"
+                >
+                  Collapse All
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatsCard icon="calendar_month" label="Total Semesters" value={stats.totalSemesters} bgColor="bg-gradient-to-br from-blue-500 to-blue-600" />
-          <StatsCard icon="apartment" label="Total Branches" value={stats.totalBranches} bgColor="bg-gradient-to-br from-indigo-500 to-indigo-600" />
-          <StatsCard icon="menu_book" label="Total Subjects" value={stats.totalSubjects} bgColor="bg-gradient-to-br from-purple-500 to-purple-600" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <StatsCard icon="calendar_month" label="Total Semesters" value={stats.totalSemesters} bgColor="bg-gradient-to-br from-blue-500 to-blue-600" compact />
+          <StatsCard icon="apartment" label="Total Branches" value={stats.totalBranches} bgColor="bg-gradient-to-br from-indigo-500 to-indigo-600" compact />
+          <StatsCard icon="menu_book" label="Total Subjects" value={stats.totalSubjects} bgColor="bg-gradient-to-br from-purple-500 to-purple-600" compact />
         </div>
 
         <Card title="Structure Explorer" subtitle="Expand semesters and branches to view subjects">
-          <div className="space-y-4">
+          <div className="space-y-3">
             {filteredStructure.map((semester) => (
-              <div key={semester._id} className="border border-[#E6E9EF] rounded-2xl overflow-hidden">
+              <div key={semester._id} className="border border-[#E6E9EF] dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
                 <button
                   onClick={() => toggleSemester(semester._id)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-[#F8FAFC] hover:bg-[#F1F5F9] transition-colors"
+                  className="w-full flex items-center justify-between px-3.5 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-[#F8FAFC] to-[#F1F5F9] dark:from-gray-800 dark:to-gray-700 hover:brightness-[0.99] transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <span className="material-symbols-outlined text-[#6B7280]">
                       {getSemesterIcon(semester.semesterNumber)}
                     </span>
                     <div className="text-left">
-                      <p className="font-semibold">{semester.name || `Semester ${semester.semesterNumber}`}</p>
+                      <p className="font-semibold text-sm sm:text-base">{semester.name || `Semester ${semester.semesterNumber}`}</p>
                       <p className="text-xs text-[#6B7280]">Academic Year: {semester.academicYear}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold bg-[#E6E9EF] text-[#111318] px-2 py-1 rounded-full">
+                    <span className="text-[11px] font-semibold bg-[#E6E9EF] dark:bg-gray-600 text-[#111318] dark:text-gray-100 px-2 py-0.5 rounded-full">
                       {semester.branches?.length || 0} Branches
                     </span>
                     <span className="material-symbols-outlined text-[#6B7280]">
@@ -265,22 +273,22 @@ const RoleAcademicStructure = () => {
                 </button>
 
                 {expandedSemesters.has(semester._id) && semester.branches && (
-                  <div className="px-4 py-4 space-y-3 bg-white">
+                  <div className="px-3.5 sm:px-4 py-3.5 space-y-2.5 bg-white dark:bg-gray-900">
                     {semester.branches.map((branch) => (
-                      <div key={branch._id} className="border border-[#E6E9EF] rounded-xl overflow-hidden">
+                      <div key={branch._id} className="border border-[#E6E9EF] dark:border-gray-700 rounded-xl overflow-hidden">
                         <button
                           onClick={() => toggleBranch(branch._id)}
-                          className="w-full flex items-center justify-between px-3 py-2 bg-[#F8FAFC] hover:bg-[#F1F5F9] transition-colors"
+                          className="w-full flex items-center justify-between px-3 py-2 bg-[#F8FAFC] dark:bg-gray-800 hover:bg-[#F1F5F9] dark:hover:bg-gray-700 transition-colors"
                         >
                           <div className="flex items-center gap-2">
                             <span className="material-symbols-outlined text-[#6B7280]">apartment</span>
                             <div className="text-left">
-                              <p className="text-sm font-semibold">{branch.name}</p>
+                              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{branch.name}</p>
                               <p className="text-xs text-[#6B7280]">Code: {branch.code}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold bg-[#E6E9EF] text-[#111318] px-2 py-1 rounded-full">
+                            <span className="text-[11px] font-semibold bg-[#E6E9EF] dark:bg-gray-600 text-[#111318] dark:text-gray-100 px-2 py-0.5 rounded-full">
                               {branch.subjects?.length || 0} Subjects
                             </span>
                             <span className="material-symbols-outlined text-[#6B7280]">
@@ -290,17 +298,17 @@ const RoleAcademicStructure = () => {
                         </button>
 
                         {expandedBranches.has(branch._id) && branch.subjects && (
-                          <div className="px-3 py-3 bg-white">
+                          <div className="px-3 py-3 bg-white dark:bg-gray-900">
                             {branch.subjects.length > 0 ? (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
                                 {branch.subjects.map((subject) => (
-                                  <div key={subject._id} className="border border-[#E6E9EF] rounded-lg p-3 hover:border-[#111318] transition-colors">
+                                  <div key={subject._id} className="border border-[#E6E9EF] dark:border-gray-700 rounded-lg p-2.5 hover:border-[#111318] dark:hover:border-gray-400 transition-colors">
                                     <div className="flex items-center justify-between">
                                       <div>
-                                        <p className="text-sm font-semibold">{subject.name}</p>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{subject.name}</p>
                                         <p className="text-xs text-[#6B7280]">{subject.code}</p>
                                       </div>
-                                      <span className="text-xs font-semibold bg-[#F1F5F9] text-[#111318] px-2 py-1 rounded-full">
+                                      <span className="text-[11px] font-semibold bg-[#F1F5F9] dark:bg-gray-700 text-[#111318] dark:text-gray-100 px-2 py-0.5 rounded-full capitalize">
                                         {subject.type || 'theory'}
                                       </span>
                                     </div>

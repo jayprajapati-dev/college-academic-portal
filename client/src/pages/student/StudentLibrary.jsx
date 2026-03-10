@@ -31,16 +31,15 @@ const StudentLibrary = () => {
     return data.data;
   }, []);
 
-  const fetchSubjects = useCallback(async (branchId, semesterId) => {
-    const res = await fetch('/api/academic/subjects');
+  const fetchSubjects = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    const res = await fetch('/api/academic/subjects/student', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
     const data = await res.json();
     if (!data.success || !Array.isArray(data.data)) return [];
 
-    return data.data.filter((subject) => {
-      if (branchId && subject.branchId !== branchId) return false;
-      if (semesterId && subject.semesterId !== semesterId) return false;
-      return true;
-    });
+    return data.data;
   }, []);
 
   const fetchBooks = useCallback(async (branchId, semesterId) => {
@@ -66,7 +65,7 @@ const StudentLibrary = () => {
         const branchId = profileData?.branch?._id || profileData?.branchId || profileData?.branch;
         const semesterId = profileData?.semester?._id || profileData?.semesterId || profileData?.semester;
 
-        const subjectList = await fetchSubjects(branchId, semesterId);
+        const subjectList = await fetchSubjects();
         setSubjects(subjectList);
 
         const bookList = await fetchBooks(branchId, semesterId);
@@ -107,24 +106,33 @@ const StudentLibrary = () => {
   return (
     <StudentLayout title="Library" onLogout={handleLogout} userName={profile?.name || 'Student'}>
       <div className="space-y-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-black text-gray-900">Library Resources</h1>
-            <p className="text-gray-600 mt-1">
-              Browse subject-based books recommended by your department
-            </p>
+        <section className="rounded-3xl bg-gradient-to-r from-[#0f172a] via-[#0f766e] to-[#14b8a6] text-white p-6 md:p-7">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-emerald-100">Knowledge Hub</p>
+              <h1 className="text-2xl md:text-3xl font-black mt-1">Library Resources</h1>
+              <p className="text-sm md:text-base text-emerald-100 mt-1">
+                Curated books by subject to speed up your daily study flow.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs font-semibold">
+              <span className="px-3 py-1 rounded-full bg-white/15">Books: {books.length}</span>
+              <span className="px-3 py-1 rounded-full bg-white/15">Subjects: {subjects.length}</span>
+            </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+        </section>
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full">
             <input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by title or author"
-              className="w-full sm:w-72 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
+              className="w-full sm:w-72 px-4 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900"
             />
             <select
               value={selectedSubjectId}
               onChange={(e) => setSelectedSubjectId(e.target.value)}
-              className="w-full sm:w-64 px-4 py-2 border border-gray-300 rounded-lg bg-white"
+              className="w-full sm:w-64 px-4 py-2.5 border border-gray-300 rounded-xl bg-white"
             >
               <option value="">All Subjects</option>
               {filteredSubjects.map((subject) => (
@@ -133,7 +141,6 @@ const StudentLibrary = () => {
                 </option>
               ))}
             </select>
-          </div>
         </div>
 
         {books.length === 0 ? (
@@ -143,11 +150,11 @@ const StudentLibrary = () => {
             </div>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {books.map((book) => (
-              <Card key={book._id} className="space-y-4">
+              <Card key={book._id} className="space-y-4 border border-[#E2E8F0] hover:shadow-md transition-shadow">
                 <div className="flex items-start gap-4">
-                  <div className="w-16 h-20 rounded-lg bg-gradient-to-br from-emerald-200 to-teal-200 overflow-hidden flex items-center justify-center">
+                  <div className="w-16 h-20 rounded-xl bg-gradient-to-br from-emerald-200 to-teal-200 overflow-hidden flex items-center justify-center border border-emerald-300/40">
                     {book.coverUrl ? (
                       <img src={book.coverUrl} alt={book.title} className="w-full h-full object-cover" />
                     ) : (
@@ -155,7 +162,7 @@ const StudentLibrary = () => {
                     )}
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{book.title}</h3>
+                    <h3 className="text-lg font-bold text-gray-900 leading-tight">{book.title}</h3>
                     <p className="text-sm text-gray-600">{book.author || 'Author not specified'}</p>
                     <p className="text-xs text-emerald-700 mt-1 font-semibold">
                       {book.subjectId?.name || 'General'}

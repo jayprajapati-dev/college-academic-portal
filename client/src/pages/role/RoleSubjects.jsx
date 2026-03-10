@@ -60,9 +60,9 @@ const RoleSubjects = () => {
     theoryInternal: 0,
     theoryExternal: 0,
     practicalInternal: 0,
-    practicalExternal: 0,
-    passingMarks: 0
+    practicalExternal: 0
   });
+  const [offeringRows, setOfferingRows] = useState([{ semesterId: '', branchId: '' }]);
 
   const token = localStorage.getItem('token');
 
@@ -156,8 +156,13 @@ const RoleSubjects = () => {
     if (isHod) {
       if (hodBranchIds.size === 0) return false;
 
+      const offeringBranchIds = Array.isArray(subject.offerings)
+        ? subject.offerings
+          .map((offering) => String(getIdValue(offering.branchId)))
+          .filter(Boolean)
+        : [];
       const subjectBranchId = String(getIdValue(subject.branchId));
-      return hodBranchIds.has(subjectBranchId);
+      return offeringBranchIds.some((id) => hodBranchIds.has(id)) || hodBranchIds.has(subjectBranchId);
     }
 
     return false;
@@ -249,8 +254,16 @@ const RoleSubjects = () => {
       const matchesSearch =
         subject.name?.toLowerCase().includes(search) ||
         subject.code?.toLowerCase().includes(search);
-      const matchesSemester = semesterFilter ? (subject.semesterId?._id || subject.semesterId) === semesterFilter : true;
-      const matchesBranch = branchFilter ? (subject.branchId?._id || subject.branchId) === branchFilter : true;
+      const subjectSemesterIds = [subject.semesterId?._id || subject.semesterId]
+        .concat(Array.isArray(subject.offerings) ? subject.offerings.map((off) => off.semesterId?._id || off.semesterId) : [])
+        .filter(Boolean)
+        .map(String);
+      const subjectBranchIds = [subject.branchId?._id || subject.branchId]
+        .concat(Array.isArray(subject.offerings) ? subject.offerings.map((off) => off.branchId?._id || off.branchId) : [])
+        .filter(Boolean)
+        .map(String);
+      const matchesSemester = semesterFilter ? subjectSemesterIds.includes(String(semesterFilter)) : true;
+      const matchesBranch = branchFilter ? subjectBranchIds.includes(String(branchFilter)) : true;
       const matchesType = typeFilter ? subject.type === typeFilter : true;
       return matchesSearch && matchesSemester && matchesBranch && matchesType;
     });
@@ -290,6 +303,21 @@ const RoleSubjects = () => {
     }
   };
 
+  const handleOfferingChange = (index, field, value) => {
+    setOfferingRows((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+  };
+
+  const addOfferingRow = () => {
+    setOfferingRows((prev) => [...prev, { semesterId: '', branchId: '' }]);
+  };
+
+  const removeOfferingRow = (index) => {
+    setOfferingRows((prev) => {
+      if (prev.length === 1) return prev;
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
   const handleMarksChange = (e) => {
     const { name, value } = e.target;
     setMarksData((prev) => ({
@@ -314,9 +342,14 @@ const RoleSubjects = () => {
       theoryInternal: 0,
       theoryExternal: 0,
       practicalInternal: 0,
-      practicalExternal: 0,
-      passingMarks: 0
+      practicalExternal: 0
     });
+    setOfferingRows([
+      {
+        semesterId: semesterFilter || '',
+        branchId: branchFilter || ''
+      }
+    ]);
   };
 
   const handleNewSubject = () => {
@@ -347,9 +380,19 @@ const RoleSubjects = () => {
       theoryInternal: subject.marks?.theory?.internal || 0,
       theoryExternal: subject.marks?.theory?.external || 0,
       practicalInternal: subject.marks?.practical?.internal || 0,
-      practicalExternal: subject.marks?.practical?.external || 0,
-      passingMarks: subject.marks?.passingMarks || 0
+      practicalExternal: subject.marks?.practical?.external || 0
     });
+    setOfferingRows(
+      Array.isArray(subject.offerings) && subject.offerings.length > 0
+        ? subject.offerings.map((offering) => ({
+          semesterId: offering.semesterId?._id || offering.semesterId || '',
+          branchId: offering.branchId?._id || offering.branchId || ''
+        }))
+        : [{
+          semesterId: subject.semesterId?._id || subject.semesterId || '',
+          branchId: subject.branchId?._id || subject.branchId || ''
+        }]
+    );
     setShowModal(true);
   };
 
@@ -386,15 +429,30 @@ const RoleSubjects = () => {
         external: marksData.practicalExternal,
         total: practicalTotal
       },
-      totalMarks,
-      passingMarks: marksData.passingMarks
+      totalMarks
     };
   };
 
   const handleSave = async () => {
     if (!canAddSubject && !editingSubject) return;
     if (!isAdmin && editingSubject && !canEditSubject(editingSubject)) return;
-    if (!formData.name || !formData.code || !formData.type || !formData.branchId || !formData.semesterId) {
+    const cleanedOfferings = offeringRows
+      .map((row) => ({
+        semesterId: row.semesterId,
+        branchId: row.branchId
+      }))
+      .filter((row) => row.semesterId && row.branchId);
+
+    const uniqueOfferingMap = new Map();
+    cleanedOfferings.forEach((row) => {
+      uniqueOfferingMap.set(`${row.semesterId}:${row.branchId}`, row);
+    });
+    const uniqueOfferings = Array.from(uniqueOfferingMap.values());
+
+    const hasValidSingleMapping = formData.branchId && formData.semesterId;
+    const hasValidMultiMappings = uniqueOfferings.length > 0;
+
+    if (!formData.name || !formData.code || !formData.type || (!hasValidSingleMapping && !hasValidMultiMappings)) {
       alert('Please fill all required fields');
       return;
     }
@@ -402,6 +460,7 @@ const RoleSubjects = () => {
     try {
       const payload = {
         ...formData,
+        offerings: uniqueOfferings,
         marks: buildMarks()
       };
 
@@ -427,6 +486,7 @@ const RoleSubjects = () => {
   const panelLabel = role === 'admin' ? 'Admin Panel' : role === 'hod' ? 'HOD Panel' : 'Teacher Panel';
   const showActions = isEditor;
   const canEditCurrent = editingSubject && canEditSubject(editingSubject);
+  const canManageMappings = isAdmin || isHod;
 
   const visibleBranches = useMemo(() => {
     if (!isHod) return branches;
@@ -460,14 +520,14 @@ const RoleSubjects = () => {
       panelLabel={panelLabel}
       profileLinks={role === 'admin' ? [] : [{ label: 'Profile', to: `/${role}/profile` }]}
     >
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black text-gray-900 dark:text-white flex items-center gap-3">
-              <span className="material-symbols-outlined text-4xl text-primary">menu_book</span>
+            <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+              <span className="material-symbols-outlined text-2xl md:text-3xl text-primary">menu_book</span>
               Subject Management
             </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1 font-medium">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 font-medium">
               Manage subject catalog, credits, and exam marks.
             </p>
             {!isAdmin && (
@@ -485,7 +545,7 @@ const RoleSubjects = () => {
             {canAddSubject && (
               <button
                 onClick={handleNewSubject}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90 transition-opacity"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-primary to-orange-500 text-white text-sm font-semibold shadow-md shadow-primary/20 hover:shadow-lg transition-all"
               >
                 + Add Subject
               </button>
@@ -493,29 +553,29 @@ const RoleSubjects = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatsCard icon="menu_book" label="Total Subjects" value={stats.total} bgColor="bg-gradient-to-br from-blue-500 to-blue-600" />
-          <StatsCard icon="science" label="Theory" value={stats.theory} bgColor="bg-gradient-to-br from-indigo-500 to-indigo-600" />
-          <StatsCard icon="engineering" label="Practical" value={stats.practical} bgColor="bg-gradient-to-br from-purple-500 to-purple-600" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <StatsCard icon="menu_book" label="Total Subjects" value={stats.total} bgColor="bg-gradient-to-br from-blue-500 to-blue-600" compact />
+          <StatsCard icon="science" label="Theory" value={stats.theory} bgColor="bg-gradient-to-br from-indigo-500 to-indigo-600" compact />
+          <StatsCard icon="engineering" label="Practical" value={stats.practical} bgColor="bg-gradient-to-br from-purple-500 to-purple-600" compact />
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 border border-gray-200 dark:border-gray-700">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex-1 min-w-[220px] relative">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3 border border-gray-100 dark:border-gray-700">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
+            <div className="w-full sm:flex-1 sm:min-w-[220px] relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xl">search</span>
               <input
                 type="text"
                 placeholder="Search by name or code..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 h-11 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                className="w-full pl-10 h-10 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all"
               />
             </div>
 
             <select
               value={semesterFilter}
               onChange={(e) => setSemesterFilter(e.target.value)}
-              className="h-11 px-4 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[160px]"
+              className="w-full sm:w-auto h-10 px-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium sm:min-w-[145px]"
             >
               <option value="">All Semesters</option>
               {visibleSemesters.map((sem) => (
@@ -528,7 +588,7 @@ const RoleSubjects = () => {
             <select
               value={branchFilter}
               onChange={(e) => setBranchFilter(e.target.value)}
-              className="h-11 px-4 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[160px]"
+              className="w-full sm:w-auto h-10 px-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium sm:min-w-[145px]"
             >
               <option value="">All Branches</option>
               {visibleBranches.map((branch) => (
@@ -541,7 +601,7 @@ const RoleSubjects = () => {
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
-              className="h-11 px-4 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[160px]"
+              className="w-full sm:w-auto h-10 px-3.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium sm:min-w-[145px]"
             >
               <option value="">All Types</option>
               <option value="theory">Theory</option>
@@ -551,49 +611,57 @@ const RoleSubjects = () => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700">
           {loading ? (
             <div className="min-h-[240px] flex items-center justify-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gradient-to-r from-gray-50 via-gray-100 to-gray-50 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 border-b-2 border-gray-200 dark:border-gray-600">
+              <table className="w-full min-w-[860px] text-left border-collapse">
+                <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 border-b border-gray-200 dark:border-gray-600">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Subject</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Code</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Type</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Credits</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Branch</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Semester</th>
+                    <th className="px-3.5 py-2.5 text-[11px] font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">Subject</th>
+                    <th className="px-3.5 py-2.5 text-[11px] font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">Code</th>
+                    <th className="px-3.5 py-2.5 text-[11px] font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">Type</th>
+                    <th className="px-3.5 py-2.5 text-[11px] font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">Credits</th>
+                    <th className="px-3.5 py-2.5 text-[11px] font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">Branch</th>
+                    <th className="px-3.5 py-2.5 text-[11px] font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">Semester</th>
                     {showActions && (
-                      <th className="px-6 py-4 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">Actions</th>
+                      <th className="px-3.5 py-2.5 text-right text-[11px] font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">Actions</th>
                     )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {paginatedSubjects.length > 0 ? (
                     paginatedSubjects.map((subject) => (
-                      <tr key={subject._id} className="hover:bg-gray-50 transition-colors duration-150">
-                        <td className="px-6 py-4">
-                          <p className="font-semibold text-gray-900 text-sm">{subject.name}</p>
+                      <tr key={subject._id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150">
+                        <td className="px-3.5 py-2.5">
+                          <p className="font-semibold text-gray-900 dark:text-white text-sm leading-snug">{subject.name}</p>
                           {subject.description && (
                             <p className="text-xs text-gray-500 line-clamp-2">{subject.description}</p>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-700 font-medium">{subject.code}</td>
-                        <td className="px-6 py-4 text-sm text-gray-700">{subject.type}</td>
-                        <td className="px-6 py-4 text-sm text-gray-700">{subject.credits}</td>
-                        <td className="px-6 py-4 text-sm text-gray-700">{subject.branchId?.name || subject.branchId?.code || 'N/A'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-700">{subject.semesterId?.semesterNumber || subject.semesterId?.name || 'N/A'}</td>
+                        <td className="px-3.5 py-2.5 text-sm text-gray-700 dark:text-gray-300 font-medium">{subject.code}</td>
+                        <td className="px-3.5 py-2.5 text-sm text-gray-700 dark:text-gray-300">{subject.type}</td>
+                        <td className="px-3.5 py-2.5 text-sm text-gray-700 dark:text-gray-300">{subject.credits}</td>
+                        <td className="px-3.5 py-2.5 text-sm text-gray-700 dark:text-gray-300">
+                          {Array.isArray(subject.offerings) && subject.offerings.length > 1
+                            ? `${subject.branchId?.name || subject.branchId?.code || 'N/A'} +${subject.offerings.length - 1}`
+                            : (subject.branchId?.name || subject.branchId?.code || 'N/A')}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-sm text-gray-700 dark:text-gray-300">
+                          {Array.isArray(subject.offerings) && subject.offerings.length > 1
+                            ? `${subject.semesterId?.semesterNumber || subject.semesterId?.name || 'N/A'} +${subject.offerings.length - 1}`
+                            : (subject.semesterId?.semesterNumber || subject.semesterId?.name || 'N/A')}
+                        </td>
                         {showActions && (
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-3.5 py-2.5 text-right">
                             <div className="flex justify-end gap-2">
                               {canEditSubject(subject) && (
                                 <button
                                   onClick={() => handleEdit(subject)}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-600 rounded-lg"
+                                  className="px-2.5 py-1 text-[11px] font-semibold bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
                                 >
                                   Edit
                                 </button>
@@ -601,7 +669,7 @@ const RoleSubjects = () => {
                               {(isAdmin || isHod || isTeacher) && canEditSubject(subject) && (
                                 <button
                                   onClick={() => handleDelete(subject)}
-                                  className="px-3 py-1.5 text-xs font-semibold bg-red-50 text-red-600 rounded-lg"
+                                  className="px-2.5 py-1 text-[11px] font-semibold bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
                                 >
                                   Delete
                                 </button>
@@ -613,7 +681,7 @@ const RoleSubjects = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={showActions ? 7 : 6} className="px-6 py-12 text-center text-gray-500">
+                      <td colSpan={showActions ? 7 : 6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                         No subjects found
                       </td>
                     </tr>
@@ -625,60 +693,61 @@ const RoleSubjects = () => {
         </div>
 
         {totalPages > 1 && (
-          <div className="flex justify-center gap-2">
+          <div className="mt-1 flex flex-wrap justify-center gap-2">
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
-              className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50"
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50"
             >
-              Previous
+              ◄ Previous
             </button>
-            <span className="px-4 py-2 text-gray-700">Page {currentPage} of {totalPages}</span>
+            <span className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">Page {currentPage} of {totalPages}</span>
             <button
               onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
-              className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50"
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50"
             >
-              Next
+              Next ►
             </button>
           </div>
         )}
       </div>
 
       {showModal && (canAddSubject || canEditCurrent) && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-3xl w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">{editingSubject ? 'Edit Subject' : 'Add Subject'}</h2>
-              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">✕</button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start sm:items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-[#1a0f0b] border border-[#e6dedb] dark:border-[#3a2a24] rounded-2xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[#f4f1f0] dark:border-[#3a2a24] bg-[#f4f1f0] dark:bg-[#2d1e18]">
+              <h2 className="text-xl font-bold text-[#181311] dark:text-white">{editingSubject ? 'Edit Subject' : 'Add Subject'}</h2>
+              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-white/70 dark:hover:bg-[#3a2a24] rounded-lg text-[#896b61] dark:text-[#c4b0a9]">✕</button>
             </div>
 
+            <div className="px-4 sm:px-6 py-4 overflow-y-auto space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold">Name</label>
+                <label className="block text-sm font-semibold text-[#181311] dark:text-white mb-1.5">Name</label>
                 <input
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold">Code</label>
+                <label className="block text-sm font-semibold text-[#181311] dark:text-white mb-1.5">Code</label>
                 <input
                   name="code"
                   value={formData.code}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold">Type</label>
+                <label className="block text-sm font-semibold text-[#181311] dark:text-white mb-1.5">Type</label>
                 <select
                   name="type"
                   value={formData.type}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                 >
                   <option value="theory">Theory</option>
                   <option value="practical">Practical</option>
@@ -686,50 +755,84 @@ const RoleSubjects = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-semibold">Credits</label>
+                <label className="block text-sm font-semibold text-[#181311] dark:text-white mb-1.5">Credits</label>
                 <input
                   type="number"
                   name="credits"
                   value={formData.credits}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-semibold">Semester</label>
-                <select
-                  name="semesterId"
-                  value={formData.semesterId}
-                  onChange={handleInputChange}
-                  disabled={!isAdmin && (!isHod || editingSubject)}
-                  className="w-full px-4 py-2 border rounded-lg"
-                >
-                  <option value="">Select semester</option>
-                  {visibleSemesters.map((sem) => (
-                    <option key={sem._id} value={sem._id}>
-                      Semester {sem.semesterNumber}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold">Branch</label>
-                <select
-                  name="branchId"
-                  value={formData.branchId}
-                  onChange={handleInputChange}
-                  disabled={!isAdmin && (!isHod || editingSubject)}
-                  className="w-full px-4 py-2 border rounded-lg"
-                >
-                  <option value="">Select branch</option>
-                  {visibleBranches.map((branch) => (
-                    <option key={branch._id} value={branch._id}>
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
+
+              <div className="mt-2 rounded-xl border border-[#e6dedb] dark:border-[#3a2a24] bg-[#fffdfc] dark:bg-[#211511] p-3 sm:p-4">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-[#181311] dark:text-white">Semester + Branch Mapping</h3>
+                    <p className="text-xs text-[#896b61] dark:text-[#c4b0a9]">
+                      {editingSubject
+                        ? 'Edit mode: mapping rows update karke subject ko multiple semesters/branches me rakh sakte ho.'
+                        : 'Ek subject ko multiple combinations me add karne ke liye "Add More" use karein.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addOfferingRow}
+                    disabled={!canManageMappings}
+                    className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    + Add More
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {offeringRows.map((row, index) => (
+                    <div key={`offering-${index}`} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2.5 items-end">
+                      <div>
+                        <label className="block text-xs font-semibold text-[#181311] dark:text-white mb-1">Semester</label>
+                        <select
+                          value={row.semesterId}
+                          onChange={(e) => handleOfferingChange(index, 'semesterId', e.target.value)}
+                          disabled={!canManageMappings}
+                          className="w-full h-10 px-3 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white text-sm"
+                        >
+                          <option value="">Select semester</option>
+                          {visibleSemesters.map((sem) => (
+                            <option key={sem._id} value={sem._id}>
+                              Semester {sem.semesterNumber}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#181311] dark:text-white mb-1">Branch</label>
+                        <select
+                          value={row.branchId}
+                          onChange={(e) => handleOfferingChange(index, 'branchId', e.target.value)}
+                          disabled={!canManageMappings}
+                          className="w-full h-10 px-3 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white text-sm"
+                        >
+                          <option value="">Select branch</option>
+                          {visibleBranches.map((branch) => (
+                            <option key={branch._id} value={branch._id}>
+                              {branch.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeOfferingRow(index)}
+                        disabled={offeringRows.length === 1 || !canManageMappings}
+                        className="h-10 px-3 rounded-lg border border-red-200 text-red-600 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <div>
@@ -739,7 +842,7 @@ const RoleSubjects = () => {
                   name="theoryInternal"
                   value={marksData.theoryInternal}
                   onChange={handleMarksChange}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                 />
               </div>
               <div>
@@ -749,7 +852,7 @@ const RoleSubjects = () => {
                   name="theoryExternal"
                   value={marksData.theoryExternal}
                   onChange={handleMarksChange}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                 />
               </div>
               <div>
@@ -759,7 +862,7 @@ const RoleSubjects = () => {
                   name="practicalInternal"
                   value={marksData.practicalInternal}
                   onChange={handleMarksChange}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                 />
               </div>
               <div>
@@ -769,53 +872,46 @@ const RoleSubjects = () => {
                   name="practicalExternal"
                   value={marksData.practicalExternal}
                   onChange={handleMarksChange}
-                  className="w-full px-4 py-2 border rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold">Passing Marks</label>
-                <input
-                  type="number"
-                  name="passingMarks"
-                  value={marksData.passingMarks}
-                  onChange={handleMarksChange}
-                  className="w-full px-4 py-2 border rounded-lg"
+                  className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                 />
               </div>
             </div>
 
             <div className="mt-4">
-              <label className="block text-sm font-semibold">Description</label>
+              <label className="block text-sm font-semibold text-[#181311] dark:text-white mb-1.5">Description</label>
               <textarea
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border rounded-lg"
+                className="w-full px-3.5 py-2.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                 rows={3}
               />
             </div>
 
             <div className="mt-4">
-              <label className="block text-sm font-semibold">Syllabus</label>
-              <textarea
+              <label className="block text-sm font-semibold text-[#181311] dark:text-white mb-1.5">Syllabus PDF Link</label>
+              <input
+                type="url"
                 name="syllabus"
                 value={formData.syllabus}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border rounded-lg"
-                rows={3}
+                placeholder="https://example.com/syllabus.pdf"
+                className="w-full h-11 px-3.5 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-[#f4f1f0] dark:bg-[#2d1e18] text-[#181311] dark:text-white"
               />
+              <p className="text-xs text-[#6B7280] mt-1">Only one syllabus PDF link is used per subject.</p>
+            </div>
             </div>
 
-            <div className="mt-6 flex gap-3">
+            <div className="px-4 sm:px-6 py-4 border-t border-[#f4f1f0] dark:border-[#3a2a24] flex flex-col sm:flex-row gap-3 sm:justify-end bg-[#f4f1f0] dark:bg-[#2d1e18]">
               <button
                 onClick={handleSave}
-                className="px-5 py-2 rounded-lg bg-primary text-white font-semibold"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-gradient-to-r from-primary to-orange-500 text-white font-semibold"
               >
                 Save
               </button>
               <button
                 onClick={() => setShowModal(false)}
-                className="px-5 py-2 rounded-lg border border-gray-300 text-gray-700"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-lg border border-[#d7cdc9] dark:border-[#3a2a24] text-[#181311] dark:text-white bg-white/70 dark:bg-[#2d1e18]"
               >
                 Cancel
               </button>

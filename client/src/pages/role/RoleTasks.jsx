@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button, Card, Input, LoadingSpinner, Modal, RoleLayout } from '../../components';
@@ -51,6 +51,23 @@ const RoleTasks = () => {
       : role === 'coordinator'
         ? 'Coordinator Panel'
         : 'Teacher Panel';
+
+  const taskStats = useMemo(() => {
+    const now = new Date();
+    const sevenDaysLater = new Date(now);
+    sevenDaysLater.setDate(now.getDate() + 7);
+
+    const total = tasks.length;
+    const drafts = tasks.filter((t) => t.status === 'draft').length;
+    const published = tasks.filter((t) => t.status === 'active').length;
+    const dueSoon = tasks.filter((t) => {
+      if (!t.dueDate) return false;
+      const due = new Date(t.dueDate);
+      return due >= now && due <= sevenDaysLater;
+    }).length;
+
+    return { total, drafts, published, dueSoon };
+  }, [tasks]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -342,37 +359,65 @@ const RoleTasks = () => {
       profileLinks={role === 'admin' ? [] : [{ label: 'Profile', to: `/${role}/profile` }]}
     >
       <div className="space-y-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-black text-gray-900 dark:text-white flex items-center gap-3">
-              <span className="material-symbols-outlined text-4xl text-blue-500">assignment</span>
-              Task Management
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1 font-medium">
-              Create drafts or publish tasks and assignments
-            </p>
+        <section className="rounded-3xl bg-gradient-to-r from-[#0f172a] via-[#1d4ed8] to-[#2563eb] text-white p-6 md:p-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-blue-100">Task Workspace</p>
+              <h1 className="text-3xl md:text-4xl font-black mt-2">Task Management</h1>
+              <p className="text-blue-100 mt-2 text-sm md:text-base">
+                Create drafts, publish assignments, and monitor submissions from one place.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+                <span className="px-3 py-1 rounded-full bg-white/15">Total: {taskStats.total}</span>
+                <span className="px-3 py-1 rounded-full bg-white/15">Published: {taskStats.published}</span>
+                <span className="px-3 py-1 rounded-full bg-white/15">Drafts: {taskStats.drafts}</span>
+                <span className="px-3 py-1 rounded-full bg-white/15">Due Soon: {taskStats.dueSoon}</span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={openCreateModal}
+                className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white border border-blue-300/70 shadow-lg shadow-blue-900/30 hover:from-blue-600 hover:to-cyan-600"
+              >
+                + Create Task
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            >
-              <option value="all">All</option>
-              <option value="active">Published</option>
-              <option value="draft">Draft</option>
-            </select>
-            <Button onClick={openCreateModal} className="bg-blue-600 hover:bg-blue-700">
-              + Create Task
-            </Button>
+        </section>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">All Tasks</p>
+            <p className="text-2xl font-black text-[#111827] mt-1">{taskStats.total}</p>
+          </div>
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">Published</p>
+            <p className="text-2xl font-black text-emerald-600 mt-1">{taskStats.published}</p>
+          </div>
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">Drafts</p>
+            <p className="text-2xl font-black text-amber-600 mt-1">{taskStats.drafts}</p>
+          </div>
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">Due In 7 Days</p>
+            <p className="text-2xl font-black text-blue-600 mt-1">{taskStats.dueSoon}</p>
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-3 bg-white dark:bg-gray-800 p-4 rounded-lg">
+        <div className="flex flex-col md:flex-row gap-3 bg-white p-4 rounded-2xl border border-[#E5E7EB]">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
+          >
+            <option value="all">All</option>
+            <option value="active">Published</option>
+            <option value="draft">Draft</option>
+          </select>
           <select
             value={filters.category}
             onChange={(e) => setFilters((prev) => ({ ...prev, category: e.target.value }))}
-            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
           >
             <option value="">All Categories</option>
             <option value="Task">Task</option>
@@ -383,7 +428,7 @@ const RoleTasks = () => {
           <select
             value={filters.semesterId}
             onChange={(e) => setFilters((prev) => ({ ...prev, semesterId: e.target.value }))}
-            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
           >
             <option value="">All Semesters</option>
             {semesters.map((s) => (
@@ -400,7 +445,7 @@ const RoleTasks = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-700 dark:to-gray-800">
+                <thead className="bg-gradient-to-r from-blue-50 to-indigo-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Title</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Category</th>
@@ -413,29 +458,29 @@ const RoleTasks = () => {
                 </thead>
                 <tbody>
                   {tasks.map((task) => (
-                    <tr key={task._id} className="border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{task.title}</td>
+                    <tr key={task._id} className="border-t border-gray-200 hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm text-gray-900">{task.title}</td>
                       <td className="px-6 py-4 text-sm">
-                        <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-xs font-medium">
+                        <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
                           {task.category}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm">
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                           task.status === 'draft'
-                            ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
+                            ? 'bg-yellow-100 text-yellow-800'
                             : task.status === 'deleted'
-                            ? 'bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200'
-                            : 'bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200'
+                            ? 'bg-gray-100 text-gray-800'
+                            : 'bg-emerald-100 text-emerald-800'
                         }`}>
                           {task.status === 'active' ? 'published' : task.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{task.subjectId?.name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                      <td className="px-6 py-4 text-sm text-gray-600">{task.subjectId?.name}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
                         {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '-'}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{task.createdBy?.name}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{task.createdBy?.name}</td>
                       <td className="px-6 py-4 text-right text-sm">
                         <div className="flex items-center justify-end gap-3">
                           <button
@@ -474,79 +519,127 @@ const RoleTasks = () => {
           )}
         </Card>
 
+        {pagination.total > pagination.limit && (
+          <div className="flex items-center justify-center gap-2">
+            <button
+              onClick={() => setPagination((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+              disabled={pagination.page === 1}
+              className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span className="px-4 py-2 text-sm text-gray-700">
+              Page {pagination.page} of {Math.max(1, Math.ceil(pagination.total / pagination.limit))}
+            </span>
+            <button
+              onClick={() => setPagination((prev) => ({ ...prev, page: prev.page + 1 }))}
+              disabled={pagination.page >= Math.ceil(pagination.total / pagination.limit)}
+              className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        )}
+
         {showModal && (
           <Modal isOpen={showModal} onClose={() => setShowModal(false)}>
-            <div className="w-full max-w-2xl">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-                {editingTask ? 'Edit Task' : 'Create Task'}
-              </h2>
+            <div className="w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-2xl">
+              <div className="px-4 sm:px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-600 to-cyan-500">
+                <h2 className="text-xl sm:text-2xl font-bold text-white">
+                  {editingTask ? 'Edit Task' : 'Create Task'}
+                </h2>
+                <p className="text-xs sm:text-sm text-blue-100 mt-1">
+                  Set details, due date, and resources before publishing.
+                </p>
+              </div>
 
-              <div className="space-y-4">
-                <Input
-                  label="Title *"
-                  value={formData.title}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-                  placeholder="Enter task title"
-                />
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description *</label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                    placeholder="Enter task description"
-                    rows="6"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              <div className="p-4 sm:p-5 space-y-4 overflow-y-auto max-h-[calc(90vh-150px)]">
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 sm:p-4 space-y-3">
+                  <p className="text-[11px] uppercase tracking-wider font-bold text-gray-500">Task Details</p>
+                  <Input
+                    label="Title *"
+                    value={formData.title}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+                    placeholder="Enter task title"
                   />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Category</label>
-                    <select
-                      value={formData.category}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    >
-                      <option value="Task">Task</option>
-                      <option value="Assignment">Assignment</option>
-                      <option value="Custom">Custom</option>
-                    </select>
-                  </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subject *</label>
-                    <select
-                      value={formData.subjectId}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, subjectId: e.target.value }))}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    >
-                      <option value="">Select Subject</option>
-                      {subjects.map((subject) => (
-                        <option key={subject._id} value={subject._id}>
-                          {subject.code || subject.name} - {subject.name}
-                        </option>
-                      ))}
-                    </select>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description *</label>
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                      placeholder="Enter task description"
+                      rows="5"
+                      className="w-full px-3.5 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Due Date</label>
-                  <input
-                    type="date"
-                    value={formData.dueDate}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, dueDate: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 sm:p-4 space-y-3">
+                  <p className="text-[11px] uppercase tracking-wider font-bold text-gray-500">Assignment Setup</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Category</label>
+                      <select
+                        value={formData.category}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
+                        className="w-full h-10 px-3.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                      >
+                        <option value="Task">Task</option>
+                        <option value="Assignment">Assignment</option>
+                        <option value="Custom">Custom</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subject *</label>
+                      <select
+                        value={formData.subjectId}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, subjectId: e.target.value }))}
+                        className="w-full h-10 px-3.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                      >
+                        <option value="">Select Subject</option>
+                        {subjects.map((subject) => (
+                          <option key={subject._id} value={subject._id}>
+                            {subject.code || subject.name} - {subject.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Due Date</label>
+                    <input
+                      type="date"
+                      value={formData.dueDate}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, dueDate: e.target.value }))}
+                      className="w-full h-10 px-3.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Attachments</label>
-                  <p className="text-xs text-gray-500 mb-2">Paste Google Drive, Dropbox, or other file sharing links</p>
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3.5 sm:p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider font-bold text-gray-500">Attachments</p>
+                      <p className="text-xs text-gray-500 mt-1">Add drive or file-sharing links for students.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({
+                        ...prev,
+                        attachments: [...prev.attachments, { name: '', url: '' }]
+                      }))}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50"
+                    >
+                      + Add Link
+                    </button>
+                  </div>
+
                   <div className="space-y-2">
                     {formData.attachments.map((att, idx) => (
-                      <div key={idx} className="flex gap-2">
+                      <div key={idx} className="grid grid-cols-1 md:grid-cols-[1fr_1.4fr_auto] gap-2 items-start md:items-center">
                         <input
                           type="text"
                           placeholder="Name/Title"
@@ -556,7 +649,7 @@ const RoleTasks = () => {
                             next[idx].name = e.target.value;
                             setFormData((prev) => ({ ...prev, attachments: next }));
                           }}
-                          className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                          className="w-full px-3.5 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                         />
                         <input
                           type="url"
@@ -567,7 +660,7 @@ const RoleTasks = () => {
                             next[idx].url = e.target.value;
                             setFormData((prev) => ({ ...prev, attachments: next }));
                           }}
-                          className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                          className="w-full px-3.5 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                         />
                         <button
                           type="button"
@@ -575,41 +668,32 @@ const RoleTasks = () => {
                             const next = formData.attachments.filter((_, i) => i !== idx);
                             setFormData((prev) => ({ ...prev, attachments: next }));
                           }}
-                          className="px-3 py-2 text-red-600 hover:text-red-800 font-medium"
+                          className="px-3 py-2 text-red-600 hover:text-red-800 font-semibold text-sm rounded-lg hover:bg-red-50 w-full md:w-auto"
                         >
                           Remove
                         </button>
                       </div>
                     ))}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setFormData((prev) => ({
-                      ...prev,
-                      attachments: [...prev.attachments, { name: '', url: '' }]
-                    }))}
-                    className="mt-2 px-4 py-2 text-blue-600 hover:text-blue-800 font-medium text-sm"
-                  >
-                    + Add Link
-                  </button>
                 </div>
               </div>
 
-              <div className="mt-6 flex gap-3 justify-end">
-                <Button variant="secondary" onClick={() => setShowModal(false)} disabled={saving}>
+              <div className="px-4 sm:px-5 py-3.5 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+                <Button variant="secondary" onClick={() => setShowModal(false)} disabled={saving} className="w-full sm:w-auto">
                   Cancel
                 </Button>
                 <Button
                   onClick={() => handleSaveTask('draft')}
                   disabled={saving}
                   variant="secondary"
+                  className="w-full sm:w-auto"
                 >
                   Save Draft
                 </Button>
                 <Button
                   onClick={() => handleSaveTask('active')}
                   disabled={saving}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-cyan-500 border border-blue-300/70 hover:from-blue-600 hover:to-cyan-600"
                 >
                   {saving ? 'Saving...' : 'Publish'}
                 </Button>

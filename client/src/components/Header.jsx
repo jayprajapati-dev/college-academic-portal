@@ -54,6 +54,18 @@ const Header = () => {
     navigate('/login');
   };
 
+  const getDashboardPath = (user) => {
+    if (!user) return '/login';
+    if (user.role === 'student') return '/student/dashboard';
+    if (user.role === 'admin' || user.adminAccess === true) return '/admin/dashboard';
+    if (user.role === 'hod') return '/hod/dashboard';
+    if (user.role === 'teacher') return '/teacher/dashboard';
+    if (user.role === 'coordinator') return '/coordinator/dashboard';
+    return '/';
+  };
+
+  const dashboardPath = getDashboardPath(currentUser);
+
   return (
     <header className="fixed top-0 w-full z-50 glass-header">
       <div className="max-w-[1280px] mx-auto px-6 h-20 flex items-center justify-between">
@@ -67,6 +79,9 @@ const Header = () => {
         </a>
 
         <nav className="hidden md:flex items-center gap-8">
+          {isLoggedIn && (
+            <a className="text-sm font-semibold hover:text-primary transition-colors" href={dashboardPath}>Dashboard</a>
+          )}
           <a className="text-sm font-semibold hover:text-primary transition-colors" href="/about">About Us</a>
           <a className="text-sm font-semibold hover:text-primary transition-colors" href="/contact">Contact Us</a>
         </nav>
@@ -182,12 +197,14 @@ const Header = () => {
                       <button
                         onClick={() => {
                           const profilePath = currentUser?.role === 'teacher' 
-                            ? '/teacher/profile' 
+                            ? '/teacher/profile?view=website' 
                             : currentUser?.role === 'hod'
-                            ? '/hod/profile'
+                            ? '/hod/profile?view=website'
                             : currentUser?.role === 'coordinator'
-                            ? '/coordinator/profile'
-                            : '/student/profile';
+                            ? '/coordinator/profile?view=website'
+                            : (currentUser?.role === 'admin' || currentUser?.adminAccess === true)
+                            ? '/admin/profile?view=website'
+                            : '/student/profile?view=website';
                           navigate(profilePath);
                           setShowProfileDropdown(false);
                         }}

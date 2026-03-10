@@ -51,11 +51,22 @@ const LoginPage = () => {
       if (data.passwordChangeRequired) {
         navigate('/first-login');
       } else {
+        const mustCompleteProfile = data.user?.role === 'student'
+          && (data.user?.profileCompletionRequired || data.user?.profileUpdateRequired || !data.user?.branch || !data.user?.semester);
+
+        if (mustCompleteProfile) {
+          navigate('/complete-profile');
+          return;
+        }
+
         // Redirect based on role
         const role = data.user?.role;
         switch (role) {
           case 'admin':
             navigate('/admin/dashboard');
+            break;
+          case 'coordinator':
+            navigate('/coordinator/dashboard');
             break;
           case 'hod':
             navigate('/hod/dashboard');
@@ -64,7 +75,7 @@ const LoginPage = () => {
             navigate('/teacher/dashboard');
             break;
           case 'student':
-            navigate('/');
+            navigate('/student/dashboard');
             break;
           default:
             navigate('/');

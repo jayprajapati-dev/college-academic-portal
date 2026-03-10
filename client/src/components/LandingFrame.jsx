@@ -12,6 +12,26 @@ const LandingFrame = ({ children, isLoggedIn, currentUser, userProfile, notifica
     window.location.href = '/login';
   };
 
+  const getDashboardPath = (user) => {
+    if (!user) return '/login';
+    if (user.role === 'student') return '/student/dashboard';
+    if (user.role === 'admin' || user.adminAccess === true) return '/admin/dashboard';
+    if (user.role === 'hod') return '/hod/dashboard';
+    if (user.role === 'teacher') return '/teacher/dashboard';
+    if (user.role === 'coordinator') return '/coordinator/dashboard';
+    return '/';
+  };
+
+  const getProfilePath = (user) => {
+    if (!user) return '/login';
+    if (user.role === 'student') return '/student/profile?view=website';
+    if (user.role === 'admin' || user.adminAccess === true) return '/admin/profile?view=website';
+    if (user.role === 'hod') return '/hod/profile?view=website';
+    if (user.role === 'teacher') return '/teacher/profile?view=website';
+    if (user.role === 'coordinator') return '/coordinator/profile?view=website';
+    return '/';
+  };
+
   return (
     <div className="font-display bg-background-light dark:bg-background-dark text-[#111318] dark:text-white transition-colors duration-300">
       <header className="fixed top-0 w-full z-50 glass-header">
@@ -25,6 +45,9 @@ const LandingFrame = ({ children, isLoggedIn, currentUser, userProfile, notifica
             <h1 className="text-xl font-extrabold tracking-tight">SmartAcademics</h1>
           </a>
           <nav className="hidden md:flex items-center gap-8">
+            {isLoggedIn && (
+              <a className="text-sm font-semibold hover:text-primary transition-colors" href={getDashboardPath(currentUser)}>Dashboard</a>
+            )}
             <a className="text-sm font-semibold hover:text-primary transition-colors" href="/about">About Us</a>
             <a className="text-sm font-semibold hover:text-primary transition-colors" href="/contact">Contact Us</a>
           </nav>
@@ -122,7 +145,7 @@ const LandingFrame = ({ children, isLoggedIn, currentUser, userProfile, notifica
                           <div className="p-2">
                             <button
                               onClick={() => {
-                                navigate('/student/profile');
+                                navigate('/student/profile?view=website');
                                 setShowProfileDropdown(false);
                               }}
                               className="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-3"
@@ -150,7 +173,12 @@ const LandingFrame = ({ children, isLoggedIn, currentUser, userProfile, notifica
 
                 {currentUser?.role !== 'student' && (
                   <>
-                    <span className="hidden md:inline text-sm font-semibold">{currentUser?.name}</span>
+                    <button
+                      onClick={() => navigate(getProfilePath(currentUser))}
+                      className="px-4 py-2 text-sm font-bold bg-[#f0f1f4] dark:bg-white/10 rounded-lg hover:bg-gray-200 transition-all"
+                    >
+                      Profile
+                    </button>
                     <button
                       onClick={handleLogout}
                       className="px-5 py-2 text-sm font-bold bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"

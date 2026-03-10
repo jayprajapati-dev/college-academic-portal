@@ -13,11 +13,6 @@ const HodLayout = ({ title, children, userName = 'HOD', onLogout = null }) => {
       navItems={navItems}
       navLoading={loading}
       panelLabel="HOD Panel"
-      topLinks={[
-        { label: 'Home', to: '/' },
-        { label: 'About', to: '/about' },
-        { label: 'Contact', to: '/contact' }
-      ]}
       profileLinks={[{ label: 'Profile', to: '/hod/profile' }]}
     >
       {children}

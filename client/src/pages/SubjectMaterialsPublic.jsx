@@ -110,8 +110,7 @@ const SubjectMaterialsPublic = () => {
     marks?.practical?.internal,
     marks?.practical?.external,
     marks?.practical?.total,
-    marks?.totalMarks,
-    marks?.passingMarks
+    marks?.totalMarks
   ].some((value) => Number(value) > 0);
   const hasSyllabus = Boolean(subject?.syllabus);
   const hasFaculty = Boolean(
@@ -236,11 +235,6 @@ const SubjectMaterialsPublic = () => {
                           <td className="py-2" colSpan={2}>Total Marks</td>
                           <td className="py-2 font-bold">{marks?.totalMarks ?? 0}</td>
                         </tr>
-                        <tr className="border-t border-[#f0f1f4] dark:border-white/10">
-                          <td className="py-2 font-semibold">Passing</td>
-                          <td className="py-2" colSpan={2}>Passing Marks</td>
-                          <td className="py-2 font-bold">{marks?.passingMarks ?? 0}</td>
-                        </tr>
                       </tbody>
                     </table>
                   </div>
@@ -259,7 +253,15 @@ const SubjectMaterialsPublic = () => {
                     {hasSyllabus && (
                       <div className="border-b border-[#f0f1f4] dark:border-white/10 pb-3">
                         <p className="text-gray-500 font-semibold uppercase text-xs tracking-wider mb-1">Syllabus</p>
-                        <p className="text-gray-700 dark:text-gray-300 leading-relaxed">{subject?.syllabus}</p>
+                        <a
+                          href={subject?.syllabus}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 text-primary font-semibold hover:underline"
+                        >
+                          <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
+                          Open Syllabus PDF
+                        </a>
                       </div>
                     )}
                     {hasFaculty && (
@@ -288,6 +290,31 @@ const SubjectMaterialsPublic = () => {
             </section>
 
             <section className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-6">
+              <div className="mb-6 p-4 rounded-xl border border-[#f0f1f4] dark:border-white/10 bg-gray-50 dark:bg-white/5">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary">picture_as_pdf</span>
+                      Syllabus
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Download official syllabus PDF.</p>
+                  </div>
+                  {subject?.syllabus ? (
+                    <a
+                      href={subject.syllabus}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90 transition-opacity"
+                    >
+                      <span className="material-symbols-outlined text-sm">open_in_new</span>
+                      Open PDF
+                    </a>
+                  ) : (
+                    <span className="text-sm text-gray-500">Syllabus PDF not uploaded yet.</span>
+                  )}
+                </div>
+              </div>
+
               <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">folder_open</span>
                 Study Materials

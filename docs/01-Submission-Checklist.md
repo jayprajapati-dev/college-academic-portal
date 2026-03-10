@@ -11,7 +11,6 @@ Submission Date: Tomorrow (Phase 1 deliverables + current project)
 - ✅ Subject page with **MARKS & EXAM TYPE** (NEW!)
 - ✅ Tasks/Assignments
 - ✅ Notices
-- ✅ Attendance
 - ✅ Student profile (editable)
 - ✅ Teacher dashboard
 
@@ -92,7 +91,6 @@ Submission Date: Tomorrow (Phase 1 deliverables + current project)
 - ✅ Student dashboard
 - ✅ Task management
 - ✅ Notice board
-- ✅ Attendance tracking
 - ✅ Timetable display
 - ✅ Library management
 - ✅ **MARKS & EXAM TYPE DISPLAY** ← NEW THIS SESSION!
@@ -140,7 +138,7 @@ Submission Date: Tomorrow (Phase 1 deliverables + current project)
      - View subject page (CHECK MARKS DISPLAY!)
      - Create task as teacher
      - Submit task as student
-     - View notices, attendance, everything
+   - View notices, timetable, everything
 
 □ 2. Make sure servers are working
      - Start frontend: cd client && npm start
@@ -177,7 +175,7 @@ Submission Date: Tomorrow (Phase 1 deliverables + current project)
 2:00  - Explain project briefly (2 min)
 5:00  - Open website, show login
 10:00 - ⭐ MAIN: Show subject page with MARKS! ⭐
-15:00 - Show tasks, notices, attendance
+15:00 - Show tasks, notices, timetable
 25:00 - Show admin panel
 30:00 - Show documentation & flowcharts
 35:00 - Q&A
@@ -194,7 +192,7 @@ Have this checklist open! ✓
 ```
 "Sir, students were getting scattered information from 
 notice boards and emails. Now they have everything 
-in ONE place - subjects, marks, tasks, attendance, all 
+in ONE place - subjects, marks, tasks, notices, all 
 centralized in our portal."
 ```
 

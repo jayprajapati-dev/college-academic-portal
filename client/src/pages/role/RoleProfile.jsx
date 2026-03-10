@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button, Card, Input, LoadingSpinner, RoleLayout } from '../../components';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Button, Card, Input, LandingFrame, LoadingSpinner, RoleLayout } from '../../components';
 import useRoleNav from '../../hooks/useRoleNav';
 
 const RoleProfile = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isWebsiteView = new URLSearchParams(location.search).get('view') === 'website';
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const isLoggedIn = Boolean(localStorage.getItem('token'));
   const [profile, setProfile] = useState(storedUser);
   const [role, setRole] = useState(storedUser?.role || 'teacher');
   const { navItems, loading: navLoading } = useRoleNav(role);
@@ -99,11 +102,11 @@ const RoleProfile = () => {
     if (editMode) {
       setEditData({});
     } else {
-      setEditData({
-        name: profile?.name || '',
-        qualifications: profile?.qualifications || '',
-        experience: profile?.experience || ''
-      });
+      const nextEditData = {
+        name: profile?.name || ''
+      };
+
+      setEditData(nextEditData);
     }
     setEditMode(!editMode);
   };
@@ -112,18 +115,20 @@ const RoleProfile = () => {
     try {
       setSaving(true);
       const token = localStorage.getItem('token');
+      const payload = { ...editData };
+
       const response = await fetch('/api/profile/me', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(editData)
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
       if (data.success) {
-        setProfile({ ...profile, ...editData });
+        setProfile({ ...profile, ...payload });
         setEditMode(false);
       } else {
         alert(data.message || 'Failed to update profile');
@@ -185,6 +190,21 @@ const RoleProfile = () => {
   }, [isAdmin, isHod, isCoordinator]);
 
   if (loading) {
+    if (isWebsiteView) {
+      return (
+        <LandingFrame
+          isLoggedIn={isLoggedIn}
+          currentUser={storedUser}
+          userProfile={profile}
+          notifications={[]}
+        >
+          <div className="max-w-6xl mx-auto px-6 py-10 min-h-[60vh] flex items-center justify-center">
+            <LoadingSpinner />
+          </div>
+        </LandingFrame>
+      );
+    }
+
     return (
       <RoleLayout
         title="Profile"
@@ -201,6 +221,188 @@ const RoleProfile = () => {
     );
   }
 
+  const profileContent = (
+    <div className={`space-y-6 ${isWebsiteView ? 'max-w-6xl mx-auto px-6 py-10' : ''}`}>
+      <section className="rounded-3xl bg-gradient-to-r from-[#0b1220] to-[#1f3a8a] text-white p-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="flex items-center gap-5">
+            <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center text-3xl font-bold">
+              {profile?.name?.charAt(0)?.toUpperCase() || 'U'}
+            </div>
+            <div>
+              <h1 className="text-3xl font-black">{profile?.name || 'User'}</h1>
+              <p className="text-sm text-blue-100">{profile?.email || '—'}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                <span className="px-3 py-1 rounded-full bg-white/15">{roleLabel}</span>
+                {profile?.mobile && (
+                  <span className="px-3 py-1 rounded-full bg-white/15">{profile.mobile}</span>
+                )}
+                {isTeacher && subjects.length > 0 && (
+                  <span className="px-3 py-1 rounded-full bg-white/15">
+                    {subjects.length} Subjects Assigned
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={handleEditToggle}
+              variant="secondary"
+              className="bg-white text-[#0b1220] hover:bg-gray-100 shadow-lg shadow-black/10"
+            >
+              {editMode ? 'Cancel' : 'Edit Profile'}
+            </Button>
+            <Button
+              onClick={() => setShowChangePassword((prev) => !prev)}
+              variant="ghost"
+              className="bg-white/10 border border-white/40 text-white hover:bg-white/20"
+            >
+              Change Password
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {showChangePassword && (
+        <Card>
+          <h3 className="text-xl font-bold text-gray-900 mb-4">Change Password</h3>
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-2">Current Password</label>
+              <Input
+                type="password"
+                value={passwordData.currentPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                placeholder="Enter current password"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-2">New Password</label>
+              <Input
+                type="password"
+                value={passwordData.newPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                placeholder="Enter new password"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-2">Confirm New Password</label>
+              <Input
+                type="password"
+                value={passwordData.confirmPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                placeholder="Confirm new password"
+              />
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button type="submit" disabled={saving} className="bg-[#111318]">
+                {saving ? 'Updating...' : 'Update Password'}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setShowChangePassword(false);
+                  setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                }}
+                className="bg-gray-200 text-gray-900 hover:bg-gray-300"
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
+      <Card title="Profile Information" subtitle="Keep your personal details updated">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-2">Full Name</label>
+            {editMode ? (
+              <Input
+                value={editData.name}
+                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                placeholder="Enter full name"
+              />
+            ) : (
+              <p className="text-gray-900 font-semibold">{profile?.name || '—'}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-2">Email</label>
+            <p className="text-gray-900 font-semibold">{profile?.email || '—'}</p>
+          </div>
+        </div>
+        {editMode && (
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Button onClick={handleSaveProfile} disabled={saving} className="bg-[#111318]">
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+            <Button
+              onClick={handleEditToggle}
+              className="bg-gray-200 text-gray-900 hover:bg-gray-300"
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      <Card title="Role Details" subtitle="Role-specific information">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-2">Role</label>
+            <p className="text-gray-900 font-semibold">{roleLabel}</p>
+          </div>
+          {isHod && (
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-2">Branch</label>
+              <p className="text-gray-900 font-semibold">{getLabel(profile?.branch) || '—'}</p>
+            </div>
+          )}
+          {isTeacher && (
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-2">Assigned Subjects</label>
+              <p className="text-gray-900 font-semibold">{subjects.length || 0}</p>
+            </div>
+          )}
+          {isAdmin && (
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-2">Access</label>
+              <p className="text-gray-900 font-semibold">Full system administration</p>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {isTeacher && subjects.length > 0 && (
+        <Card title="Assigned Subjects" subtitle="Subjects currently linked to your account">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {subjects.map((subject) => (
+              <div key={subject._id || subject.id} className="p-4 border border-[#E6E9EF] rounded-2xl">
+                <p className="font-semibold text-gray-900">{subject.name}</p>
+                <p className="text-sm text-gray-500">{subject.code || '—'}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+
+  if (isWebsiteView) {
+    return (
+      <LandingFrame
+        isLoggedIn={isLoggedIn}
+        currentUser={profile || storedUser}
+        userProfile={profile}
+        notifications={[]}
+      >
+        {profileContent}
+      </LandingFrame>
+    );
+  }
+
   return (
     <RoleLayout
       title="Profile"
@@ -210,196 +412,7 @@ const RoleProfile = () => {
       navLoading={navLoading}
       panelLabel={panelLabel}
     >
-      <div className="space-y-6">
-        <section className="rounded-3xl bg-gradient-to-r from-[#0b1220] to-[#1f3a8a] text-white p-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <div className="flex items-center gap-5">
-              <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center text-3xl font-bold">
-                {profile?.name?.charAt(0)?.toUpperCase() || 'U'}
-              </div>
-              <div>
-                <h1 className="text-3xl font-black">{profile?.name || 'User'}</h1>
-                <p className="text-sm text-blue-100">{profile?.email || '—'}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                  <span className="px-3 py-1 rounded-full bg-white/15">{roleLabel}</span>
-                  {profile?.mobile && (
-                    <span className="px-3 py-1 rounded-full bg-white/15">{profile.mobile}</span>
-                  )}
-                  {isTeacher && subjects.length > 0 && (
-                    <span className="px-3 py-1 rounded-full bg-white/15">
-                      {subjects.length} Subjects Assigned
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Button
-                onClick={handleEditToggle}
-                variant="secondary"
-                className="bg-white text-[#0b1220] hover:bg-gray-100 shadow-lg shadow-black/10"
-              >
-                {editMode ? 'Cancel' : 'Edit Profile'}
-              </Button>
-              <Button
-                onClick={() => setShowChangePassword((prev) => !prev)}
-                variant="ghost"
-                className="bg-white/10 border border-white/40 text-white hover:bg-white/20"
-              >
-                Change Password
-              </Button>
-            </div>
-          </div>
-        </section>
-
-        {showChangePassword && (
-          <Card>
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Change Password</h3>
-            <form onSubmit={handleChangePassword} className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-2">Current Password</label>
-                <Input
-                  type="password"
-                  value={passwordData.currentPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                  placeholder="Enter current password"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-2">New Password</label>
-                <Input
-                  type="password"
-                  value={passwordData.newPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                  placeholder="Enter new password"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-2">Confirm New Password</label>
-                <Input
-                  type="password"
-                  value={passwordData.confirmPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                  placeholder="Confirm new password"
-                />
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <Button type="submit" disabled={saving} className="bg-[#111318]">
-                  {saving ? 'Updating...' : 'Update Password'}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setShowChangePassword(false);
-                    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-                  }}
-                  className="bg-gray-200 text-gray-900 hover:bg-gray-300"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </Card>
-        )}
-
-        <Card title="Profile Information" subtitle="Keep your personal details updated">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-2">Full Name</label>
-              {editMode ? (
-                <Input
-                  value={editData.name}
-                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                  placeholder="Enter full name"
-                />
-              ) : (
-                <p className="text-gray-900 font-semibold">{profile?.name || '—'}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-2">Email</label>
-              <p className="text-gray-900 font-semibold">{profile?.email || '—'}</p>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-2">Qualifications</label>
-              {editMode ? (
-                <Input
-                  value={editData.qualifications}
-                  onChange={(e) => setEditData({ ...editData, qualifications: e.target.value })}
-                  placeholder="Enter qualifications"
-                />
-              ) : (
-                <p className="text-gray-900 font-semibold">{profile?.qualifications || '—'}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-2">Experience</label>
-              {editMode ? (
-                <Input
-                  value={editData.experience}
-                  onChange={(e) => setEditData({ ...editData, experience: e.target.value })}
-                  placeholder="Enter experience"
-                />
-              ) : (
-                <p className="text-gray-900 font-semibold">{profile?.experience || '—'}</p>
-              )}
-            </div>
-          </div>
-          {editMode && (
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Button onClick={handleSaveProfile} disabled={saving} className="bg-[#111318]">
-                {saving ? 'Saving...' : 'Save Changes'}
-              </Button>
-              <Button
-                onClick={handleEditToggle}
-                className="bg-gray-200 text-gray-900 hover:bg-gray-300"
-              >
-                Cancel
-              </Button>
-            </div>
-          )}
-        </Card>
-
-        <Card title="Role Details" subtitle="Role-specific information">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-2">Role</label>
-              <p className="text-gray-900 font-semibold">{roleLabel}</p>
-            </div>
-            {isHod && (
-              <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-2">Branch</label>
-                <p className="text-gray-900 font-semibold">{getLabel(profile?.branch) || '—'}</p>
-              </div>
-            )}
-            {isTeacher && (
-              <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-2">Assigned Subjects</label>
-                <p className="text-gray-900 font-semibold">{subjects.length || 0}</p>
-              </div>
-            )}
-            {isAdmin && (
-              <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-2">Access</label>
-                <p className="text-gray-900 font-semibold">Full system administration</p>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {isTeacher && subjects.length > 0 && (
-          <Card title="Assigned Subjects" subtitle="Subjects currently linked to your account">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {subjects.map((subject) => (
-                <div key={subject._id || subject.id} className="p-4 border border-[#E6E9EF] rounded-2xl">
-                  <p className="font-semibold text-gray-900">{subject.name}</p>
-                  <p className="text-sm text-gray-500">{subject.code || '—'}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
-      </div>
+      {profileContent}
     </RoleLayout>
   );
 };

@@ -23,7 +23,6 @@ Our portal brings everything together:
 - Subject details with marks and exam type
 - Assignments with deadlines
 - Notices and announcements
-- Attendance tracking
 - Timetable
 - Library catalog
 - All in one place!"
@@ -154,25 +153,11 @@ Steps:
 
 ---
 
-#### 2.5 ATTENDANCE SYSTEM
+#### 2.5 ATTENDANCE
 
 ```
-Steps:
-1. Login as Teacher
-2. Go to "Mark Attendance"
-3. Show:
-   - Subject selector
-   - Class type (Lecture/Lab)
-   - Date selector
-   - Students list with checkboxes
-   - Mark present/absent
-   - Submit button
-   
-4. Now show as Student:
-   - Login with student account
-   - Go to "View Attendance"
-   - Show attendance records
-   - Show summary (total lectures, attended, absent, percentage)
+Attendance module is intentionally out-of-scope for this repository.
+If asked during review, clarify that attendance is being delivered in a separate dedicated project.
 ```
 
 ---
@@ -273,7 +258,6 @@ Collections (10+):
 ✅ Subjects - with marks, exam type, materials
 ✅ Tasks - assignments from teachers
 ✅ Notices - announcements
-✅ Attendance - lecture/lab attendance
 ✅ Timetables - class schedules
 ✅ Branches - CS, EC, ME, etc
 ✅ Semesters - Sem 1-8
@@ -378,18 +362,19 @@ All data persists in MongoDB"
 2. Subjects (with marks display)
 3. Tasks/Assignments
 4. Notices
-5. Attendance
-6. Timetable
-7. Library
-8. Notifications
-9. Admin Panel"
+5. Timetable
+6. Library
+7. Notifications
+8. Admin Panel
+
+Attendance is handled in a separate project."
 ```
 
 ### Q2: "Kyan data database maa save hoy che?" (Is data saved in database?)
 **Answer:**
 ```
 "Yes sir! MongoDB database.
-Every user, subject, task, notice, attendance - 
+Every user, subject, task, notice, timetable - 
 all saved permanently in database.
 If server restarts, data stays safe."
 ```
@@ -461,7 +446,7 @@ TIMING | ACTIVITY
 17:00  Task creation (as teacher)
 20:00  Student submits task
 23:00  Notice board
-25:00  Attendance marking
+25:00  Timetable and library
 27:00  Profile editing
 30:00  Timetable view
 32:00  Show documents/flowcharts

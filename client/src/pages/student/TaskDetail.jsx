@@ -60,17 +60,20 @@ const StudentTaskDetail = () => {
   return (
     <StudentLayout title="Task Details" onLogout={handleLogout}>
       <div className="space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-black text-gray-900">{task.title}</h1>
-            <p className="text-gray-600 mt-1">{task.subjectId?.name}</p>
+        <section className="rounded-3xl bg-gradient-to-r from-[#0f172a] via-[#1e40af] to-[#0284c7] text-white p-6 md:p-7">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-sky-100">Task Detail</p>
+              <h1 className="text-2xl md:text-3xl font-black mt-1">{task.title}</h1>
+              <p className="text-sm text-sky-100 mt-1">{task.subjectId?.name}</p>
+            </div>
+            <Button variant="secondary" onClick={() => navigate(-1)} className="bg-white text-[#0f172a] hover:bg-[#F1F5F9]">
+              Back
+            </Button>
           </div>
-          <Button variant="secondary" onClick={() => navigate(-1)}>
-            Back
-          </Button>
-        </div>
+        </section>
 
-        <Card>
+        <Card className="border border-[#E5E7EB]">
           <div className="space-y-4">
             <div>
               <h3 className="text-sm font-semibold text-gray-700">Description</h3>
@@ -89,7 +92,7 @@ const StudentTaskDetail = () => {
           </div>
         </Card>
 
-        <Card>
+        <Card className="border border-[#E5E7EB]">
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-gray-700">Submission Status</h3>
             <div className="flex items-center gap-3">
@@ -105,11 +108,11 @@ const StudentTaskDetail = () => {
             </div>
             <p className="text-sm text-gray-600">
               {task.studentStatus === 'completed' ? (
-                'Your teacher has marked this task as completed.'
+                'Your teacher has verified and completed this task status.'
               ) : task.studentStatus === 'submitted' ? (
-                'Your submission is pending teacher approval.'
+                'Your teacher has verified your offline submission.'
               ) : (
-                'Your teacher will mark your submission status after reviewing your work.'
+                'No online submit required. Your teacher will update status after offline verification.'
               )}
             </p>
           </div>

@@ -75,6 +75,18 @@ const UserManagement = () => {
   const [branchFilter, setBranchFilter] = useState('');
   const [semesterFilter, setSemesterFilter] = useState('');
 
+  // Academic Assignment Modal State
+  const [showAcademicModal, setShowAcademicModal] = useState(false);
+  const [academicForm, setAcademicForm] = useState({
+    branch: '',
+    semester: '',
+    status: 'active'
+  });
+
+  // Profile Update Required State
+  const [showProfileUpdateModal, setShowProfileUpdateModal] = useState(false);
+  const [profileUpdateAction, setProfileUpdateAction] = useState('single'); // 'single' or 'bulk'
+
   const toDateInputValue = (value) => {
     if (!value) return '';
     const date = new Date(value);
@@ -713,6 +725,119 @@ const UserManagement = () => {
     }
   };
 
+  // Academic Assignment Handlers
+  const handleOpenAcademicModal = (user) => {
+    setSelectedUser(user);
+    setAcademicForm({
+      branch: user?.branch?._id || user?.branch || '',
+      semester: user?.semester?._id || user?.semester || '',
+      status: user?.status || 'active'
+    });
+    setShowAcademicModal(true);
+  };
+
+  const handleAcademicAssignmentSave = async () => {
+    if (!selectedUser) return;
+    if (!academicForm.branch || !academicForm.semester) {
+      setErrorMessage('Please select both branch and semester');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/admin/users/${selectedUser._id}/academic-assignment`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          branch: academicForm.branch,
+          semester: academicForm.semester,
+          status: academicForm.status
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setUsers(users.map(u => u._id === selectedUser._id ? { ...u, branch: academicForm.branch, semester: academicForm.semester, status: academicForm.status } : u));
+        setShowAcademicModal(false);
+        setSuccessMessage('Student academic assignment updated successfully!');
+        setTimeout(() => setSuccessMessage(''), 3000);
+        fetchUsers();
+      } else {
+        setErrorMessage(data.message || 'Failed to update academic assignment');
+      }
+    } catch (error) {
+      console.error('Error updating academic assignment:', error);
+      setErrorMessage('Error updating academic assignment');
+    }
+  };
+
+  // Profile Update Required Handlers
+  const handleOpenProfileUpdateModal = (user, action = 'single') => {
+    setSelectedUser(user);
+    setProfileUpdateAction(action);
+    setShowProfileUpdateModal(true);
+  };
+
+  const handleProfileUpdateRequiredSave = async (required = true) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (profileUpdateAction === 'single' && selectedUser) {
+        const response = await fetch(`/api/admin/users/${selectedUser._id}/profile-update-required`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ required })
+        });
+
+        const data = await response.json();
+        if (response.ok && data.success) {
+          setUsers(users.map(u => u._id === selectedUser._id ? { ...u, profileUpdateRequired: required } : u));
+          setShowProfileUpdateModal(false);
+          setSuccessMessage(required ? 'Student will be prompted to update profile' : 'Profile update requirement cleared');
+          setTimeout(() => setSuccessMessage(''), 3000);
+          fetchUsers();
+        } else {
+          setErrorMessage(data.message || 'Failed to update profile requirement');
+        }
+      } else if (profileUpdateAction === 'bulk') {
+        // Bulk update for filtered students
+        const payload = {
+          required,
+          branchId: branchFilter || undefined,
+          semesterId: semesterFilter || undefined
+        };
+
+        const response = await fetch(`/api/admin/users/profile-update-required/bulk`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (response.ok && data.success) {
+          setShowProfileUpdateModal(false);
+          setSuccessMessage(`${data.data.modifiedCount || 0} student(s) updated successfully`);
+          setTimeout(() => setSuccessMessage(''), 3000);
+          fetchUsers();
+        } else {
+          setErrorMessage(data.message || 'Failed to bulk update profile requirement');
+        }
+      }
+    } catch (error) {
+      console.error('Error updating profile requirement:', error);
+      setErrorMessage('Error updating profile requirement');
+    }
+  };
+
   const getRoleColor = (role) => {
     const colors = {
       admin: 'bg-red-100 text-red-800',
@@ -738,6 +863,22 @@ const UserManagement = () => {
     if (user.role === 'hod' && user.adminAccess) return 'HOD (Admin)';
     if (user.role === 'coordinator') return 'COORDINATOR';
     return user.role?.toUpperCase() || 'USER';
+  };
+
+  const getBranchName = (user) => {
+    if (!user || user.role !== 'student') return null;
+    const branchId = user.branch?._id || user.branch;
+    if (!branchId) return 'Not assigned';
+    const branch = branches.find(b => b._id === branchId);
+    return branch ? `${branch.code}` : 'Unknown';
+  };
+
+  const getSemesterName = (user) => {
+    if (!user || user.role !== 'student') return null;
+    const semesterId = user.semester?._id || user.semester;
+    if (!semesterId) return 'Not assigned';
+    const semester = semesters.find(s => s._id === semesterId);
+    return semester ? `Sem ${semester.semesterNumber}` : 'Unknown';
   };
 
   const roleOptions = useMemo(() => {
@@ -773,6 +914,8 @@ const UserManagement = () => {
   const canToggleAdminAccess = (user) => isAdminMode && ['teacher', 'hod'].includes(user.role);
   const canManageCoordinator = (user) => (isAdminMode || role === 'hod') && ['teacher', 'coordinator'].includes(user.role);
   const canDeleteUser = () => true;
+  const canEditAcademicAssignment = (user) => (isAdminMode || role === 'hod' || role === 'coordinator') && user.role === 'student';
+  const canManageProfileUpdate = (user) => (isAdminMode || role === 'hod' || role === 'coordinator') && user.role === 'student';
 
   const adminCandidates = useMemo(() => {
     const term = adminSearch.trim().toLowerCase();
@@ -855,7 +998,7 @@ const UserManagement = () => {
       navLoading={navLoading}
       panelLabel={panelLabel}
     >
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-5">
         {/* Success/Error Messages */}
         {successMessage && (
           <div className="mb-4 p-4 bg-green-100 border-l-4 border-green-500 text-green-700 rounded-lg flex items-center justify-between">
@@ -890,12 +1033,12 @@ const UserManagement = () => {
         )}
 
         {/* Professional Header */}
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-red-500 to-pink-600 p-3 rounded-xl shadow-lg">
-            <span className="material-symbols-outlined text-white text-3xl">group</span>
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="bg-gradient-to-br from-red-500 to-pink-600 p-2.5 sm:p-3 rounded-xl shadow-lg">
+            <span className="material-symbols-outlined text-white text-2xl sm:text-3xl">group</span>
           </div>
           <div>
-            <h1 className="text-3xl font-black text-gray-900 dark:text-white">User Management</h1>
+            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white">User Management</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
               {isAdminMode
                 ? 'Manage system users, roles, and access levels'
@@ -907,17 +1050,17 @@ const UserManagement = () => {
         </div>
 
         {/* Filters and Search */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 border border-gray-200 dark:border-gray-700">
-          <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3.5 sm:p-4 border border-gray-200 dark:border-gray-700">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 mb-4 sm:mb-5">
             {/* Search Bar */}
-            <div className="flex-1 min-w-[250px] relative">
+            <div className="flex-1 min-w-[220px] relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xl">search</span>
               <input
                 type="text"
                 placeholder="Search by name, email or mobile..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 h-11 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                className="w-full pl-10 pr-3 h-10 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all"
               />
             </div>
 
@@ -925,7 +1068,7 @@ const UserManagement = () => {
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="h-11 px-4 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[140px]"
+              className="h-10 px-3.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[130px]"
             >
               {roleOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -936,7 +1079,7 @@ const UserManagement = () => {
               <select
                 value={branchFilter}
                 onChange={(e) => setBranchFilter(e.target.value)}
-                className="h-11 px-4 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[160px]"
+                className="h-10 px-3.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[140px]"
               >
                 <option value="">All Branches</option>
                 {branches.map((branch) => (
@@ -949,12 +1092,12 @@ const UserManagement = () => {
               <select
                 value={semesterFilter}
                 onChange={(e) => setSemesterFilter(e.target.value)}
-                className="h-11 px-4 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[160px]"
+                className="h-10 px-3.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[140px]"
               >
                 <option value="">All Semesters</option>
                 {semesters.map((semester) => (
                   <option key={semester._id} value={semester._id}>
-                    Sem {semester.semesterNumber} ({semester.academicYear})
+                    Sem {semester.semesterNumber}{semester.academicYear ? ` (${semester.academicYear})` : ''}
                   </option>
                 ))}
               </select>
@@ -964,7 +1107,7 @@ const UserManagement = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-11 px-4 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[140px]"
+              className="h-10 px-3.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[130px]"
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -973,7 +1116,7 @@ const UserManagement = () => {
             </select>
 
             {/* Add User Buttons (Role-Based) */}
-            <div className="flex gap-3 ml-auto">
+            <div className="flex flex-wrap gap-2.5 sm:gap-3 ml-auto w-full sm:w-auto sm:justify-end">
               {isAdminMode && (
                 <>
                   <button
@@ -981,7 +1124,7 @@ const UserManagement = () => {
                       setAddHodError('');
                       setShowAddHodModal(true);
                     }}
-                    className="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-purple-500/20 hover:opacity-90 transition-all h-11"
+                    className="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 hover:opacity-90 transition-all h-10 w-full sm:w-auto"
                   >
                     <span className="material-symbols-outlined text-xl">badge</span>
                     Add HOD
@@ -991,14 +1134,14 @@ const UserManagement = () => {
                       setAddTeacherError('');
                       setShowAddTeacherModal(true);
                     }}
-                    className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-blue-500/20 hover:opacity-90 transition-all h-11"
+                    className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 hover:opacity-90 transition-all h-10 w-full sm:w-auto"
                   >
                     <span className="material-symbols-outlined text-xl">school</span>
                     Add Teacher
                   </button>
                   <button
                     onClick={() => setShowAdminModal(true)}
-                    className="bg-gradient-to-r from-slate-900 to-slate-700 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-slate-500/20 hover:opacity-90 transition-all h-11"
+                    className="bg-gradient-to-r from-slate-900 to-slate-700 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-slate-500/20 hover:opacity-90 transition-all h-10 w-full sm:w-auto"
                   >
                     <span className="material-symbols-outlined text-xl">admin_panel_settings</span>
                     Add Admin
@@ -1008,58 +1151,68 @@ const UserManagement = () => {
               {role === 'hod' && !isAdminMode && (
                 <button
                   onClick={() => navigate('/hod/add-teacher')}
-                  className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-5 py-2.5 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-blue-500/20 hover:opacity-90 transition-all h-11"
+                  className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 hover:opacity-90 transition-all h-10 w-full sm:w-auto"
                 >
                   <span className="material-symbols-outlined text-xl">school</span>
                   Add Teacher
+                </button>
+              )}
+              {(isAdminMode || role === 'hod' || role === 'coordinator') && filteredUsers.filter(u => u.role === 'student').length > 0 && (
+                <button
+                  onClick={() => handleOpenProfileUpdateModal(null, 'bulk')}
+                  className="bg-gradient-to-r from-orange-500 to-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 hover:opacity-90 transition-all h-10 w-full sm:w-auto"
+                  title="Request all filtered students to update their profile"
+                >
+                  <span className="material-symbols-outlined text-xl">campaign</span>
+                  Alert All Students
                 </button>
               )}
             </div>
           </div>
 
           {/* Statistics Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
+            <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center gap-3">
                 <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-3 rounded-lg">
                   <span className="material-symbols-outlined text-2xl">group</span>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase">Total</p>
-                  <p className="text-2xl font-black text-gray-900 dark:text-white">{filteredUsers.length}</p>
+                  <p className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">{filteredUsers.length}</p>
                 </div>
               </div>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center gap-3">
                 <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-3 rounded-lg">
                   <span className="material-symbols-outlined text-2xl">check_circle</span>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase">Active</p>
-                  <p className="text-2xl font-black text-gray-900 dark:text-white">{filteredUsers.filter(u => u.status === 'active').length}</p>
+                  <p className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">{filteredUsers.filter(u => u.status === 'active').length}</p>
                 </div>
               </div>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center gap-3">
                 <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white p-3 rounded-lg">
                   <span className="material-symbols-outlined text-2xl">schedule</span>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase">Pending</p>
-                  <p className="text-2xl font-black text-gray-900 dark:text-white">{filteredUsers.filter(u => u.status === 'pending').length}</p>
+                  <p className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">{filteredUsers.filter(u => u.status === 'pending').length}</p>
                 </div>
               </div>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center gap-3">
                 <div className="bg-gradient-to-br from-red-500 to-red-600 text-white p-3 rounded-lg">
                   <span className="material-symbols-outlined text-2xl">block</span>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase">Disabled</p>
-                  <p className="text-2xl font-black text-gray-900 dark:text-white">{filteredUsers.filter(u => u.status === 'disabled').length}</p>
+                  <p className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">{filteredUsers.filter(u => u.status === 'disabled').length}</p>
                 </div>
               </div>
             </div>
@@ -1069,22 +1222,28 @@ const UserManagement = () => {
         {/* Users Table */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-200 dark:border-gray-700">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[980px]">
               <thead className="bg-gradient-to-r from-gray-50 via-gray-100 to-gray-50 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 border-b-2 border-gray-200 dark:border-gray-600">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">User Details</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Role</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Contact</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Joined</th>
-                  <th className="px-6 py-4 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">User Details</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Role</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Contact</th>
+                  {(isAdminMode || role === 'hod' || role === 'coordinator') && (
+                    <>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Branch</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Semester</th>
+                    </>
+                  )}
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Joined</th>
+                  <th className="px-4 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {currentUsers.length > 0 ? (
                   currentUsers.map((user) => (
                     <tr key={user._id} className="hover:bg-gray-50 transition-colors duration-150">
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-400 to-orange-400 flex items-center justify-center text-white font-bold text-sm shadow-md">
                             {user.name.charAt(0).toUpperCase()}
@@ -1095,7 +1254,7 @@ const UserManagement = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3.5">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${getRoleColor(user.role)} shadow-sm`}>
                             {getRoleLabel(user)}
@@ -1107,13 +1266,35 @@ const UserManagement = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3.5">
                         <div className="text-sm space-y-1">
                           <p className="text-gray-900 font-medium">{user.email}</p>
                           <p className="text-gray-500">{user.mobile || 'N/A'}</p>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      {(isAdminMode || role === 'hod' || role === 'coordinator') && (
+                        <>
+                          <td className="px-4 py-3.5">
+                            {user.role === 'student' ? (
+                              <span className="text-sm text-gray-900 font-medium">
+                                {getBranchName(user) || '-'}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            {user.role === 'student' ? (
+                              <span className="text-sm text-gray-900 font-medium">
+                                {getSemesterName(user) || '-'}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-400">-</span>
+                            )}
+                          </td>
+                        </>
+                      )}
+                      <td className="px-4 py-3.5">
                         <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(user.status)}`}>
                           <div className={`w-2 h-2 rounded-full mr-2 ${
                             user.status === 'active' ? 'bg-emerald-500' :
@@ -1123,14 +1304,14 @@ const UserManagement = () => {
                           {user.status?.toUpperCase()}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3.5">
                         <p className="text-sm text-gray-600">{new Date(user.createdAt).toLocaleDateString()}</p>
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-1">
+                      <td className="px-4 py-3.5 text-right">
+                        <div className="flex justify-end gap-0.5">
                           <button
                             onClick={() => handleViewUser(user)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
                             title="View Details"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1145,7 +1326,7 @@ const UserManagement = () => {
                                 setNewRole(user.role);
                                 setShowRoleModal(true);
                               }}
-                              className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                              className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                               title="Change Role"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1156,7 +1337,7 @@ const UserManagement = () => {
                           {canToggleStudentBlock(user) && (
                             <button
                               onClick={() => handleStatusChange(user, user.status === 'disabled' ? 'active' : 'disabled')}
-                              className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                              className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                               title={user.status === 'disabled' ? 'Unblock Student' : 'Block Student'}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1167,7 +1348,7 @@ const UserManagement = () => {
                           {canEditPermissions(user) && (
                             <button
                               onClick={() => handleOpenPermissions(user)}
-                              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                              className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                               title="Edit Permissions"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1178,7 +1359,7 @@ const UserManagement = () => {
                           {canManageCoordinator(user) && (
                             <button
                               onClick={() => handleOpenCoordinatorModal(user)}
-                              className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                              className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
                               title={user.role === 'coordinator' ? 'Edit Coordinator' : 'Assign Coordinator'}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1189,11 +1370,33 @@ const UserManagement = () => {
                           {canToggleAdminAccess(user) && (
                             <button
                               onClick={() => handleAdminAccessToggle(user, !user.adminAccess)}
-                              className="p-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                              className="p-1.5 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                               title={user.adminAccess ? 'Revoke Admin Access' : 'Grant Admin Access'}
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.657 0 3-1.343 3-3V6a3 3 0 10-6 0v2c0 1.657 1.343 3 3 3zm0 0v3m0 4h.01M4 21h16a1 1 0 001-1v-2a7 7 0 10-14 0v2a1 1 0 001 1z" />
+                              </svg>
+                            </button>
+                          )}
+                          {canEditAcademicAssignment(user) && (
+                            <button
+                              onClick={() => handleOpenAcademicModal(user)}
+                              className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                              title="Edit Branch/Semester"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                              </svg>
+                            </button>
+                          )}
+                          {canManageProfileUpdate(user) && (
+                            <button
+                              onClick={() => handleOpenProfileUpdateModal(user, 'single')}
+                              className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                              title={user.profileUpdateRequired ? 'Clear Update Required' : 'Request Profile Update'}
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                               </svg>
                             </button>
                           )}
@@ -1203,7 +1406,7 @@ const UserManagement = () => {
                                 setSelectedUser(user);
                                 setShowDeleteModal(true);
                               }}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                               title="Delete User"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1217,7 +1420,7 @@ const UserManagement = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" className="px-6 py-12 text-center">
+                    <td colSpan={isAdminMode || role === 'hod' || role === 'coordinator' ? "8" : "6"} className="px-6 py-12 text-center">
                       <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                       </svg>
@@ -1230,22 +1433,22 @@ const UserManagement = () => {
           </div>
 
           {/* Pagination */}
-          <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex items-center justify-between">
+          <div className="bg-gray-50 border-t border-gray-200 px-4 py-3 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
             <div className="text-sm text-gray-600 font-medium">
               Page <span className="font-bold">{currentPage}</span> of <span className="font-bold">{totalPages}</span> ({filteredUsers.length} total users)
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full sm:w-auto">
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm w-full sm:w-auto"
               >
                 ← Previous
               </button>
               <button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm"
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium text-sm w-full sm:w-auto"
               >
                 Next →
               </button>
@@ -1342,7 +1545,7 @@ const UserManagement = () => {
               >
                 Cancel
               </button>
-              {isAdminMode && selectedUser && (
+              {isAdminMode && selectedUser && canEditPermissions(selectedUser) && (
                 <button
                   onClick={() => {
                     setShowDetailModal(false);
@@ -1360,9 +1563,9 @@ const UserManagement = () => {
       )}
 
       {/* Edit Permissions Modal */}
-      {showPermissionsModal && selectedUser && isAdminMode && (
+      {showPermissionsModal && selectedUser && isAdminMode && canEditPermissions(selectedUser) && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-700">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-emerald-500 to-teal-500">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold text-white">Edit Permissions</h3>
@@ -1375,7 +1578,7 @@ const UserManagement = () => {
               <p className="text-sm text-emerald-50 mt-2">{selectedUser.name} • {selectedUser.role?.toUpperCase()}</p>
             </div>
 
-            <div className="p-6">
+            <div className="p-5 sm:p-6 overflow-y-auto">
               <p className="text-sm text-gray-600 mb-4">Select the modules this user can access.</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {(permissionsMap[selectedUser.role] || []).map((moduleKey) => (
@@ -1413,7 +1616,7 @@ const UserManagement = () => {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+            <div className="px-5 sm:px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex flex-col-reverse sm:flex-row justify-end gap-3">
               <button
                 onClick={() => setShowPermissionsModal(false)}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
@@ -1434,13 +1637,13 @@ const UserManagement = () => {
       {/* Role Change Modal */}
       {showRoleModal && selectedUser && isAdminMode && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-500 to-pink-500">
               <h3 className="text-xl font-bold text-white">Change User Role</h3>
               <p className="text-sm text-white/90 mt-1">Update system access permissions for this user.</p>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <p className="font-semibold text-gray-900">{selectedUser.name}</p>
                 <p className="text-sm text-gray-600">{selectedUser.email}</p>
@@ -1468,7 +1671,7 @@ const UserManagement = () => {
               </div>
             </div>
 
-            <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+            <div className="bg-gray-50 border-t border-gray-200 px-5 sm:px-6 py-4 flex flex-col-reverse sm:flex-row justify-end gap-3">
               <button
                 onClick={() => setShowRoleModal(false)}
                 className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors font-semibold"
@@ -1495,7 +1698,7 @@ const UserManagement = () => {
       {/* Coordinator Assignment Modal */}
       {showCoordinatorModal && selectedUser && (isAdminMode || role === 'hod') && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-teal-600 to-emerald-500">
               <h3 className="text-xl font-bold text-white">Coordinator Assignment</h3>
               <p className="text-sm text-white/90 mt-1">
@@ -1503,7 +1706,7 @@ const UserManagement = () => {
               </p>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Branch *</label>
                 <select
@@ -1522,7 +1725,7 @@ const UserManagement = () => {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Semesters *</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {semesters.map((semester) => (
                     <label key={semester._id} className="flex items-center gap-2 text-sm text-gray-700">
                       <input
@@ -1538,7 +1741,7 @@ const UserManagement = () => {
                           });
                         }}
                       />
-                      Sem {semester.semesterNumber} ({semester.academicYear})
+                      Sem {semester.semesterNumber}{semester.academicYear ? ` (${semester.academicYear})` : ''}
                     </label>
                   ))}
                 </div>
@@ -1575,7 +1778,7 @@ const UserManagement = () => {
               </div>
             </div>
 
-            <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex flex-wrap gap-3 justify-end">
+            <div className="bg-gray-50 border-t border-gray-200 px-5 sm:px-6 py-4 flex flex-col-reverse sm:flex-row sm:flex-wrap gap-3 justify-end">
               {selectedUser.role === 'coordinator' && (
                 <button
                   onClick={() => handleRevokeCoordinator(selectedUser)}
@@ -1604,7 +1807,7 @@ const UserManagement = () => {
       {/* Delete User Modal */}
       {showDeleteModal && selectedUser && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-red-500 to-orange-500">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold text-white">Delete User</h3>
@@ -1616,7 +1819,7 @@ const UserManagement = () => {
               </div>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
               <p className="text-gray-700">Are you sure you want to delete this user? This action cannot be undone.</p>
 
               <div className="bg-red-50 p-4 rounded-lg border border-red-200">
@@ -1632,7 +1835,7 @@ const UserManagement = () => {
               </div>
             </div>
 
-            <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+            <div className="bg-gray-50 border-t border-gray-200 px-5 sm:px-6 py-4 flex flex-col-reverse sm:flex-row justify-end gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
                 className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors font-semibold"
@@ -1653,7 +1856,7 @@ const UserManagement = () => {
       {/* Add HOD Modal */}
       {showAddHodModal && isAdminMode && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-500 to-pink-500">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold text-white">Add New HOD</h3>
@@ -1669,7 +1872,7 @@ const UserManagement = () => {
               <p className="text-sm text-white/90 mt-1">Create a new HOD account with branch and subject assignment.</p>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
               {addHodError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
                   {addHodError}
@@ -1703,7 +1906,7 @@ const UserManagement = () => {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">Assign Branches *</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {branches.map((branch) => (
                     <label key={branch._id} className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
                       <input
@@ -1720,7 +1923,7 @@ const UserManagement = () => {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">Assign Semesters *</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {semesters.map((semester) => (
                     <label key={semester._id} className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
                       <input
@@ -1729,7 +1932,7 @@ const UserManagement = () => {
                         onChange={() => handleHodSemesterToggle(semester._id)}
                         className="w-4 h-4 text-purple-500 rounded"
                       />
-                      <span className="ml-3 text-gray-700">Sem {semester.semesterNumber} ({semester.academicYear})</span>
+                      <span className="ml-3 text-gray-700">Sem {semester.semesterNumber}{semester.academicYear ? ` (${semester.academicYear})` : ''}</span>
                     </label>
                   ))}
                 </div>
@@ -1767,7 +1970,7 @@ const UserManagement = () => {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+            <div className="px-5 sm:px-6 py-4 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
               <button
                 onClick={() => setShowAddHodModal(false)}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
@@ -1789,7 +1992,7 @@ const UserManagement = () => {
       {/* Add Teacher Modal */}
       {showAddTeacherModal && isAdminMode && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-500 to-cyan-500">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold text-white">Add New Teacher</h3>
@@ -1805,7 +2008,7 @@ const UserManagement = () => {
               <p className="text-sm text-white/90 mt-1">Create a new teacher account with branch and subject assignment.</p>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
               {addTeacherError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
                   {addTeacherError}
@@ -1839,7 +2042,7 @@ const UserManagement = () => {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">Select Branches *</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {branches.map((branch) => (
                     <label key={branch._id} className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
                       <input
@@ -1856,7 +2059,7 @@ const UserManagement = () => {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">Select Semesters *</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {semesters.map((semester) => (
                     <label key={semester._id} className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
                       <input
@@ -1865,7 +2068,7 @@ const UserManagement = () => {
                         onChange={() => handleTeacherSemesterToggle(semester._id)}
                         className="w-4 h-4 text-blue-500 rounded"
                       />
-                      <span className="ml-3 text-gray-700">Sem {semester.semesterNumber} ({semester.academicYear})</span>
+                      <span className="ml-3 text-gray-700">Sem {semester.semesterNumber}{semester.academicYear ? ` (${semester.academicYear})` : ''}</span>
                     </label>
                   ))}
                 </div>
@@ -1901,7 +2104,7 @@ const UserManagement = () => {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+            <div className="px-5 sm:px-6 py-4 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
               <button
                 onClick={() => setShowAddTeacherModal(false)}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
@@ -1923,7 +2126,7 @@ const UserManagement = () => {
       {/* Add Admin Modal */}
       {showAdminModal && isAdminMode && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-gray-200 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-700">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-slate-900 to-slate-700">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold text-white">Add Admin</h3>
@@ -1939,8 +2142,8 @@ const UserManagement = () => {
               <p className="text-sm text-white/90 mt-1">Create new admin or promote existing HOD/Teacher.</p>
             </div>
 
-            <div className="p-6">
-              <div className="flex gap-2 mb-6">
+            <div className="p-5 sm:p-6 overflow-y-auto">
+              <div className="flex flex-wrap gap-2 mb-5">
                 <button
                   onClick={() => setAdminTab('new')}
                   className={`px-4 py-2 rounded-lg text-sm font-semibold ${adminTab === 'new' ? 'bg-[#111318] text-white' : 'bg-gray-100 text-gray-700'}`}
@@ -2023,7 +2226,7 @@ const UserManagement = () => {
               )}
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+            <div className="px-5 sm:px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex flex-col-reverse sm:flex-row justify-end gap-3">
               <button
                 onClick={() => setShowAdminModal(false)}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
@@ -2045,6 +2248,171 @@ const UserManagement = () => {
                   Promote
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Academic Assignment Modal */}
+      {showAcademicModal && selectedUser && (isAdminMode || role === 'hod' || role === 'coordinator') && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-500 to-purple-500">
+              <h3 className="text-xl font-bold text-white">Edit Academic Assignment</h3>
+              <p className="text-sm text-white/90 mt-1">Update student branch and semester</p>
+            </div>
+
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <p className="font-semibold text-gray-900">{selectedUser.name}</p>
+                <p className="text-sm text-gray-600">{selectedUser.email}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Branch</label>
+                <select
+                  value={academicForm.branch}
+                  onChange={(e) => setAcademicForm({ ...academicForm, branch: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                >
+                  <option value="">Select Branch</option>
+                  {branches.map((branch) => (
+                    <option key={branch._id} value={branch._id}>
+                      {branch.name} ({branch.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Semester</label>
+                <select
+                  value={academicForm.semester}
+                  onChange={(e) => setAcademicForm({ ...academicForm, semester: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                >
+                  <option value="">Select Semester</option>
+                  {semesters.map((semester) => (
+                    <option key={semester._id} value={semester._id}>
+                      Semester {semester.semesterNumber}{semester.academicYear ? ` (${semester.academicYear})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
+                <select
+                  value={academicForm.status}
+                  onChange={(e) => setAcademicForm({ ...academicForm, status: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                >
+                  <option value="active">Active</option>
+                  <option value="pending">Pending</option>
+                  <option value="disabled">Disabled</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border-t border-gray-200 px-5 sm:px-6 py-4 flex flex-col-reverse sm:flex-row justify-end gap-3">
+              <button
+                onClick={() => setShowAcademicModal(false)}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAcademicAssignmentSave}
+                className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Update Required Modal */}
+      {showProfileUpdateModal && (isAdminMode || role === 'hod' || role === 'coordinator') && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-orange-500 to-red-500">
+              <h3 className="text-xl font-bold text-white">
+                {profileUpdateAction === 'single' ? 'Profile Update Alert' : 'Bulk Profile Update Alert'}
+              </h3>
+              <p className="text-sm text-white/90 mt-1">
+                {profileUpdateAction === 'single' 
+                  ? 'Request student to update their profile' 
+                  : 'Send update request to all filtered students'}
+              </p>
+            </div>
+
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
+              {profileUpdateAction === 'single' && selectedUser && (
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <p className="font-semibold text-gray-900">{selectedUser.name}</p>
+                  <p className="text-sm text-gray-600">{selectedUser.email}</p>
+                  {selectedUser.profileUpdateRequired && (
+                    <span className="inline-block mt-2 px-2 py-1 bg-orange-100 text-orange-800 text-xs font-bold rounded">
+                      Update Already Required
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {profileUpdateAction === 'bulk' && (
+                <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                  <p className="text-sm text-gray-700 font-semibold mb-2">
+                    📢 Alert will be sent to: <strong className="text-orange-600">{filteredUsers.filter(u => u.role === 'student').length} students</strong>
+                  </p>
+                  <div className="mt-3 space-y-1 text-xs text-gray-600">
+                    <p className="font-semibold">Current Filters:</p>
+                    {roleFilter !== 'all' && roleFilter === 'student' && <p>✓ Role: Students Only</p>}
+                    {statusFilter !== 'all' && <p>✓ Status: {statusFilter}</p>}
+                    {branchFilter && <p>✓ Branch: {branches.find(b => b._id === branchFilter)?.name}</p>}
+                    {semesterFilter && <p>✓ Semester: Sem {semesters.find(s => s._id === semesterFilter)?.semesterNumber}</p>}
+                    {roleFilter === 'all' && !branchFilter && !semesterFilter && statusFilter === 'all' && (
+                      <p className="text-orange-600 font-semibold">⚠️ All students in system will be alerted!</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <p className="text-xs text-blue-800 flex items-start gap-2">
+                  <span className="text-base">ℹ️</span>
+                  <span>
+                    <strong>What happens next:</strong><br/>
+                    • Students will see "Update Branch & Semester" prompt at next login<br/>
+                    • They must update their profile to access the system<br/>
+                    • Data will auto-update once they submit the form
+                  </span>
+                </p>
+              </div>
+
+              <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                <p className="text-xs text-yellow-800 flex items-start">
+                  <span className="mr-2">⚠️</span>
+                  <span>
+                    This action will immediately flag all filtered students for profile update. Use with caution.
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+              <button
+                onClick={() => setShowProfileUpdateModal(false)}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleProfileUpdateRequiredSave(true)}
+                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold"
+              >
+                {profileUpdateAction === 'single' ? 'Send Alert' : `Send Alert to ${filteredUsers.filter(u => u.role === 'student').length} Students`}
+              </button>
             </div>
           </div>
         </div>

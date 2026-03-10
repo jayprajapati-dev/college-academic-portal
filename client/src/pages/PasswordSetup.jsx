@@ -26,7 +26,8 @@ const PasswordSetup = () => {
     "What is your favorite movie?",
     "What was the name of your first school?",
     "What is your favorite food?",
-    "What is your favorite sport?"
+    "What is your favorite sport?",
+    "What is your favorite color?"
   ];
 
   const handleStep1Submit = async (e) => {

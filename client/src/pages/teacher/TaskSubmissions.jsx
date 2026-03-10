@@ -72,6 +72,13 @@ const TaskSubmissions = () => {
     );
   }, [searchTerm, submissions]);
 
+  const statusBadgeClass = (status) => {
+    if (status === 'completed') return 'text-emerald-700 bg-emerald-100';
+    if (status === 'submitted') return 'text-blue-700 bg-blue-100';
+    if (status === 'in-progress') return 'text-amber-700 bg-amber-100';
+    return 'text-gray-700 bg-gray-100';
+  };
+
   const panelLabel = role === 'admin'
     ? 'Admin Panel'
     : role === 'hod'
@@ -168,20 +175,38 @@ const TaskSubmissions = () => {
                     <tr key={entry.student?._id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-semibold text-gray-900">{entry.student?.name || '—'}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{entry.student?.email || '—'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600 capitalize">{entry.status}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${statusBadgeClass(entry.status)}`}>
+                          {entry.status || 'pending'}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {entry.submittedAt ? new Date(entry.submittedAt).toLocaleString() : '—'}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {entry.status === 'submitted' ? (
+                        {entry.status === 'completed' ? (
+                          <span className="text-xs font-semibold text-emerald-600">Completed</span>
+                        ) : entry.status === 'submitted' ? (
                           <button
                             onClick={() => handleStatusUpdate(entry.student?._id, 'completed')}
                             className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold"
                           >
                             Mark Completed
                           </button>
-                        ) : entry.status === 'completed' ? (
-                          <span className="text-xs font-semibold text-emerald-600">Completed</span>
+                        ) : entry.status === 'in-progress' ? (
+                          <button
+                            onClick={() => handleStatusUpdate(entry.student?._id, 'submitted')}
+                            className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold"
+                          >
+                            Verify & Mark Submitted
+                          </button>
+                        ) : entry.status === 'pending' ? (
+                          <button
+                            onClick={() => handleStatusUpdate(entry.student?._id, 'submitted')}
+                            className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold"
+                          >
+                            Verify & Mark Submitted
+                          </button>
                         ) : (
                           <span className="text-xs text-gray-500">Waiting</span>
                         )}

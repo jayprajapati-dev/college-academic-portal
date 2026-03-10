@@ -119,6 +119,14 @@ const RoleNotices = () => {
 
   const allAudienceValues = useMemo(() => audienceOptions.map((option) => option.value), [audienceOptions]);
 
+  const noticeStats = useMemo(() => {
+    const total = notices.length;
+    const published = notices.filter((n) => n.status !== 'draft').length;
+    const drafts = notices.filter((n) => n.status === 'draft').length;
+    const highPriority = notices.filter((n) => n.priority === 'High').length;
+    return { total, published, drafts, highPriority };
+  }, [notices]);
+
   const resetForm = () => {
     setFormData({
       title: '',
@@ -283,29 +291,63 @@ const RoleNotices = () => {
       profileLinks={role === 'admin' ? [] : [{ label: 'Profile', to: `/${role}/profile` }]}
     >
       <div className="space-y-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-black text-gray-900 dark:text-white flex items-center gap-3">
-              <span className="material-symbols-outlined text-4xl text-red-500">notifications</span>
-              Notice Management
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1 font-medium">
-              Create drafts or publish notices to your audience
-            </p>
+        <section className="rounded-3xl bg-gradient-to-r from-[#7f1d1d] via-[#be123c] to-[#db2777] text-white p-6 md:p-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-rose-100">Announcement Center</p>
+              <h1 className="text-3xl md:text-4xl font-black mt-2">Notice Management</h1>
+              <p className="text-rose-100 mt-2 text-sm md:text-base">
+                Publish targeted notices with clear priority and recipient groups.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+                <span className="px-3 py-1 rounded-full bg-white/15">Total: {noticeStats.total}</span>
+                <span className="px-3 py-1 rounded-full bg-white/15">Published: {noticeStats.published}</span>
+                <span className="px-3 py-1 rounded-full bg-white/15">Drafts: {noticeStats.drafts}</span>
+                <span className="px-3 py-1 rounded-full bg-white/15">High Priority: {noticeStats.highPriority}</span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={openCreateModal}
+                className="bg-gradient-to-r from-[#e11d48] to-[#be123c] text-white border border-rose-200/70 hover:border-rose-100 hover:from-[#be123c] hover:to-[#9f1239] shadow-lg shadow-rose-700/30"
+              >
+                + Create Notice
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            >
-              <option value="all">All</option>
-              <option value="published">Published</option>
-              <option value="draft">Draft</option>
-            </select>
-            <Button onClick={openCreateModal} className="bg-red-600 hover:bg-red-700">
-              + Create Notice
-            </Button>
+        </section>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">All Notices</p>
+            <p className="text-2xl font-black text-[#111827] mt-1">{noticeStats.total}</p>
+          </div>
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">Published</p>
+            <p className="text-2xl font-black text-emerald-600 mt-1">{noticeStats.published}</p>
+          </div>
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">Drafts</p>
+            <p className="text-2xl font-black text-amber-600 mt-1">{noticeStats.drafts}</p>
+          </div>
+          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+            <p className="text-xs text-[#6B7280]">High Priority</p>
+            <p className="text-2xl font-black text-rose-600 mt-1">{noticeStats.highPriority}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
+          >
+            <option value="all">All</option>
+            <option value="published">Published</option>
+            <option value="draft">Draft</option>
+          </select>
+          <div className="px-4 py-2 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] text-sm text-[#475569]">
+            Showing {notices.length} notices on this page
           </div>
         </div>
 
@@ -427,94 +469,106 @@ const RoleNotices = () => {
       {showModal && (
         <Modal isOpen={showModal} onClose={() => setShowModal(false)}>
           <div className="space-y-4">
-            <h2 className="text-xl font-bold">{editingNotice ? 'Edit Notice' : 'Create Notice'}</h2>
-            <div>
-              <label className="block text-sm font-medium">Title</label>
-              <input
-                value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                className="w-full px-4 py-2 border rounded-lg"
-              />
+            <div className="rounded-xl border border-rose-100 bg-gradient-to-r from-rose-50 to-pink-50 px-4 py-3">
+              <h2 className="text-xl font-bold text-rose-900">{editingNotice ? 'Edit Notice' : 'Create Notice'}</h2>
+              <p className="text-sm text-rose-700 mt-1">Create a clear notice with proper audience and priority.</p>
             </div>
-            <div>
-              <label className="block text-sm font-medium">Content</label>
-              <textarea
-                value={formData.content}
-                onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
-                className="w-full px-4 py-2 border rounded-lg"
-                rows={4}
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+            <div className="rounded-xl border border-gray-200 p-3.5 sm:p-4 space-y-3">
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Notice Content</p>
               <div>
-                <label className="block text-sm font-medium">Priority</label>
-                <select
-                  value={formData.priority}
-                  onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
-                  className="w-full px-4 py-2 border rounded-lg"
-                >
-                  <option value="Normal">Normal</option>
-                  <option value="High">High</option>
-                  <option value="Low">Low</option>
-                </select>
+                <label className="block text-sm font-medium mb-1.5">Title</label>
+                <input
+                  value={formData.title}
+                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full h-10 px-3.5 border border-gray-300 rounded-lg bg-white text-sm"
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium">Send To</label>
-                <div className="border rounded-lg p-3 space-y-2">
-                  <label className="flex items-center gap-2 text-sm font-semibold">
-                    <input
-                      type="checkbox"
-                      checked={formData.targetRoles.length === allAudienceValues.length}
-                      onChange={() =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          targetRoles:
-                            prev.targetRoles.length === allAudienceValues.length ? [] : allAudienceValues
-                        }))
-                      }
-                    />
-                    All
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {audienceOptions.map((option) => (
-                      <label key={option.value} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={formData.targetRoles.includes(option.value)}
-                          onChange={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              targetRoles: prev.targetRoles.includes(option.value)
-                                ? prev.targetRoles.filter((item) => item !== option.value)
-                                : [...prev.targetRoles, option.value]
-                            }))
-                          }
-                        />
-                        {option.label}
-                      </label>
-                    ))}
+                <label className="block text-sm font-medium mb-1.5">Content</label>
+                <textarea
+                  value={formData.content}
+                  onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm"
+                  rows={4}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 p-3.5 sm:p-4 space-y-3">
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Delivery Settings</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Priority</label>
+                  <select
+                    value={formData.priority}
+                    onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
+                    className="w-full h-10 px-3.5 border border-gray-300 rounded-lg bg-white text-sm"
+                  >
+                    <option value="Normal">Normal</option>
+                    <option value="High">High</option>
+                    <option value="Low">Low</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Send To</label>
+                  <div className="border border-gray-300 rounded-lg p-3 space-y-2 bg-white">
+                    <label className="flex items-center gap-2 text-sm font-semibold">
+                      <input
+                        type="checkbox"
+                        checked={formData.targetRoles.length === allAudienceValues.length}
+                        onChange={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            targetRoles:
+                              prev.targetRoles.length === allAudienceValues.length ? [] : allAudienceValues
+                          }))
+                        }
+                      />
+                      All
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {audienceOptions.map((option) => (
+                        <label key={option.value} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={formData.targetRoles.includes(option.value)}
+                            onChange={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                targetRoles: prev.targetRoles.includes(option.value)
+                                  ? prev.targetRoles.filter((item) => item !== option.value)
+                                  : [...prev.targetRoles, option.value]
+                              }))
+                            }
+                          />
+                          {option.label}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {role === 'admin'
+                        ? 'Admin notices go to selected roles across the system.'
+                        : role === 'hod'
+                          ? 'HOD notices go to selected roles within your branch.'
+                          : 'Teacher notices go to selected roles within your assigned branch/semester.'}
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    {role === 'admin'
-                      ? 'Admin notices go to selected roles across the system.'
-                      : role === 'hod'
-                        ? 'HOD notices go to selected roles within your branch.'
-                        : 'Teacher notices go to selected roles within your assigned branch/semester.'}
-                  </p>
                 </div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-3">
+
+            <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
               <Button
                 onClick={() => handleSaveNotice('draft')}
-                className="bg-gray-200 text-gray-900 hover:bg-gray-300"
+                className="w-full sm:w-auto bg-gray-200 text-gray-900 hover:bg-gray-300"
                 disabled={saving}
               >
                 Save Draft
               </Button>
               <Button
                 onClick={() => handleSaveNotice('published')}
-                className="bg-red-600 hover:bg-red-700"
+                className="w-full sm:w-auto bg-gradient-to-r from-[#e11d48] to-[#be123c] border border-rose-200/70 hover:from-[#be123c] hover:to-[#9f1239]"
                 disabled={saving}
               >
                 Publish
