@@ -16,6 +16,7 @@ const ROLE_NAV = {
     { key: 'semesters', label: 'Semesters', to: '/admin/semesters', icon: 'calendar_month' },
     { key: 'branches', label: 'Branches', to: '/admin/branches', icon: 'apartment' },
     { key: 'subjects', label: 'Subjects', to: '/admin/subjects', icon: 'menu_book' },
+    { key: 'rooms', label: 'Rooms', to: '/admin/rooms', icon: 'meeting_room' },
     { key: 'timetable', label: 'Timetable', to: '/admin/timetable', icon: 'calendar_today' },
     { key: 'notices', label: 'Notice Board', to: '/admin/notices', icon: 'campaign' },
     { key: 'exams', label: 'Exams', to: '/admin/exams', icon: 'quiz' },
@@ -25,20 +26,20 @@ const ROLE_NAV = {
   ],
   hod: [
     { key: 'dashboard', label: 'Dashboard', to: '/hod/dashboard', icon: 'space_dashboard' },
+    { key: 'branches', label: 'Branches', to: '/hod/branches', icon: 'apartment' },
     { key: 'subjects', label: 'Subjects', to: '/hod/subjects', icon: 'menu_book' },
-    { key: 'manage-teachers', label: 'Manage Teachers', to: '/hod/manage-teachers', icon: 'group' },
-    { key: 'notices', label: 'Notice Board', to: '/hod/notices', icon: 'campaign' },
-    { key: 'tasks', label: 'Tasks', to: '/hod/tasks', icon: 'assignment' },
-    { key: 'projects', label: 'Projects', to: '/hod/projects', icon: 'folder_open' },
-    { key: 'materials', label: 'Materials', to: '/hod/materials', icon: 'menu_book' },
-    { key: 'library', label: 'Library', to: '/hod/library', icon: 'library_books' },
-    { key: 'exams', label: 'Exams', to: '/hod/exams', icon: 'quiz' },
-    { key: 'reports', label: 'Reports', to: '/hod/reports', icon: 'insights' },
+    { key: 'rooms', label: 'Rooms', to: '/hod/rooms', icon: 'meeting_room' },
     { key: 'timetable', label: 'Timetable', to: '/hod/timetable', icon: 'calendar_today' },
-    { key: 'users', label: 'Manage Users', to: '/hod/users', icon: 'group' }
+    { key: 'notices', label: 'Notice Board', to: '/hod/notices', icon: 'campaign' },
+    { key: 'exams', label: 'Exams', to: '/hod/exams', icon: 'quiz' },
+    { key: 'add-teacher', label: 'Add Teacher', to: '/hod/add-teacher', icon: 'person_add' },
+    { key: 'manage-teachers', label: 'Manage Teachers', to: '/hod/manage-teachers', icon: 'groups' },
+    { key: 'users', label: 'Users', to: '/hod/users', icon: 'group' },
+    { key: 'reports', label: 'Reports', to: '/hod/reports', icon: 'assessment' }
   ],
   teacher: [
     { key: 'dashboard', label: 'Dashboard', to: '/teacher/dashboard', icon: 'space_dashboard' },
+    { key: 'timetable', label: 'Timetable', to: '/teacher/timetable', icon: 'calendar_today' },
     { key: 'materials', label: 'Materials', to: '/teacher/materials', icon: 'menu_book' },
     { key: 'library', label: 'Library', to: '/teacher/library', icon: 'library_books' },
     { key: 'tasks', label: 'Tasks', to: '/teacher/tasks', icon: 'assignment' },
@@ -52,12 +53,13 @@ const ROLE_NAV = {
     { key: 'tasks', label: 'Tasks', to: '/coordinator/tasks', icon: 'assignment' },
     { key: 'projects', label: 'Projects', to: '/coordinator/projects', icon: 'folder_open' },
     { key: 'notices', label: 'Notice Board', to: '/coordinator/notices', icon: 'campaign' },
+    { key: 'exams', label: 'Exams', to: '/coordinator/exams', icon: 'quiz' },
     { key: 'users', label: 'Students', to: '/coordinator/users', icon: 'group' },
     { key: 'activity', label: 'Activity Log', to: '/coordinator/activity', icon: 'history' }
   ]
 };
 
-const ADMIN_PROXY_SAFE_KEYS = new Set(['dashboard', 'users', 'notices', 'timetable', 'exams']);
+const ADMIN_PROXY_SAFE_KEYS = new Set(['dashboard', 'academic-structure', 'semesters', 'branches', 'subjects', 'timetable', 'notices', 'exams', 'users', 'contacts', 'rooms']);
 
 const useRoleNav = (role) => {
   const location = useLocation();
@@ -114,6 +116,14 @@ const useRoleNav = (role) => {
         const res = await fetch(`/api/permissions/me${modeParam}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          if (window.location.pathname !== '/login') {
+            window.location.assign('/login');
+          }
+          return;
+        }
         const data = await res.json();
         if (!res.ok || !data?.success) {
           throw new Error(data?.message || 'Failed to load permissions');

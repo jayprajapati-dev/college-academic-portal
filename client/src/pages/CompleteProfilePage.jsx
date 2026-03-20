@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { LandingFrame } from '../components';
 import useLandingAuth from '../hooks/useLandingAuth';
 
+const isSystemGeneratedFallbackEmail = (email) => /^[0-9]{10}@college\.edu$/i.test(String(email || '').trim());
+
 const CompleteProfilePage = () => {
   const navigate = useNavigate();
   const { isLoggedIn, currentUser, userProfile, notifications } = useLandingAuth();
@@ -18,6 +20,8 @@ const CompleteProfilePage = () => {
     mobile: '',
     role: '',
     branch: '',
+    branches: [],
+    department: '',
     semester: '',
     subjects: [],
     hod: ''
@@ -59,12 +63,17 @@ const CompleteProfilePage = () => {
       const data = await response.json();
 
       if (data.success) {
+        const incomingEmail = data.data.email || '';
+        const shouldHideFallbackEmail = data.data.role !== 'student' && isSystemGeneratedFallbackEmail(incomingEmail);
+
         setProfileData({
           name: data.data.name || '',
-          email: data.data.email || '',
+          email: shouldHideFallbackEmail ? '' : incomingEmail,
           mobile: data.data.mobile || '',
           role: data.data.role || '',
           branch: data.data.branch?._id || data.data.branch || '',
+          branches: data.data.branches || [],
+          department: data.data.department || '',
           semester: data.data.semester?._id || data.data.semester || '',
           subjects: data.data.assignedSubjects?.map((s) => s.name) || [],
           hod: data.data.assignedHOD?.name || 'Not Assigned'
@@ -99,6 +108,10 @@ const CompleteProfilePage = () => {
 
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
 
       if (profileData.role === 'student' && (!profileData.branch || !profileData.semester)) {
         setMessage({ type: 'error', text: 'Please select branch and semester to continue.' });
@@ -168,6 +181,66 @@ const CompleteProfilePage = () => {
   };
 
   const showStudentAcademicSelects = profileData.role === 'student';
+
+  const resolveBranchName = useMemo(() => {
+    const fromObject = (value) => {
+      if (value && typeof value === 'object') return value.name || value.code || '';
+      return '';
+    };
+
+    const fromId = (value) => {
+      if (!value || typeof value !== 'string') return '';
+      const matched = branches.find((b) => String(b._id) === String(value));
+      return matched ? `${matched.name} (${matched.code})` : '';
+    };
+
+    const fromPlainText = (value) => {
+      if (!value || typeof value !== 'string') return '';
+      const trimmed = value.trim();
+      return trimmed || '';
+    };
+
+    const directBranchName = fromObject(profileData.branch) || fromId(profileData.branch) || fromPlainText(profileData.branch);
+    if (directBranchName) return directBranchName;
+
+    const departmentName = fromObject(profileData.department) || fromId(profileData.department) || fromPlainText(profileData.department);
+    if (departmentName) return departmentName;
+
+    if (Array.isArray(profileData.branches) && profileData.branches.length > 0) {
+      const firstBranch = profileData.branches[0];
+      const firstBranchName = fromObject(firstBranch) || fromId(firstBranch);
+      if (firstBranchName) return firstBranchName;
+    }
+
+    return 'Not Assigned';
+  }, [profileData.branch, profileData.branches, profileData.department, branches]);
+
+  const resolveSemesterName = useMemo(() => {
+    const fromObject = (value) => {
+      if (!value || typeof value !== 'object') return '';
+      return value.name || value.semesterNumber || value.academicYear || '';
+    };
+
+    const fromId = (value) => {
+      if (!value || typeof value !== 'string') return '';
+      const matched = semesters.find((s) => String(s._id) === String(value));
+      return matched ? formatSemesterOptionLabel(matched) : '';
+    };
+
+    const fromPlainText = (value) => {
+      if (!value || typeof value !== 'string') return '';
+      const trimmed = value.trim();
+      return trimmed || '';
+    };
+
+    const directSemesterName = fromObject(profileData.semester) || fromId(profileData.semester) || fromPlainText(profileData.semester);
+    if (directSemesterName) return directSemesterName;
+
+    return 'Not Assigned';
+  }, [profileData.semester, semesters]);
+
+  const isHod = profileData.role === 'hod';
+  const canEditEmail = profileData.role === 'student' || !String(profileData.email || '').trim() || isSystemGeneratedFallbackEmail(profileData.email);
 
   if (loading) {
     return (
@@ -258,17 +331,24 @@ const CompleteProfilePage = () => {
                   />
                 </div>
 
-                {profileData.role === 'student' ? (
+                {canEditEmail ? (
                   <div>
-                    <label className="block text-sm font-semibold text-[#374151] mb-1.5">Email</label>
+                    <label className="block text-sm font-semibold text-[#374151] mb-1.5">
+                      Email {profileData.role !== 'student' && <span className="text-[#9CA3AF] font-medium">(Optional)</span>}
+                    </label>
                     <input
                       type="email"
                       name="email"
                       value={profileData.email}
                       onChange={handleChange}
                       className="w-full px-3.5 py-2.5 border border-[#D7DCE5] rounded-lg focus:ring-2 focus:ring-[#194ce6]/20 focus:border-[#194ce6] outline-none transition"
-                      placeholder="Enter your email"
+                      placeholder={profileData.role === 'student' ? 'Enter your email' : 'Enter email (optional)'}
                     />
+                    {profileData.role !== 'student' && (
+                      <p className="text-xs text-[#6B7280] mt-1">
+                        Add your personal/work email to use it for login along with mobile.
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div>
@@ -331,21 +411,23 @@ const CompleteProfilePage = () => {
                     <label className="block text-sm font-semibold text-[#374151] mb-1.5">Branch</label>
                     <input
                       type="text"
-                      value={profileData.branch?.name || profileData.branch || 'Not Assigned'}
+                      value={resolveBranchName}
                       disabled
                       className="w-full px-3.5 py-2.5 border border-[#E2E8F0] rounded-lg bg-[#F8FAFC] text-[#64748B]"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-[#374151] mb-1.5">Semester</label>
-                    <input
-                      type="text"
-                      value={profileData.semester?.name || profileData.semester || 'Not Assigned'}
-                      disabled
-                      className="w-full px-3.5 py-2.5 border border-[#E2E8F0] rounded-lg bg-[#F8FAFC] text-[#64748B]"
-                    />
-                  </div>
+                  {!isHod && (
+                    <div>
+                      <label className="block text-sm font-semibold text-[#374151] mb-1.5">Semester</label>
+                      <input
+                        type="text"
+                        value={resolveSemesterName}
+                        disabled
+                        className="w-full px-3.5 py-2.5 border border-[#E2E8F0] rounded-lg bg-[#F8FAFC] text-[#64748B]"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 

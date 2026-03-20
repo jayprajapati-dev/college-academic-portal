@@ -10,6 +10,18 @@ const { protect, authorize } = require('../middleware/auth');
 
 // Links-based attachments only (Google Drive, Dropbox, etc.)
 
+const normalizeId = (value) => {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  return value?._id ? String(value._id) : null;
+};
+
+const getHodBranchIds = (user) =>
+  Array.from(new Set(
+    [normalizeId(user?.branch), normalizeId(user?.department), ...((user?.branches || []).map((b) => normalizeId(b)))]
+      .filter(Boolean)
+  ));
+
 // Helper function to get eligible users based on audience
 const getEligibleUserIds = async (targetAudience, targetRoles, targetBranch, createdByRole, branchIds = [], semesterIds = []) => {
   try {
@@ -317,9 +329,14 @@ router.get('/admin', protect, authorize('admin', 'hod'), async (req, res) => {
 
     // HOD sees notices from their branch users only
     if (req.user.role === 'hod') {
-      const usersInBranch = await User.find({ branch: req.user.branch }).select('_id');
-      const userIds = usersInBranch.map(u => u._id);
-      query = { createdBy: { $in: userIds } };
+      const hodBranchIds = getHodBranchIds(req.user);
+      const usersInBranch = await User.find({
+        $or: [
+          { branch: { $in: hodBranchIds } },
+          { branches: { $in: hodBranchIds } },
+          { department: { $in: hodBranchIds } }
+        ]
+      }).select('_id');
     }
 
     if (status && status !== 'all') {
@@ -443,7 +460,8 @@ router.put('/:id', protect, authorize('admin', 'hod', 'teacher', 'coordinator'),
       }
 
       const creator = await User.findById(notice.createdBy).select('branch');
-      const sameBranch = creator?.branch?.equals(req.user.branch) || notice.targetBranch?.equals(req.user.branch);
+      const hodBranchIds = getHodBranchIds(req.user);
+      const sameBranch = hodBranchIds.some((id) => creator?.branch?.equals(id)) || hodBranchIds.some((id) => notice.targetBranch?.equals(id));
       if (!sameBranch) {
         return res.status(403).json({
           success: false,
@@ -618,7 +636,8 @@ router.delete('/:id', protect, authorize('admin', 'hod', 'teacher', 'coordinator
       }
 
       const creator = await User.findById(notice.createdBy).select('branch');
-      const sameBranch = creator?.branch?.equals(req.user.branch) || notice.targetBranch?.equals(req.user.branch);
+      const hodBranchIds = getHodBranchIds(req.user);
+      const sameBranch = hodBranchIds.some((id) => creator?.branch?.equals(id)) || hodBranchIds.some((id) => notice.targetBranch?.equals(id));
       if (!sameBranch) {
         return res.status(403).json({
           success: false,

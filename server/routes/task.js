@@ -349,8 +349,9 @@ router.get('/hod', protect, authorize('hod'), async (req, res) => {
   try {
     const { page = 1, limit = 10, category, semesterId, status } = req.query;
 
+    const hodBranchIds = getHodBranchScope(req.user);
     const query = {
-      branchId: req.user.branch
+      branchId: hodBranchIds.length > 0 ? { $in: hodBranchIds } : req.user.branch
     };
 
     if (status && status !== 'all') {

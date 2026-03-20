@@ -129,25 +129,25 @@ const RegisterPage = () => {
   return (
   <div className="bg-background-light dark:bg-background-dark text-[#111318] dark:text-white min-h-screen flex flex-col mesh-background">
     <header className="fixed top-0 w-full z-50 bg-white/40 dark:bg-white/5 backdrop-blur-xl border-b border-white/20 dark:border-white/10">
-      <div className="max-w-[1280px] mx-auto px-6 h-20 flex items-center justify-between">
-        <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <div className="p-1.5 bg-gradient-to-br from-primary to-primary/80 rounded-lg text-white shadow-lg shadow-primary/20">
-            <svg className="size-6" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+      <div className="max-w-[1280px] mx-auto px-3 sm:px-4 h-12 sm:h-14 flex items-center justify-between gap-2">
+        <a href="/" className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity">
+          <div className="p-1 sm:p-1.5 bg-gradient-to-br from-primary to-primary/80 rounded-lg text-white shadow-lg shadow-primary/20 shrink-0">
+            <svg className="size-4 sm:size-5" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
               <path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path>
             </svg>
           </div>
-          <div className="flex flex-col">
-            <h1 className="text-lg font-black tracking-tight">SmartAcademics</h1>
-            <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Registration</p>
+          <div className="flex flex-col min-w-0">
+            <h1 className="text-sm sm:text-base font-black tracking-tight truncate">SmartAcademics</h1>
+            <p className="text-[9px] sm:text-[10px] font-bold text-primary uppercase tracking-[0.22em] truncate">Registration</p>
           </div>
         </a>
         <nav className="hidden md:flex items-center gap-8">
           <a className="text-sm font-semibold hover:text-primary transition-colors" href="/about">About Us</a>
           <a className="text-sm font-semibold hover:text-primary transition-colors" href="/contact">Contact Us</a>
         </nav>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           <a
-            className="px-6 py-2 text-sm font-bold bg-white/80 dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg hover:bg-primary hover:text-white hover:border-primary transition-all shadow-sm"
+            className="px-3 sm:px-6 py-1.5 sm:py-2 text-xs sm:text-sm font-bold bg-white/80 dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded-lg hover:bg-primary hover:text-white hover:border-primary transition-all shadow-sm"
             href="/login"
           >
             Have an Account?
@@ -155,7 +155,7 @@ const RegisterPage = () => {
         </div>
       </div>
     </header>
-    <main className="flex-1 lg:flex pt-20">
+    <main className="flex-1 lg:flex pt-12 sm:pt-14">
       <section className="relative hidden lg:flex lg:w-1/2 flex-col justify-center p-20 pt-12 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent dark:from-primary/15 dark:to-transparent">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-primary/5 dark:from-primary/10"></div>
         <div className="relative z-10 space-y-8">
@@ -165,7 +165,7 @@ const RegisterPage = () => {
             </div>
           </div>
           <div className="max-w-md">
-            <h1 className="text-[#111318] dark:text-white text-5xl font-black leading-tight tracking-tight">Accelerate Your Academic Future</h1>
+            <h1 className="text-[#111318] dark:text-white text-2xl font-black leading-tight tracking-tight">Accelerate Your Academic Future</h1>
             <p className="mt-4 text-[#636c88] dark:text-gray-400 text-lg leading-relaxed">Access elite resources, personalized mentoring, and a global network of top-performing scholars from India's leading institutions.</p>
             <div className="mt-8 flex items-center gap-4">
               <div className="flex -space-x-2">
@@ -182,11 +182,11 @@ const RegisterPage = () => {
           </div>
         </div>
       </section>
-      <section className="flex flex-1 flex-col items-center justify-center p-6 md:p-12 lg:p-16 lg:w-1/2">
-        <div className="w-full max-w-2xl pt-20 lg:pt-0">
-          <div className="mb-12">
-            <h2 className="text-[#111318] dark:text-white text-4xl font-black leading-tight tracking-tight">Create Your Student Account</h2>
-            <p className="text-[#636c88] dark:text-gray-400 mt-3 text-lg">Join thousands of students already benefiting from SmartAcademics premium features.</p>
+      <section className="flex flex-1 flex-col items-center justify-center p-4 md:p-8 lg:w-1/2">
+        <div className="w-full max-w-2xl pt-14 sm:pt-16 lg:pt-0">
+          <div className="mb-5">
+            <h2 className="text-[#111318] dark:text-white text-xl font-black leading-tight tracking-tight">Create Your Student Account</h2>
+            <p className="text-[#636c88] dark:text-gray-400 mt-2 text-xs">Join thousands of students already benefiting from SmartAcademics premium features.</p>
           </div>
           {error && (
             <div className="rounded-lg p-4 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 mb-4">
@@ -204,7 +204,7 @@ const RegisterPage = () => {
               </div>
             </div>
           )}
-          <form onSubmit={handleSubmit} className="space-y-8 bg-white dark:bg-gray-900/80 p-10 md:p-12 rounded-2xl shadow-2xl shadow-black/10 border border-gray-100 dark:border-gray-800 backdrop-blur-sm">
+          <form onSubmit={handleSubmit} className="space-y-5 bg-white dark:bg-gray-900/80 p-5 rounded-2xl shadow-2xl shadow-black/10 border border-gray-100 dark:border-gray-800 backdrop-blur-sm">
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-2">
                 <span className="material-symbols-outlined text-primary text-xl">person</span>

@@ -4,6 +4,7 @@ import './App.css';
 
 // Import all pages
 import LandingPage from './pages/LandingPage';
+import AcademicExplorerPage from './pages/AcademicExplorerPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -42,6 +43,7 @@ import ContactManagement from './pages/admin/ContactManagement';
 import PasswordSetup from './pages/PasswordSetup';
 import ExamManagement from './pages/ExamManagement';
 import ActivityLog from './pages/ActivityLog';
+import RoomsPage from './pages/RoomsPage';
 
 // Import HOD pages
 import AddTeacher from './pages/hod/AddTeacher';
@@ -73,6 +75,7 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/academic-explorer" element={<AcademicExplorerPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -116,6 +119,7 @@ function App() {
         <Route path="/coordinator/projects" element={<RoleProjects />} />
         <Route path="/coordinator/tasks/:taskId/submissions" element={<TaskSubmissions />} />
         <Route path="/coordinator/notices" element={<RoleNotices />} />
+        <Route path="/coordinator/exams" element={<ExamManagement />} />
         <Route path="/coordinator/users" element={<UserManagement />} />
         <Route path="/coordinator/activity" element={<ActivityLog />} />
         <Route path="/hod/dashboard" element={<RoleDashboard />} />
@@ -123,13 +127,14 @@ function App() {
         <Route path="/hod/add-teacher" element={<AddTeacher />} />
         <Route path="/hod/manage-teachers" element={<RoleManageTeachers />} />
         <Route path="/hod/materials" element={<RoleMaterials />} />
-        <Route path="/hod/reports" element={<BranchReports />} />
+        <Route path="/hod/subjects" element={<RoleHODSubjects />} />
+        <Route path="/hod/rooms" element={<RoomsPage />} />
         <Route path="/hod/timetable" element={<RoleTimetable />} />
         <Route path="/hod/notices" element={<RoleNotices />} />
         <Route path="/hod/tasks" element={<RoleTasks />} />
         <Route path="/hod/tasks/:taskId/submissions" element={<TaskSubmissions />} />
         <Route path="/hod/library" element={<RoleLibrary />} />
-        <Route path="/hod/projects" element={<RoleProjects />} />
+        <Route path="/hod/reports" element={<BranchReports />} />
         <Route path="/hod/exams" element={<ExamManagement />} />
         <Route path="/admin/dashboard" element={<RoleDashboard />} />
         <Route path="/admin/profile" element={<RoleProfile />} />
@@ -148,6 +153,7 @@ function App() {
         <Route path="/admin/activity" element={<ActivityLog />} />
         <Route path="/admin/timetable" element={<RoleTimetable />} />
         <Route path="/admin/notices" element={<RoleNotices />} />
+        <Route path="/admin/rooms" element={<RoomsPage />} />
         <Route path="/admin/tasks" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/admin/materials" element={<RoleMaterials />} />
         <Route path="/admin/library" element={<Navigate to="/admin/dashboard" replace />} />

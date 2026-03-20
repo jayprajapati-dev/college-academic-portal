@@ -105,175 +105,203 @@ const StudentDashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#194ce6]"></div>
+      <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_top,_#eef2ff,_#f8fafc)]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#e0e7ff] border-t-[#4338ca]" />
+          <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#6366f1]">Loading workspace…</p>
+        </div>
       </div>
     );
   }
 
   return (
     <StudentLayout title="Student Dashboard" onLogout={handleLogout} userName={user?.name || 'Student'}>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <section className="rounded-3xl bg-gradient-to-r from-[#0f172a] via-[#1d4ed8] to-[#2563eb] text-white p-6 md:p-8 mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-white/15 flex items-center justify-center text-2xl font-black">
-                {(user?.name || 'S').charAt(0).toUpperCase()}
+      <main className="mx-auto max-w-7xl space-y-4 px-3.5 py-4 sm:space-y-5 sm:px-5 sm:py-5 md:space-y-6 md:px-6 lg:px-8 lg:py-7 font-display">
+
+        {/* ── Hero ── */}
+        <section className="relative overflow-hidden rounded-[2rem] border border-[#c7d2fe] bg-[radial-gradient(circle_at_top_left,rgba(199,210,254,0.35),transparent_26%),linear-gradient(135deg,#1e1b4b_0%,#312e81_28%,#4338ca_58%,#06b6d4_100%)] px-4 py-5 text-white shadow-[0_28px_80px_rgba(49,46,129,0.32)] sm:px-6 sm:py-7 md:px-8 md:py-8">
+          <div className="absolute inset-0 bg-[linear-gradient(118deg,rgba(255,255,255,0.08),transparent_34%,rgba(255,255,255,0.04)_66%,transparent)]" />
+          <div className="absolute -left-12 top-8 h-40 w-40 rounded-full bg-[#818cf8]/20 blur-3xl" />
+          <div className="absolute right-0 top-0 h-56 w-56 translate-x-14 -translate-y-12 rounded-full bg-[#22d3ee]/18 blur-3xl" />
+          <div className="absolute bottom-0 left-1/2 h-20 w-48 translate-y-8 -translate-x-1/2 rounded-full bg-black/20 blur-2xl" />
+
+          <div className="relative z-10 grid gap-5 xl:grid-cols-[1.15fr_0.85fr] xl:items-center">
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.30em] text-indigo-200 backdrop-blur-md sm:text-[11px]">
+                <span className="material-symbols-outlined text-[13px] sm:text-[14px]">school</span>
+                Student Workspace
               </div>
+
               <div>
-                <p className="text-xs uppercase tracking-[0.22em] text-blue-100">Student Workspace</p>
-                <h2 className="text-2xl md:text-3xl font-black mt-1">Welcome back, {user?.name}!</h2>
-                <p className="text-blue-100 text-sm mt-1">Everything you need for classes, notices, and exams in one place.</p>
+                <h2 className="text-xl font-black leading-tight tracking-tight sm:text-3xl md:text-5xl">
+                  Welcome back,{' '}
+                  <span className="text-cyan-300">{user?.name?.split(' ')[0] || 'Student'}</span>!
+                </h2>
+                <p className="mt-1.5 text-xs leading-5 text-indigo-100/80 sm:mt-2 sm:text-sm md:text-base">
+                  Classes, notices, and exams — all in one place.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                {user?.branch?.name && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[10px] font-semibold backdrop-blur-md sm:px-3 sm:text-[11px]">
+                    <span className="material-symbols-outlined text-[12px] opacity-80 sm:text-[13px]">location_on</span>
+                    {user.branch.name}
+                  </span>
+                )}
+                {user?.semester?.semesterNumber && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[10px] font-semibold backdrop-blur-md sm:px-3 sm:text-[11px]">
+                    <span className="material-symbols-outlined text-[12px] opacity-80 sm:text-[13px]">book_2</span>
+                    Sem {user.semester.semesterNumber}
+                  </span>
+                )}
+                {user?.enrollmentNumber && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[10px] font-semibold backdrop-blur-md sm:px-3 sm:text-[11px]">
+                    <span className="material-symbols-outlined text-[12px] opacity-80 sm:text-[13px]">badge</span>
+                    {user.enrollmentNumber}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => navigate('/student/subjects')}
+                  className="inline-flex items-center gap-1.5 rounded-2xl bg-white px-4 py-2 text-xs font-black text-[#4338ca] shadow-[0_14px_32px_rgba(67,56,202,0.28)] transition hover:-translate-y-0.5 sm:py-2.5 sm:text-sm"
+                >
+                  <span className="material-symbols-outlined text-[15px] sm:text-[16px]">menu_book</span>
+                  Study Materials
+                </button>
+                <button
+                  onClick={() => navigate('/notices')}
+                  className="inline-flex items-center gap-1.5 rounded-2xl border border-white/30 bg-white/10 px-4 py-2 text-xs font-black text-white backdrop-blur-md transition hover:-translate-y-0.5 hover:bg-white/15 sm:py-2.5 sm:text-sm"
+                >
+                  <span className="material-symbols-outlined text-[15px] sm:text-[16px]">notifications</span>
+                  View Notices
+                </button>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 text-xs font-semibold">
-              {user?.branch?.name && <span className="px-3 py-1 rounded-full bg-white/15">{user.branch.name}</span>}
-              {user?.semester?.semesterNumber && <span className="px-3 py-1 rounded-full bg-white/15">Semester {user.semester.semesterNumber}</span>}
-              {user?.enrollmentNumber && <span className="px-3 py-1 rounded-full bg-white/15">{user.enrollmentNumber}</span>}
+
+            <div className="hidden xl:grid grid-cols-2 gap-3">
+              {[
+                { icon: 'draft', label: 'Materials', value: stats.materials },
+                { icon: 'notifications', label: 'Alerts', value: stats.notices },
+                { icon: 'menu_book', label: 'Subjects', value: stats.subjects },
+                { icon: 'book_2', label: 'Semester', value: user?.semester?.semesterNumber ?? '—' },
+              ].map((s) => (
+                <div key={s.label} className="rounded-[1.4rem] border border-white/15 bg-white/10 p-4 backdrop-blur-xl">
+                  <span className="material-symbols-outlined text-[22px] text-white/60">{s.icon}</span>
+                  <p className="mt-2 text-[10px] uppercase tracking-[0.2em] text-white/60">{s.label}</p>
+                  <p className="mt-1 text-3xl font-black leading-none">{s.value}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm">Study Materials</p>
-                <p className="text-3xl font-bold text-[#194ce6] mt-1">{stats.materials}</p>
-              </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <svg className="w-8 h-8 text-[#194ce6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm">Active Notices</p>
-                <p className="text-3xl font-bold text-purple-600 mt-1">{stats.notices}</p>
-              </div>
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
+        {/* ── Stats ── */}
+        <div className="grid grid-cols-2 gap-2.5 md:gap-4 xl:grid-cols-4">
+          {[
+            { label: 'Study Materials', value: stats.materials, icon: 'draft', shell: 'from-[#1e3a5f] via-[#1d4ed8] to-[#60a5fa]', note: 'Subjects with content' },
+            { label: 'Unread Notices', value: stats.notices, icon: 'notifications', shell: 'from-[#3b0764] via-[#7c3aed] to-[#c084fc]', note: 'Pending notifications' },
+            { label: 'My Subjects', value: stats.subjects, icon: 'menu_book', shell: 'from-[#134e4a] via-[#0f766e] to-[#34d399]', note: 'Enrolled this semester' },
+            { label: 'Enrolled Sem', value: user?.semester?.semesterNumber ?? '—', icon: 'book_2', shell: 'from-[#92400e] via-[#b45309] to-[#fbbf24]', note: user?.branch?.name || 'Current branch' },
+          ].map((item) => (
+            <div key={item.label} className="rounded-[1.25rem] border border-white/40 bg-white p-[3px] shadow-[0_18px_40px_rgba(15,23,42,0.10)] transition duration-300 hover:-translate-y-0.5 sm:rounded-[1.5rem] sm:p-1">
+              <div className={`rounded-[1.1rem] bg-gradient-to-br ${item.shell} p-3 text-white sm:rounded-[1.3rem] sm:p-4`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/75 sm:text-[11px]">{item.label}</p>
+                    <p className="mt-1.5 text-2xl font-black leading-none sm:mt-2 sm:text-3xl">{item.value}</p>
+                  </div>
+                  <span className="material-symbols-outlined shrink-0 rounded-lg bg-white/15 p-2 text-[20px] leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] sm:rounded-xl sm:p-2.5 sm:text-[24px]">{item.icon}</span>
+                </div>
+                <div className="mt-2.5 rounded-xl border border-white/15 bg-black/10 px-2.5 py-1.5 text-[10px] text-white/80 backdrop-blur-sm sm:mt-4 sm:px-3 sm:py-2 sm:text-xs">
+                  {item.note}
+                </div>
               </div>
             </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm">My Subjects</p>
-                <p className="text-3xl font-bold text-green-600 mt-1">{stats.subjects}</p>
-              </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
 
-        <section className="grid grid-cols-1 xl:grid-cols-[1.5fr_1fr] gap-6 mb-8">
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <h3 className="text-2xl font-bold text-gray-800 mb-6">Quick Actions</h3>
-            <div className="flex gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-4 md:overflow-visible">
+        {/* ── Quick Modules ── */}
+        <section className="rounded-[1.5rem] border border-[#c7d2fe] bg-[linear-gradient(180deg,#ffffff_0%,#eef2ff_100%)] p-3.5 shadow-[0_18px_40px_rgba(67,56,202,0.09)] sm:rounded-[2rem] sm:p-4 md:p-6">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#4338ca] sm:text-xs">Quick Access</p>
+              <h3 className="mt-1 text-base font-black text-[#0f172a] sm:mt-2 sm:text-xl md:text-2xl">Your learning toolkit</h3>
+            </div>
+            <p className="hidden shrink-0 text-xs text-[#475569] sm:block">6 modules ready</p>
+          </div>
+          <div className="mt-3.5 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 xl:grid-cols-3">
+            {[
+              { key: 'Content', label: 'Study Materials', to: '/student/subjects', accent: 'text-[#1d4ed8]' },
+              { key: 'Notices', label: 'Notice Board', to: '/notices', accent: 'text-[#7c3aed]' },
+              { key: 'Exams', label: 'Exam Schedule', to: '/student/exams', accent: 'text-[#be123c]' },
+              { key: 'Schedule', label: 'Timetable', to: '/student/timetable', accent: 'text-[#0369a1]' },
+              { key: 'Library', label: 'Reading Room', to: '/student/library', accent: 'text-[#047857]' },
+              { key: 'Profile', label: 'My Profile', to: '/student/profile', accent: 'text-[#b45309]' },
+            ].map((item) => (
               <button
-                onClick={() => navigate('/student/subjects')}
-                className="min-w-[210px] md:min-w-0 p-5 md:p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl hover:shadow-lg transition group"
+                key={item.to}
+                onClick={() => navigate(item.to)}
+                className="group rounded-[1rem] border border-[#e0e7ff] bg-white px-3 py-3 text-left shadow-[0_8px_20px_rgba(67,56,202,0.07)] transition duration-200 hover:-translate-y-0.5 sm:rounded-[1.25rem] sm:px-4 sm:py-4"
               >
-                <div className="p-3 bg-white rounded-lg w-fit mb-3 group-hover:scale-110 transition">
-                  <svg className="w-6 h-6 text-[#194ce6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
+                <p className={`text-[10px] font-bold uppercase tracking-[0.18em] ${item.accent} sm:text-[11px]`}>{item.key}</p>
+                <p className="mt-1.5 text-sm font-black text-[#0f172a] line-clamp-1 sm:mt-2 sm:text-base">{item.label}</p>
+                <div className="mt-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.14em] text-[#4338ca] sm:mt-3 sm:text-[11px]">
+                  <span>Open</span>
+                  <span className="material-symbols-outlined text-[15px] transition duration-200 group-hover:translate-x-1">arrow_forward</span>
                 </div>
-                <p className="font-semibold text-gray-800">Study Materials</p>
-                <p className="text-sm text-gray-600 mt-1">Browse resources</p>
               </button>
+            ))}
+          </div>
+        </section>
 
+        {/* ── Notifications ── */}
+        <section className="rounded-[1.5rem] border border-[#c7d2fe] bg-[linear-gradient(180deg,#ffffff_0%,#eef2ff_100%)] shadow-[0_22px_50px_rgba(67,56,202,0.10)] sm:rounded-[2rem]">
+          <div className="border-b border-[#e0e7ff] px-3.5 py-3 sm:px-4 sm:py-4 md:px-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#4338ca] sm:text-xs">Recent Activity</p>
+                <h3 className="mt-1 text-base font-black text-[#111827] sm:mt-2 sm:text-xl md:text-2xl">Update stream</h3>
+                <p className="mt-0.5 text-[10px] text-[#6b7280] sm:mt-1 sm:text-xs">Latest college notices and alerts</p>
+              </div>
               <button
                 onClick={() => navigate('/notices')}
-                className="min-w-[210px] md:min-w-0 p-5 md:p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl hover:shadow-lg transition group"
+                className="shrink-0 rounded-full border border-[#c7d2fe] bg-white px-3 py-1.5 text-[10px] font-bold text-[#4338ca] shadow-sm sm:px-4 sm:py-2 sm:text-xs"
               >
-                <div className="p-3 bg-white rounded-lg w-fit mb-3 group-hover:scale-110 transition">
-                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                </div>
-                <p className="font-semibold text-gray-800">View Notices</p>
-                <p className="text-sm text-gray-600 mt-1">Latest updates</p>
-              </button>
-
-              <button
-                onClick={() => navigate('/student/exams')}
-                className="min-w-[210px] md:min-w-0 p-5 md:p-6 bg-gradient-to-br from-pink-50 to-rose-100 rounded-xl hover:shadow-lg transition group"
-              >
-                <div className="p-3 bg-white rounded-lg w-fit mb-3 group-hover:scale-110 transition">
-                  <svg className="w-6 h-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5h6m-6 4h6m-7 4h8m-5 4h2m-9 0h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <p className="font-semibold text-gray-800">Exams</p>
-                <p className="text-sm text-gray-600 mt-1">Schedules & results</p>
-              </button>
-
-              <button
-                onClick={() => navigate('/student/profile')}
-                className="min-w-[210px] md:min-w-0 p-5 md:p-6 bg-gradient-to-br from-red-50 to-red-100 rounded-xl hover:shadow-lg transition group"
-              >
-                <div className="p-3 bg-white rounded-lg w-fit mb-3 group-hover:scale-110 transition">
-                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
-                <p className="font-semibold text-gray-800">My Profile</p>
-                <p className="text-sm text-gray-600 mt-1">View & edit profile</p>
+                <span className="sm:hidden">All</span>
+                <span className="hidden sm:inline">Open Notices</span>
               </button>
             </div>
           </div>
-
-          <div className="bg-white rounded-2xl shadow-lg border border-[#E6E9EF] overflow-hidden">
-            <div className="px-5 py-4 border-b border-[#EEF2F7] flex items-center justify-between">
-              <h3 className="text-lg font-bold text-[#111827]">Recent Activity</h3>
-              <button
-                onClick={() => navigate('/notices')}
-                className="text-xs font-semibold text-[#194ce6] hover:underline"
-              >
-                Open Notices
-              </button>
-            </div>
-            <div className="max-h-[420px] overflow-y-auto">
-              {notifications.length === 0 ? (
-                <div className="px-5 py-8 text-sm text-[#64748B] text-center">No recent updates yet.</div>
-              ) : (
-                notifications.map((item) => (
+          <div className="max-h-[20rem] overflow-y-auto px-3.5 py-3 sm:max-h-[24rem] sm:px-4 sm:py-4 md:px-5">
+            {notifications.length === 0 ? (
+              <div className="rounded-[1rem] border border-dashed border-[#c7d2fe] bg-white/75 px-4 py-7 text-center text-xs text-[#6b7280] sm:rounded-[1.2rem] sm:py-9 sm:text-sm">
+                No recent updates available.
+              </div>
+            ) : (
+              <div className="space-y-2 sm:space-y-2.5">
+                {notifications.map((item) => (
                   <button
                     key={item._id}
                     onClick={() => navigate(item.actionUrl || item.link || '/notices')}
-                    className="w-full text-left px-5 py-4 border-b border-[#F1F5F9] hover:bg-[#F8FAFC] transition"
+                    className="w-full rounded-[1rem] border border-[#e0e7ff] bg-white px-3 py-2.5 text-left shadow-[0_6px_16px_rgba(15,23,42,0.05)] transition duration-200 hover:-translate-y-0.5 sm:rounded-[1.2rem] sm:px-4 sm:py-3"
                   >
-                    <p className="text-sm font-semibold text-[#0F172A] truncate">{item.title || 'Notification'}</p>
-                    <p className="text-xs text-[#64748B] mt-1 line-clamp-2">{item.message || 'New update available'}</p>
+                    <div className="flex items-start gap-2.5">
+                      <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${(item.isRead ?? item.read) ? 'bg-slate-300' : 'bg-indigo-500'}`} />
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-[#111827] truncate sm:text-sm">{item.title || 'Notification'}</p>
+                        <p className="mt-0.5 text-[10px] text-[#6b7280] line-clamp-1 sm:mt-1 sm:text-xs sm:line-clamp-2">{item.message || 'New update available'}</p>
+                      </div>
+                    </div>
                   </button>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
-        <div className="bg-white rounded-2xl shadow-lg p-5 md:p-6">
-          <h3 className="text-lg md:text-xl font-bold text-gray-800 mb-3">Student Essentials</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <button onClick={() => navigate('/student/subjects')} className="h-11 rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] text-sm font-semibold text-[#0F172A] hover:bg-[#EEF2FF] transition">Subjects</button>
-            <button onClick={() => navigate('/student/library')} className="h-11 rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] text-sm font-semibold text-[#0F172A] hover:bg-[#EEF2FF] transition">Library</button>
-            <button onClick={() => navigate('/student/timetable')} className="h-11 rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] text-sm font-semibold text-[#0F172A] hover:bg-[#EEF2FF] transition">Timetable</button>
-            <button onClick={() => navigate('/student/profile')} className="h-11 rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] text-sm font-semibold text-[#0F172A] hover:bg-[#EEF2FF] transition">Profile</button>
-          </div>
-        </div>
       </main>
     </StudentLayout>
   );

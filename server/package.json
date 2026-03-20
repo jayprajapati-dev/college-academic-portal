@@ -17,7 +17,8 @@
     "mongodb": "^5.1.0",
     "mongoose": "^7.0.0",
     "multer": "^2.0.2",
-    "nodemon": "^2.0.20"
+    "nodemon": "^2.0.20",
+    "smart-college-academic-portal": "file:.."
   },
   "engines": {
     "node": ">=14.0.0"

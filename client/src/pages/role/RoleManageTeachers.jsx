@@ -90,15 +90,13 @@ const RoleManageTeachers = () => {
       setMetaLoading(true);
       const token = localStorage.getItem('token');
 
-      const [branchesRes, semestersRes, subjectsRes] = await Promise.all([
+      const [branchesRes, semestersRes] = await Promise.all([
         fetch('/api/academic/branches', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
-        fetch('/api/academic/semesters', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
-        fetch('/api/academic/subjects/hod', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json())
+        fetch('/api/academic/semesters', { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json())
       ]);
 
       setBranches(branchesRes?.data || []);
       setSemesters(semestersRes?.data || []);
-      setSubjects(subjectsRes?.data || subjectsRes?.subjects || []);
     } catch (error) {
       console.error('Error fetching metadata:', error);
     } finally {
@@ -120,6 +118,40 @@ const RoleManageTeachers = () => {
     }
   }, [fetchMeta, showAddModal]);
 
+  const fetchSubjects = useCallback(async (branchIds, semesterIds) => {
+    if (!branchIds.length || !semesterIds.length) {
+      setSubjects([]);
+      setFormData((prev) => ({ ...prev, selectedSubjects: [] }));
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const params = new URLSearchParams({ page: '1', limit: '200' });
+      branchIds.forEach((id) => params.append('branchId', id));
+      semesterIds.forEach((id) => params.append('semesterId', id));
+      const response = await fetch(`/api/academic/subjects/admin/list?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      const subjectList = data.subjects || [];
+      setSubjects(subjectList);
+      const allowedIds = new Set(subjectList.map((subject) => String(subject._id)));
+      setFormData((prev) => ({
+        ...prev,
+        selectedSubjects: prev.selectedSubjects.filter((id) => allowedIds.has(String(id)))
+      }));
+    } catch (error) {
+      console.error('Error fetching subjects:', error);
+      setSubjects([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showAddModal) return;
+    fetchSubjects(formData.selectedBranches, formData.selectedSemesters);
+  }, [fetchSubjects, formData.selectedBranches, formData.selectedSemesters, showAddModal]);
+
   const filteredTeachers = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return teachers;
@@ -137,17 +169,24 @@ const RoleManageTeachers = () => {
     return { total, active, pending };
   }, [teachers]);
 
-  const filteredSubjects = useMemo(() => {
-    if (formData.selectedBranches.length === 0 || formData.selectedSemesters.length === 0) {
-      return [];
-    }
+  const getTeacherBranchLabel = useCallback((teacher) => {
+    const branchNames = (Array.isArray(teacher.branches) ? teacher.branches : [])
+      .map((branch) => {
+        if (branch?.name) return branch.name;
+        const id = String(branch?._id || branch || '');
+        return branches.find((item) => String(item._id) === id)?.name;
+      })
+      .filter(Boolean);
 
-    return subjects.filter((subject) => {
-      const branchId = typeof subject.branchId === 'string' ? subject.branchId : subject.branchId?._id;
-      const semesterId = typeof subject.semesterId === 'string' ? subject.semesterId : subject.semesterId?._id;
-      return formData.selectedBranches.includes(branchId) && formData.selectedSemesters.includes(semesterId);
-    });
-  }, [formData.selectedBranches, formData.selectedSemesters, subjects]);
+    if (branchNames.length > 0) return branchNames.join(', ');
+    return teacher.branch?.name || teacher.department?.name || 'N/A';
+  }, [branches]);
+
+  const getTeacherSubjectCount = (teacher) => {
+    if (Array.isArray(teacher.subjects)) return teacher.subjects.length;
+    if (Array.isArray(teacher.assignedSubjects)) return teacher.assignedSubjects.length;
+    return 0;
+  };
 
   const resetForm = () => {
     setFormData({
@@ -157,6 +196,7 @@ const RoleManageTeachers = () => {
       selectedSemesters: [],
       selectedSubjects: []
     });
+    setSubjects([]);
     setFormError('');
     setFormSuccess('');
   };
@@ -169,8 +209,7 @@ const RoleManageTeachers = () => {
   const toggleSelection = (key, id) => {
     setFormData((prev) => ({
       ...prev,
-      [key]: prev[key].includes(id) ? prev[key].filter((item) => item !== id) : [...prev[key], id],
-      ...(key !== 'selectedSubjects' ? { selectedSubjects: [] } : {})
+      [key]: prev[key].includes(id) ? prev[key].filter((item) => item !== id) : [...prev[key], id]
     }));
   };
 
@@ -186,16 +225,6 @@ const RoleManageTeachers = () => {
 
     if (!formData.mobile.trim() || formData.mobile.trim().length !== 10) {
       setFormError('Valid 10-digit mobile number is required');
-      return;
-    }
-
-    if (formData.selectedBranches.length === 0) {
-      setFormError('Please select at least one branch');
-      return;
-    }
-
-    if (formData.selectedSemesters.length === 0) {
-      setFormError('Please select at least one semester');
       return;
     }
 
@@ -344,12 +373,10 @@ const RoleManageTeachers = () => {
                         <p>{teacher.mobile || 'N/A'}</p>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
-                        {teacher.branch?.name || teacher.department?.name || 'N/A'}
+                        {getTeacherBranchLabel(teacher)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
-                        {Array.isArray(teacher.assignedSubjects)
-                          ? teacher.assignedSubjects.length
-                          : 0}
+                        {getTeacherSubjectCount(teacher)}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
@@ -425,7 +452,7 @@ const RoleManageTeachers = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Branches *</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Branches (Optional)</label>
                   <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
                     {branches.map((branch) => (
                       <label key={branch._id} className="flex items-center gap-2 text-sm">
@@ -443,7 +470,7 @@ const RoleManageTeachers = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Semesters *</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Semesters (Optional)</label>
                   <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
                     {semesters.map((semester) => (
                       <label key={semester._id} className="flex items-center gap-2 text-sm">
@@ -462,24 +489,27 @@ const RoleManageTeachers = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Subjects (optional)</label>
-                <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                  {filteredSubjects.map((subject) => (
-                    <label key={subject._id} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={formData.selectedSubjects.includes(subject._id)}
-                        onChange={() => toggleSelection('selectedSubjects', subject._id)}
-                      />
-                      {subject.name} ({subject.code || 'N/A'})
-                    </label>
-                  ))}
-                  {filteredSubjects.length === 0 && (
-                    <p className="text-xs text-gray-500">Select branches + semesters to load subjects</p>
+              {formData.selectedBranches.length > 0 && formData.selectedSemesters.length > 0 && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Subjects (Optional)</label>
+                  {subjects.length === 0 ? (
+                    <p className="text-xs text-gray-500">No subjects found for selected branch and semester.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                      {subjects.map((subject) => (
+                        <label key={subject._id} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={formData.selectedSubjects.includes(subject._id)}
+                            onChange={() => toggleSelection('selectedSubjects', subject._id)}
+                          />
+                          {subject.name} ({subject.code})
+                        </label>
+                      ))}
+                    </div>
                   )}
                 </div>
-              </div>
+              )}
 
               <div className="flex justify-end gap-2.5 pt-1">
                 <button

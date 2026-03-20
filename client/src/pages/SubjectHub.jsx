@@ -135,15 +135,15 @@ const SubjectHub = () => {
       userProfile={userProfile}
       notifications={notifications}
     >
-      <div className="max-w-[1200px] mx-auto px-6 pt-28 pb-16 space-y-12">
+      <div className="max-w-[1200px] mx-auto px-4 pt-12 sm:pt-16 pb-8 space-y-5">
         {loading ? (
-          <div className="text-center py-20 text-gray-500">Loading subject hub...</div>
+          <div className="text-center py-12 text-sm text-gray-500">Loading subject hub...</div>
         ) : error && !subject ? (
-          <div className="text-center py-20">
+          <div className="text-center py-12">
             <p className="text-red-500 font-semibold">{error}</p>
             <button
               onClick={() => navigate('/')}
-              className="mt-4 px-6 py-2 bg-primary text-white rounded-lg font-semibold"
+              className="mt-3 px-5 py-2 text-sm bg-primary text-white rounded-lg font-semibold"
             >
               Back to Home
             </button>
@@ -156,86 +156,86 @@ const SubjectHub = () => {
               </div>
             )}
 
-            <section className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-3xl p-8 shadow-sm">
-              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
-                <div className="space-y-3">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase">
+            <section className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div className="space-y-2 min-w-0">
+                  <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase w-fit">
                     {subject?.code}
                   </div>
-                  <h1 className="text-3xl md:text-4xl font-black">{subject?.name}</h1>
-                  <p className="text-gray-600 dark:text-gray-400 max-w-2xl">
+                  <h1 className="text-xl sm:text-2xl md:text-4xl font-black leading-tight break-words">{subject?.name}</h1>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 max-w-2xl">
                     {subject?.description || 'No description provided for this subject.'}
                   </p>
-                  <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                  <div className="flex flex-wrap gap-1.5 text-[10px] sm:text-xs font-semibold">
                     {subject?.branchId?.name && (
-                      <span className="px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                      <span className="px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
                         {subject.branchId.name}
                       </span>
                     )}
                     {subject?.semesterId?.semesterNumber && (
-                      <span className="px-3 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                      <span className="px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
                         Semester {subject.semesterId.semesterNumber}
                       </span>
                     )}
                     {subject?.credits && (
-                      <span className="px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
+                      <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
                         Credits {subject.credits}
                       </span>
                     )}
                   </div>
                 </div>
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2 sm:min-w-[180px]">
                   <button
                     onClick={() => handleJump('materials')}
-                    className="px-6 py-3 rounded-xl bg-primary text-white font-bold hover:opacity-90 transition"
+                    className="px-4 py-2.5 text-sm rounded-xl bg-primary text-white font-bold hover:opacity-90 transition"
                   >
                     Explore Materials
                   </button>
                   <button
                     onClick={() => handleJump('timetable')}
-                    className="px-6 py-3 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-bold hover:opacity-90 transition"
+                    className="px-4 py-2.5 text-sm rounded-xl bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white font-bold hover:opacity-90 transition"
                   >
                     View Timetable
                   </button>
                 </div>
               </div>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <button onClick={() => handleJump('library')} className="px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-sm font-semibold hover:border-primary/40">Library</button>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button onClick={() => handleJump('library')} className="px-3 py-1.5 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-xs font-semibold hover:border-primary/40">Library</button>
                 {isLoggedIn && !subjectAccessDenied && (
                   <>
-                    <button onClick={() => handleJump('tasks')} className="px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-sm font-semibold hover:border-primary/40">Tasks</button>
-                    <button onClick={() => handleJump('notices')} className="px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-sm font-semibold hover:border-primary/40">Notices</button>
-                    <button onClick={() => handleJump('projects')} className="px-4 py-2 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-sm font-semibold hover:border-primary/40">Projects</button>
+                    <button onClick={() => handleJump('tasks')} className="px-3 py-1.5 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-xs font-semibold hover:border-primary/40">Tasks</button>
+                    <button onClick={() => handleJump('notices')} className="px-3 py-1.5 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-xs font-semibold hover:border-primary/40">Notices</button>
+                    <button onClick={() => handleJump('projects')} className="px-3 py-1.5 rounded-full bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 text-xs font-semibold hover:border-primary/40">Projects</button>
                   </>
                 )}
               </div>
 
               {!isLoggedIn && (
-                <div className="mt-4 p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-white/5 text-sm text-gray-600 dark:text-gray-400">
+                <div className="mt-3 p-3 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-white/5 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   Public view only shows subject details, marks and library. Login to access Tasks, Notices and Projects.
                 </div>
               )}
 
               {isLoggedIn && subjectAccessDenied && (
-                <div className="mt-4 p-4 rounded-xl border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-sm text-amber-800 dark:text-amber-200">
+                <div className="mt-3 p-3 rounded-xl border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-xs sm:text-sm text-amber-800 dark:text-amber-200">
                   You do not have access to subject modules for this subject. Only scoped users can view Tasks, Notices and Projects.
                 </div>
               )}
 
               {/* Exam Type & Marks Section */}
-              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="mt-4 grid grid-cols-2 gap-3">
                 {/* Exam Type Card */}
-                <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10 border border-blue-200 dark:border-blue-800">
-                  <h3 className="text-sm font-bold text-blue-900 dark:text-blue-300 uppercase tracking-wider mb-2">Exam Type</h3>
-                  <p className="text-2xl font-black text-blue-700 dark:text-blue-200 capitalize">
+                <div className="p-3 sm:p-4 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10 border border-blue-200 dark:border-blue-800">
+                  <h3 className="text-[10px] sm:text-sm font-bold text-blue-900 dark:text-blue-300 uppercase tracking-wider mb-1">Exam Type</h3>
+                  <p className="text-sm sm:text-xl font-black text-blue-700 dark:text-blue-200 capitalize leading-tight">
                     {subject?.type === 'theory+practical' ? 'Theory + Practical' : subject?.type || 'Theory'}
                   </p>
                 </div>
 
                 {/* Total Marks Card */}
-                <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-900/10 border border-emerald-200 dark:border-emerald-800">
-                  <h3 className="text-sm font-bold text-emerald-900 dark:text-emerald-300 uppercase tracking-wider mb-2">Total Marks</h3>
-                  <p className="text-2xl font-black text-emerald-700 dark:text-emerald-200">
+                <div className="p-3 sm:p-4 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-900/10 border border-emerald-200 dark:border-emerald-800">
+                  <h3 className="text-[10px] sm:text-sm font-bold text-emerald-900 dark:text-emerald-300 uppercase tracking-wider mb-1">Total Marks</h3>
+                  <p className="text-sm sm:text-xl font-black text-emerald-700 dark:text-emerald-200">
                     {subject?.marks?.totalMarks || 0}
                   </p>
                 </div>
@@ -243,14 +243,14 @@ const SubjectHub = () => {
 
               {/* Detailed Marks Breakdown */}
               {(subject?.marks?.theory?.total > 0 || subject?.marks?.practical?.total > 0) && (
-                <div className="mt-8 p-6 rounded-2xl bg-gray-50 dark:bg-white/5 border border-[#dcdee5] dark:border-white/10">
-                  <h3 className="text-lg font-bold mb-6">Marks Breakdown</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="mt-4 p-4 rounded-xl bg-gray-50 dark:bg-white/5 border border-[#dcdee5] dark:border-white/10">
+                  <h3 className="text-base font-bold mb-4">Marks Breakdown</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Theory Marks */}
                     {subject?.marks?.theory?.total > 0 && (
-                      <div className="space-y-3">
-                        <h4 className="font-bold text-primary">Theory</h4>
-                        <div className="space-y-2 text-sm">
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-bold text-primary">Theory</h4>
+                        <div className="space-y-2 text-xs sm:text-sm">
                           <div className="flex justify-between items-center p-2 bg-white dark:bg-white/10 rounded-lg">
                             <span className="text-gray-600 dark:text-gray-400">Internal</span>
                             <span className="font-bold">{subject.marks.theory.internal || 0}</span>
@@ -269,9 +269,9 @@ const SubjectHub = () => {
 
                     {/* Practical Marks */}
                     {subject?.marks?.practical?.total > 0 && (
-                      <div className="space-y-3">
-                        <h4 className="font-bold text-primary">Practical</h4>
-                        <div className="space-y-2 text-sm">
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-bold text-primary">Practical</h4>
+                        <div className="space-y-2 text-xs sm:text-sm">
                           <div className="flex justify-between items-center p-2 bg-white dark:bg-white/10 rounded-lg">
                             <span className="text-gray-600 dark:text-gray-400">Internal</span>
                             <span className="font-bold">{subject.marks.practical.internal || 0}</span>
@@ -292,83 +292,83 @@ const SubjectHub = () => {
               )}
             </section>
 
-            <section id="materials" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-3xl p-8 shadow-sm">
-              <div className="mb-6 p-5 rounded-2xl border border-[#dcdee5] dark:border-white/10 bg-gray-50 dark:bg-white/5">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <section id="materials" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-sm">
+              <div className="mb-4 p-4 rounded-xl border border-[#dcdee5] dark:border-white/10 bg-gray-50 dark:bg-white/5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
-                    <h3 className="text-xl font-bold">Syllabus</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Official syllabus PDF for this subject.</p>
+                    <h3 className="text-base font-bold">Syllabus</h3>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Official syllabus PDF for this subject.</p>
                   </div>
                   {subject?.syllabus ? (
                     <a
                       href={subject.syllabus}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90"
+                      className="inline-flex items-center gap-2 px-3 py-2 text-xs sm:text-sm rounded-lg bg-primary text-white font-semibold hover:opacity-90"
                     >
                       <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
                       Open Syllabus PDF
                     </a>
                   ) : (
-                    <span className="text-sm text-gray-500">Syllabus not uploaded yet.</span>
+                    <span className="text-xs sm:text-sm text-gray-500">Syllabus not uploaded yet.</span>
                   )}
                 </div>
               </div>
 
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div>
-                  <h2 className="text-2xl font-bold">Materials</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Notes, slides, assignments, and resources.</p>
+                  <h2 className="text-lg sm:text-2xl font-bold">Materials</h2>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Notes, slides, assignments, and resources.</p>
                 </div>
                 <button
                   onClick={() => navigate(`/subjects/${id}/materials`)}
-                  className="px-4 py-2 rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10"
+                  className="px-3 py-2 text-xs sm:text-sm rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10"
                 >
                   View Full Library
                 </button>
               </div>
               {!isLoggedIn ? (
-                <div className="p-6 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 text-center">
-                  <p className="text-gray-600 dark:text-gray-400">Log in to view full subject materials.</p>
-                  <button onClick={() => navigate('/login')} className="mt-3 px-5 py-2 bg-primary text-white rounded-lg font-semibold">Login</button>
+                <div className="p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 text-center">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Log in to view full subject materials.</p>
+                  <button onClick={() => navigate('/login')} className="mt-3 px-4 py-2 text-sm bg-primary text-white rounded-lg font-semibold">Login</button>
                 </div>
               ) : materialPreview.length === 0 ? (
-                <div className="text-center py-10 text-gray-500">No materials added yet.</div>
+                <div className="text-center py-8 text-sm text-gray-500">No materials added yet.</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {materialPreview.map((item, index) => (
-                    <div key={item._id || index} className="p-4 rounded-xl border border-[#dcdee5] dark:border-white/10 bg-gray-50 dark:bg-white/5">
+                    <div key={item._id || index} className="p-3 rounded-xl border border-[#dcdee5] dark:border-white/10 bg-gray-50 dark:bg-white/5">
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-bold text-gray-900 dark:text-white">{item.title || item.name || 'Material'}</p>
+                        <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">{item.title || item.name || 'Material'}</p>
                         {item.category && (
-                          <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded-full">
+                          <span className="text-[10px] sm:text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded-full">
                             {item.category}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">{item.description || item.type || 'Academic resource'}</p>
+                      <p className="text-[11px] sm:text-xs text-gray-600 dark:text-gray-400">{item.description || item.type || 'Academic resource'}</p>
                     </div>
                   ))}
                 </div>
               )}
             </section>
 
-            <section id="timetable" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-3xl p-8 shadow-sm">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <section id="timetable" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div>
-                  <h2 className="text-2xl font-bold">Timetable</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Weekly schedule for this subject.</p>
+                  <h2 className="text-lg sm:text-2xl font-bold">Timetable</h2>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Weekly schedule for this subject.</p>
                 </div>
                 <button
                   onClick={() => navigate('/student/timetable')}
-                  className="px-4 py-2 rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10"
+                  className="px-3 py-2 text-xs sm:text-sm rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10"
                 >
                   Open Full Timetable
                 </button>
               </div>
               {!isLoggedIn ? (
-                <div className="p-6 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 text-center">
-                  <p className="text-gray-600 dark:text-gray-400">Log in to view the timetable.</p>
+                <div className="p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 text-center">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Log in to view the timetable.</p>
                 </div>
               ) : (
                 <SubjectTimetableView subjectId={id} subjectName={subject?.name || 'Subject'} />
@@ -376,15 +376,15 @@ const SubjectHub = () => {
             </section>
 
             {isLoggedIn && !subjectAccessDenied && (
-            <section id="tasks" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-3xl p-8 shadow-sm">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <section id="tasks" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div>
-                  <h2 className="text-2xl font-bold">Tasks</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Assignments, submissions, and timelines.</p>
+                  <h2 className="text-lg sm:text-2xl font-bold">Tasks</h2>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Assignments, submissions, and timelines.</p>
                 </div>
                 <button
                   onClick={() => navigate(`/subjects/${id}/tasks`)}
-                  className="px-4 py-2 rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10"
+                  className="px-3 py-2 text-xs sm:text-sm rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10"
                 >
                   View All Tasks
                 </button>
@@ -394,26 +394,26 @@ const SubjectHub = () => {
                   <p className="text-gray-600 dark:text-gray-400">Log in to view tasks for this subject.</p>
                 </div>
               ) : taskPreview.length === 0 ? (
-                <div className="text-center py-10 text-gray-500">No tasks available right now.</div>
+                <div className="text-center py-8 text-sm text-gray-500">No tasks available right now.</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {taskPreview.map((task) => (
-                    <div key={task._id} className="p-4 rounded-xl border border-[#dcdee5] dark:border-white/10 bg-gray-50 dark:bg-white/5">
+                    <div key={task._id} className="p-3 rounded-xl border border-[#dcdee5] dark:border-white/10 bg-gray-50 dark:bg-white/5">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="font-semibold text-gray-900 dark:text-white">{task.title}</p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">{task.title}</p>
+                          <p className="text-[11px] sm:text-xs text-gray-600 dark:text-gray-400 mt-1">
                             {task.description?.slice(0, 120) || 'Subject task'}
                           </p>
                         </div>
                         {task.status && (
-                          <span className="text-xs font-semibold px-2 py-1 rounded-full bg-primary/10 text-primary">
+                          <span className="text-[10px] sm:text-xs font-semibold px-2 py-1 rounded-full bg-primary/10 text-primary">
                             {task.status}
                           </span>
                         )}
                       </div>
                       {task.dueDate && (
-                        <p className="text-xs text-gray-500 mt-3">Due: {new Date(task.dueDate).toLocaleDateString()}</p>
+                        <p className="text-[11px] sm:text-xs text-gray-500 mt-2">Due: {new Date(task.dueDate).toLocaleDateString()}</p>
                       )}
                     </div>
                   ))}
@@ -423,15 +423,15 @@ const SubjectHub = () => {
             )}
 
             {isLoggedIn && !subjectAccessDenied && (
-            <section id="notices" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-3xl p-8 shadow-sm">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <section id="notices" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div>
-                  <h2 className="text-2xl font-bold">Notices</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Latest announcements from the department.</p>
+                  <h2 className="text-lg sm:text-2xl font-bold">Notices</h2>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Latest announcements from the department.</p>
                 </div>
                 <button
                   onClick={() => navigate('/notices')}
-                  className="px-4 py-2 rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10"
+                  className="px-3 py-2 text-xs sm:text-sm rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10"
                 >
                   Open Notice Board
                 </button>
@@ -441,16 +441,16 @@ const SubjectHub = () => {
                   <p className="text-gray-600 dark:text-gray-400">Log in to view notices.</p>
                 </div>
               ) : noticePreview.length === 0 ? (
-                <div className="text-center py-10 text-gray-500">No notices yet.</div>
+                <div className="text-center py-8 text-sm text-gray-500">No notices yet.</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {noticePreview.map((notice) => (
-                    <div key={notice._id} className="p-4 rounded-xl border border-[#dcdee5] dark:border-white/10 bg-gray-50 dark:bg-white/5">
-                      <p className="font-semibold text-gray-900 dark:text-white">{notice.title}</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    <div key={notice._id} className="p-3 rounded-xl border border-[#dcdee5] dark:border-white/10 bg-gray-50 dark:bg-white/5">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{notice.title}</p>
+                      <p className="text-[11px] sm:text-xs text-gray-600 dark:text-gray-400 mt-1">
                         {notice.content?.slice(0, 120) || 'Notice'}
                       </p>
-                      <p className="text-xs text-gray-500 mt-3">
+                      <p className="text-[11px] sm:text-xs text-gray-500 mt-2">
                         {new Date(notice.createdAt).toLocaleDateString()}
                       </p>
                     </div>
@@ -460,29 +460,29 @@ const SubjectHub = () => {
             </section>
             )}
 
-            <section id="library" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-3xl p-8 shadow-sm">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <section id="library" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div>
-                  <h2 className="text-2xl font-bold">Library</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Recommended books and references.</p>
+                  <h2 className="text-lg sm:text-2xl font-bold">Library</h2>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Recommended books and references.</p>
                 </div>
                 <button
                   onClick={() => navigate(`/student/library?subjectId=${id}`)}
-                  className="px-4 py-2 rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10"
+                  className="px-3 py-2 text-xs sm:text-sm rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10"
                 >
                   Open Library
                 </button>
               </div>
               {libraryPreview.length === 0 ? (
-                <div className="text-center py-10 text-gray-500">No books listed for this subject.</div>
+                <div className="text-center py-8 text-sm text-gray-500">No books listed for this subject.</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {libraryPreview.map((book) => (
-                    <div key={book._id} className="p-4 rounded-xl border border-[#dcdee5] dark:border-white/10 bg-gray-50 dark:bg-white/5">
-                      <p className="font-semibold text-gray-900 dark:text-white">{book.title}</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{book.author || 'Author not specified'}</p>
+                    <div key={book._id} className="p-3 rounded-xl border border-[#dcdee5] dark:border-white/10 bg-gray-50 dark:bg-white/5">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{book.title}</p>
+                      <p className="text-[11px] sm:text-xs text-gray-600 dark:text-gray-400 mt-1">{book.author || 'Author not specified'}</p>
                       {book.publisher && (
-                        <p className="text-xs text-gray-500 mt-2">{book.publisher}</p>
+                        <p className="text-[11px] sm:text-xs text-gray-500 mt-2">{book.publisher}</p>
                       )}
                     </div>
                   ))}
@@ -491,41 +491,41 @@ const SubjectHub = () => {
             </section>
 
             {isLoggedIn && !subjectAccessDenied && (
-            <section id="projects" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-3xl p-8 shadow-sm">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <section id="projects" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div>
-                  <h2 className="text-2xl font-bold">Projects</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Capstones, mini-projects, and lab work.</p>
+                  <h2 className="text-lg sm:text-2xl font-bold">Projects</h2>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Capstones, mini-projects, and lab work.</p>
                 </div>
                 <button
                   onClick={() => navigate(`/subjects/${id}/projects`)}
-                  className="px-4 py-2 rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10"
+                  className="px-3 py-2 text-xs sm:text-sm rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10"
                 >
                   View All Projects
                 </button>
               </div>
               {projectPreview.length === 0 ? (
-                <div className="text-center py-10 text-gray-500">No projects available for this subject.</div>
+                <div className="text-center py-8 text-sm text-gray-500">No projects available for this subject.</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {projectPreview.map((project) => (
-                    <div key={project._id} className="p-4 rounded-xl border border-[#dcdee5] dark:border-white/10 bg-gray-50 dark:bg-white/5">
+                    <div key={project._id} className="p-3 rounded-xl border border-[#dcdee5] dark:border-white/10 bg-gray-50 dark:bg-white/5">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="font-semibold text-gray-900 dark:text-white">{project.title}</p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{project.category || 'Project'}</p>
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">{project.title}</p>
+                          <p className="text-[11px] sm:text-xs text-gray-600 dark:text-gray-400 mt-1">{project.category || 'Project'}</p>
                         </div>
                         {project.status && (
-                          <span className="text-xs font-semibold px-2 py-1 rounded-full bg-primary/10 text-primary capitalize">
+                          <span className="text-[10px] sm:text-xs font-semibold px-2 py-1 rounded-full bg-primary/10 text-primary capitalize">
                             {project.status}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 line-clamp-2">
+                      <p className="text-[11px] sm:text-xs text-gray-600 dark:text-gray-400 mt-2 line-clamp-2">
                         {project.description || 'No description available.'}
                       </p>
                       {project.dueDate && (
-                        <p className="text-xs text-gray-500 mt-3">Due: {new Date(project.dueDate).toLocaleDateString()}</p>
+                        <p className="text-[11px] sm:text-xs text-gray-500 mt-2">Due: {new Date(project.dueDate).toLocaleDateString()}</p>
                       )}
                     </div>
                   ))}

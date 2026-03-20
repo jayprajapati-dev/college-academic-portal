@@ -414,19 +414,53 @@ router.get('/analytics/public', async (req, res) => {
 // @access  Private (HOD/Admin)
 router.get('/branch-stats', protect, authorize('admin', 'hod'), async (req, res) => {
   try {
-    const branchId = req.query.branchId || req.user.branch;
+    const requestedBranchId = String(req.query.branchId || '').trim();
+    const isAdmin = req.user.role === 'admin' || req.user.adminAccess === true;
+    const hodBranchScope = getHodBranchScope(req.user);
+    const branchIds = requestedBranchId
+      ? [requestedBranchId]
+      : (isAdmin ? [] : hodBranchScope);
+    const uniqueBranchIds = Array.from(new Set(branchIds.filter(Boolean).map((id) => String(id))));
 
-    if (!branchId) {
-      return res.status(400).json({
+    if (requestedBranchId && !isAdmin && !hodBranchScope.includes(requestedBranchId)) {
+      return res.status(403).json({
         success: false,
-        message: 'Branch ID is required'
+        message: 'You are not authorized to access stats for this branch'
       });
     }
 
+    if (uniqueBranchIds.length === 0) {
+      if (isAdmin) {
+        return res.status(400).json({
+          success: false,
+          message: 'Branch ID is required'
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: { teachers: 0, students: 0, subjects: 0 }
+      });
+    }
+
+    const branchFilter = { $in: uniqueBranchIds };
+
     const [teachers, students, subjects] = await Promise.all([
-      User.countDocuments({ role: 'teacher', branch: branchId }),
-      User.countDocuments({ role: 'student', branch: branchId }),
-      Subject.countDocuments({ branchId })
+      User.countDocuments({
+        role: 'teacher',
+        $or: [
+          { branch: branchFilter },
+          { branches: branchFilter },
+          { department: branchFilter }
+        ]
+      }),
+      User.countDocuments({ role: 'student', branch: branchFilter }),
+      Subject.countDocuments({
+        $or: [
+          { branchId: branchFilter },
+          { 'offerings.branchId': branchFilter }
+        ]
+      })
     ]);
 
     res.json({

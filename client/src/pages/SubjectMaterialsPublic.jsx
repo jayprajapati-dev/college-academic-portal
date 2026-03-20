@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { LandingFrame } from '../components';
+import { LandingFrame, StudentLayout } from '../components';
 import useLandingAuth from '../hooks/useLandingAuth';
 
 const SubjectMaterialsPublic = () => {
@@ -8,7 +8,17 @@ const SubjectMaterialsPublic = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const initialSubject = location.state?.subject || null;
+  const sourceFromState = location.state?.source;
+  const sourceFromQuery = new URLSearchParams(location.search).get('source');
+  const isStudentContext = sourceFromState === 'student-panel' || sourceFromQuery === 'student-panel';
   const { isLoggedIn, currentUser, userProfile, notifications } = useLandingAuth();
+  const storedUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user') || '{}');
+    } catch (_) {
+      return {};
+    }
+  }, []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [subject, setSubject] = useState(initialSubject);
@@ -119,57 +129,51 @@ const SubjectMaterialsPublic = () => {
     subject?.faculty?.office
   );
 
-  return (
-    <LandingFrame
-      isLoggedIn={isLoggedIn}
-      currentUser={currentUser}
-      userProfile={userProfile}
-      notifications={notifications}
-    >
-      <main className="max-w-[1200px] mx-auto px-6 py-10 pt-28 space-y-8">
-        <div className="flex flex-wrap items-center gap-3">
+  const pageContent = (
+    <main className={`mx-auto space-y-6 sm:space-y-8 ${isStudentContext ? 'max-w-[1400px] px-3 sm:px-5 py-5' : 'max-w-[1200px] px-4 sm:px-6 py-8 pt-24 sm:pt-28'}`}>
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+        <button
+          onClick={() => navigate(isStudentContext ? '/student/subjects' : `/subjects/${id}`)}
+          className="w-full sm:w-auto px-4 py-2 rounded-lg border border-primary text-primary font-semibold text-sm sm:text-base hover:bg-primary/10"
+        >
+          {isStudentContext ? 'Back to My Subjects' : 'Back to Subject Hub'}
+        </button>
+        <button
+          onClick={() => navigate(isStudentContext ? '/student/dashboard' : '/')}
+          className="w-full sm:w-auto px-4 py-2 rounded-lg bg-primary text-white font-semibold text-sm sm:text-base hover:opacity-90 transition-opacity"
+        >
+          {isStudentContext ? 'Go to Dashboard' : 'Go to Home'}
+        </button>
+      </div>
+      {loading ? (
+        <div className="text-center py-20">
+          <p className="text-gray-500">Loading subject details...</p>
+        </div>
+      ) : error && !subject ? (
+        <div className="text-center py-20">
+          <p className="text-red-500 font-semibold">{error}</p>
           <button
-            onClick={() => navigate(`/subjects/${id}`)}
-            className="px-4 py-2 rounded-lg border border-primary text-primary font-semibold hover:bg-primary/10"
+            onClick={() => navigate(isStudentContext ? '/student/subjects' : '/')}
+            className="mt-4 px-6 py-2 bg-primary text-white rounded-lg font-semibold"
           >
-            Back to Subject Hub
-          </button>
-          <button
-            onClick={() => navigate('/')}
-            className="px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90 transition-opacity"
-          >
-            Go to Home
+            {isStudentContext ? 'Back to My Subjects' : 'Back to Home'}
           </button>
         </div>
-        {loading ? (
-          <div className="text-center py-20">
-            <p className="text-gray-500">Loading subject details...</p>
-          </div>
-        ) : error && !subject ? (
-          <div className="text-center py-20">
-            <p className="text-red-500 font-semibold">{error}</p>
-            <button
-              onClick={() => navigate('/')}
-              className="mt-4 px-6 py-2 bg-primary text-white rounded-lg font-semibold"
-            >
-              Back to Home
-            </button>
-          </div>
-        ) : (
+      ) : (
           <>
             {error && (
               <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 text-amber-800 dark:text-amber-200">
                 {error} Showing basic subject information.
               </div>
             )}
-            <section className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-6 shadow-sm">
+            <section className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-4 sm:p-6 shadow-sm">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase">
+                <div className="min-w-0">
+                  <div className="inline-flex max-w-full items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase break-all">
                     {subject?.code}
                   </div>
-                  <h2 className="text-2xl font-bold mt-3">{subject?.name}</h2>
-                  <p className="text-gray-600 dark:text-gray-400 mt-2 max-w-3xl">
+                  <h2 className="text-xl sm:text-2xl font-bold mt-3 break-words">{subject?.name}</h2>
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-2 max-w-3xl break-words">
                     {subject?.description || 'No description provided for this subject.'}
                   </p>
                   {(subject?.branchId?.name || subject?.semesterId?.semesterNumber) && (
@@ -187,7 +191,7 @@ const SubjectMaterialsPublic = () => {
                     </div>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full md:w-auto">
                   <div className="p-4 rounded-xl bg-gray-50 dark:bg-white/5 border border-[#dcdee5] dark:border-white/10">
                     <p className="text-xs font-semibold text-gray-500 uppercase">Course Type</p>
                     <p className="text-lg font-bold capitalize">{subject?.type || 'theory'}</p>
@@ -201,13 +205,13 @@ const SubjectMaterialsPublic = () => {
             </section>
 
             <section className="grid lg:grid-cols-2 gap-6">
-              <div className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-6">
-                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <div className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-4 sm:p-6">
+                <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary">grading</span>
                   Marks Distribution
                 </h3>
                 {hasMarks ? (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto -mx-1 sm:mx-0">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="text-left text-gray-500">
@@ -243,8 +247,8 @@ const SubjectMaterialsPublic = () => {
                 )}
               </div>
 
-              <div className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-6">
-                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <div className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-4 sm:p-6">
+                <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary">info</span>
                   Subject Details
                 </h3>
@@ -269,7 +273,7 @@ const SubjectMaterialsPublic = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
                             <p className="text-gray-500 font-semibold uppercase text-xs tracking-wider mb-1">Faculty</p>
-                            <p className="text-gray-700 dark:text-gray-300 font-semibold">{subject?.faculty?.name || 'Not Assigned'}</p>
+                            <p className="text-gray-700 dark:text-gray-300 font-semibold break-words">{subject?.faculty?.name || 'Not Assigned'}</p>
                           </div>
                           <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 p-3 rounded-lg border border-purple-200 dark:border-purple-800">
                             <p className="text-gray-500 font-semibold uppercase text-xs tracking-wider mb-1">Email</p>
@@ -278,7 +282,7 @@ const SubjectMaterialsPublic = () => {
                         </div>
                         <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
                           <p className="text-gray-500 font-semibold uppercase text-xs tracking-wider mb-1">Office Location</p>
-                          <p className="text-gray-700 dark:text-gray-300 font-semibold">{subject?.faculty?.office || 'Not Available'}</p>
+                          <p className="text-gray-700 dark:text-gray-300 font-semibold break-words">{subject?.faculty?.office || 'Not Available'}</p>
                         </div>
                       </>
                     )}
@@ -289,11 +293,11 @@ const SubjectMaterialsPublic = () => {
               </div>
             </section>
 
-            <section className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-6">
+            <section className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-4 sm:p-6">
               <div className="mb-6 p-4 rounded-xl border border-[#f0f1f4] dark:border-white/10 bg-gray-50 dark:bg-white/5">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div>
-                    <h3 className="text-lg font-bold flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-bold flex items-center gap-2">
                       <span className="material-symbols-outlined text-primary">picture_as_pdf</span>
                       Syllabus
                     </h3>
@@ -304,7 +308,7 @@ const SubjectMaterialsPublic = () => {
                       href={subject.syllabus}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90 transition-opacity"
+                      className="inline-flex w-full sm:w-auto justify-center items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90 transition-opacity"
                     >
                       <span className="material-symbols-outlined text-sm">open_in_new</span>
                       Open PDF
@@ -315,7 +319,7 @@ const SubjectMaterialsPublic = () => {
                 </div>
               </div>
 
-              <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">folder_open</span>
                 Study Materials
               </h3>
@@ -326,7 +330,7 @@ const SubjectMaterialsPublic = () => {
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => setSelectedCategory('All')}
-                    className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                    className={`px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all ${
                       selectedCategory === 'All'
                         ? 'bg-primary text-white'
                         : 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
@@ -338,7 +342,7 @@ const SubjectMaterialsPublic = () => {
                     <button
                       key={cat}
                       onClick={() => setSelectedCategory(cat)}
-                      className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                      className={`max-w-full px-3 sm:px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all break-all ${
                         selectedCategory === cat
                           ? 'bg-primary text-white'
                           : 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20'
@@ -358,22 +362,22 @@ const SubjectMaterialsPublic = () => {
               ) : (
                 <div className="space-y-3">
                   {materials.map((mat) => (
-                    <div key={mat._id} className="border border-[#f0f1f4] dark:border-white/10 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h4 className="font-semibold text-gray-900 dark:text-white">{mat.title}</h4>
-                            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                    <div key={mat._id} className="border border-[#f0f1f4] dark:border-white/10 rounded-lg p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <h4 className="font-semibold text-gray-900 dark:text-white break-words">{mat.title}</h4>
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
                               {mat.category}
                             </span>
-                            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 capitalize">
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 capitalize">
                               {mat.addedByRole}
                             </span>
                           </div>
                           {mat.description && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{mat.description}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 break-words">{mat.description}</p>
                           )}
-                          <p className="text-xs text-gray-500 dark:text-gray-500">
+                          <p className="text-xs text-gray-500 dark:text-gray-500 break-words">
                             Uploaded on {formatDate(mat.uploadedAt)}
                           </p>
                         </div>
@@ -381,7 +385,7 @@ const SubjectMaterialsPublic = () => {
                           href={mat.link}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90 transition-opacity whitespace-nowrap"
+                          className="inline-flex w-full sm:w-auto justify-center items-center gap-1 px-4 py-2 rounded-lg bg-primary text-white font-semibold hover:opacity-90 transition-opacity text-sm"
                         >
                           <span className="material-symbols-outlined text-sm">open_in_new</span>
                           Open Link
@@ -395,6 +399,24 @@ const SubjectMaterialsPublic = () => {
           </>
         )}
       </main>
+  );
+
+  if (isStudentContext) {
+    return (
+      <StudentLayout title={subject?.name || 'Subject Materials'} userName={storedUser?.name || 'Student'}>
+        {pageContent}
+      </StudentLayout>
+    );
+  }
+
+  return (
+    <LandingFrame
+      isLoggedIn={isLoggedIn}
+      currentUser={currentUser}
+      userProfile={userProfile}
+      notifications={notifications}
+    >
+      {pageContent}
     </LandingFrame>
   );
 };

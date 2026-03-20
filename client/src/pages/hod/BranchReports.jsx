@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HodLayout } from '../../components';
+import { RoleLayout } from '../../components';
+import useRoleNav from '../../hooks/useRoleNav';
+import useActiveBranch from '../../hooks/useActiveBranch';
 
 const normalizeFileType = (fileType = '') => {
   const clean = String(fileType || '').toLowerCase().replace('.', '').trim();
@@ -28,6 +30,8 @@ const fileTypeMeta = {
 
 const BranchReports = () => {
   const navigate = useNavigate();
+  const { navItems, loading: navLoading } = useRoleNav('hod');
+  const { activeBranchId, activeBranchName } = useActiveBranch();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [user, setUser] = useState(null);
@@ -96,7 +100,7 @@ const BranchReports = () => {
       }
       setUser(profile);
 
-      const branchId = profile?.branch?._id;
+      const branchId = activeBranchId || profile?.branch?._id;
       const branchStatsUrl = branchId ? `/api/academic/branch-stats?branchId=${branchId}` : '/api/academic/branch-stats';
 
       const [branchStatsData, subjectsData, teachersData] = await Promise.all([
@@ -192,7 +196,7 @@ const BranchReports = () => {
     } finally {
       setLoading(false);
     }
-  }, [fetchJson, handleAuthError, navigate]);
+  }, [activeBranchId, fetchJson, handleAuthError, navigate]);
 
   useEffect(() => {
     loadReports();
@@ -215,31 +219,27 @@ const BranchReports = () => {
 
   if (loading) {
     return (
-      <HodLayout
+      <RoleLayout
         title="Branch Reports"
         userName={user?.name || 'HOD'}
-        onLogout={() => {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          navigate('/login');
-        }}
+        onLogout={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login'); }}
+        navItems={navItems} navLoading={navLoading} panelLabel="Branch Reports"
+        profileLinks={[{ label: 'Profile', to: '/hod/profile' }]}
       >
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-2 border-[#111318] border-t-transparent"></div>
         </div>
-      </HodLayout>
+      </RoleLayout>
     );
   }
 
   return (
-    <HodLayout
+    <RoleLayout
       title="Branch Reports"
       userName={user?.name || 'HOD'}
-      onLogout={() => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        navigate('/login');
-      }}
+      onLogout={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login'); }}
+      navItems={navItems} navLoading={navLoading} panelLabel="Branch Reports"
+      profileLinks={[{ label: 'Profile', to: '/hod/profile' }]}
     >
       <div className="px-3 sm:px-5 lg:px-6 pb-6">
         <div className="max-w-6xl mx-auto space-y-5">
@@ -272,7 +272,7 @@ const BranchReports = () => {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-100">Department Intelligence</p>
-                <h2 className="text-xl md:text-2xl font-black mt-1">{user?.branch?.name || 'Branch'} Snapshot</h2>
+                <h2 className="text-xl md:text-2xl font-black mt-1">{activeBranchName || user?.branch?.name || 'Branch'} Snapshot</h2>
                 <p className="text-sm text-cyan-100 mt-1">All metrics are calculated from live branch APIs.</p>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
@@ -364,7 +364,7 @@ const BranchReports = () => {
           </section>
         </div>
       </div>
-    </HodLayout>
+    </RoleLayout>
   );
 };
 

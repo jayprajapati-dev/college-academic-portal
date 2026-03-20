@@ -11,6 +11,13 @@ const RoleHODSubjects = () => {
   const [role, setRole] = useState(storedUser?.role || 'hod');
   const { navItems, loading: navLoading } = useRoleNav(role);
 
+  // Logout handler
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login');
+  };
+
   // HOD Branch Scope
   const hodBranchIds = useMemo(() => {
     const getIdValue = (value) => (value && typeof value === 'object' ? value._id : value);
@@ -331,7 +338,13 @@ const RoleHODSubjects = () => {
 
   if (role !== 'hod') {
     return (
-      <RoleLayout navItems={navItems} loading={navLoading}>
+      <RoleLayout 
+        userName={user.name || 'User'}
+        onLogout={handleLogout}
+        navItems={navItems}
+        navLoading={navLoading}
+        panelLabel="HOD Panel"
+      >
         <div className="flex items-center justify-center min-h-screen">
           <Card className="p-8 text-center">
             <p className="text-red-600 font-semibold">Only HODs can access this page</p>
@@ -343,7 +356,13 @@ const RoleHODSubjects = () => {
 
   if (hodBranchIds.size === 0) {
     return (
-      <RoleLayout navItems={navItems} loading={navLoading}>
+      <RoleLayout 
+        userName={user.name || 'User'}
+        onLogout={handleLogout}
+        navItems={navItems}
+        navLoading={navLoading}
+        panelLabel="HOD Panel"
+      >
         <div className="flex items-center justify-center min-h-screen">
           <Card className="p-8 text-center">
             <p className="text-amber-600 font-semibold">No branches assigned to you yet</p>
@@ -355,7 +374,13 @@ const RoleHODSubjects = () => {
   }
 
   return (
-    <RoleLayout navItems={navItems} loading={navLoading}>
+    <RoleLayout 
+      userName={user.name || 'User'}
+      onLogout={handleLogout}
+      navItems={navItems}
+      navLoading={navLoading}
+      panelLabel="HOD Panel"
+    >
       <div className="max-w-7xl mx-auto p-4 md:p-6">
         {/* Header */}
         <div className="mb-8">

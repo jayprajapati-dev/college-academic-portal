@@ -7,7 +7,22 @@ const Notification = require('../models/Notification');
 router.get('/', protect, async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
-    const notifications = await Notification.find({ userId })
+    const query = { userId };
+
+    // Hide test/audit notifications from students in production UI.
+    if (req.user?.role === 'student') {
+      query.$and = [
+        {
+          $nor: [
+            { title: { $regex: '\\[QA-AUTO\\]', $options: 'i' } },
+            { message: { $regex: 'Automated validation', $options: 'i' } },
+            { title: { $regex: 'QA AUTO|QA-AUTO', $options: 'i' } }
+          ]
+        }
+      ];
+    }
+
+    const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
       .lean();
 

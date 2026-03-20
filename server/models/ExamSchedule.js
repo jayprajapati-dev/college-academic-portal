@@ -8,8 +8,29 @@ const examScheduleSchema = new mongoose.Schema({
   },
   examType: {
     type: String,
-    enum: ['Internal', 'External', 'Mid', 'Final', 'Practical', 'Viva', 'Other'],
-    default: 'Internal'
+    trim: true,
+    required: true,
+    default: 'Internal Exam'
+  },
+  examCategory: {
+    type: String,
+    enum: [
+      'Custom',
+      'Mid Exam',
+      'Pa-1 Exam',
+      'Pa-2 Exam',
+      'GTU Exam',
+      'Test Exam',
+      'Practical Exam',
+      'Internal Exam',
+      'External Exam'
+    ],
+    default: 'Internal Exam'
+  },
+  customExamType: {
+    type: String,
+    trim: true,
+    default: ''
   },
   subjectId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -61,7 +82,7 @@ const examScheduleSchema = new mongoose.Schema({
   },
   createdByRole: {
     type: String,
-    enum: ['admin', 'hod', 'teacher'],
+    enum: ['admin', 'hod', 'teacher', 'coordinator'],
     required: true
   }
 }, {

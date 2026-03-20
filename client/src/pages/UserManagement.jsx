@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Input, RoleLayout } from '../components';
+import { RoleLayout } from '../components';
 import useRoleNav from '../hooks/useRoleNav';
 
 const UserManagement = () => {
@@ -25,6 +25,21 @@ const UserManagement = () => {
   const [selectedPermissions, setSelectedPermissions] = useState([]);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Auto-dismiss toasts
+  useEffect(() => {
+    if (successMessage) {
+      const t = setTimeout(() => setSuccessMessage(''), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [successMessage]);
+
+  useEffect(() => {
+    if (errorMessage) {
+      const t = setTimeout(() => setErrorMessage(''), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [errorMessage]);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showAddHodModal, setShowAddHodModal] = useState(false);
   const [showAddTeacherModal, setShowAddTeacherModal] = useState(false);
@@ -40,6 +55,13 @@ const UserManagement = () => {
   const [addTeacherLoading, setAddTeacherLoading] = useState(false);
   const [addHodError, setAddHodError] = useState('');
   const [addTeacherError, setAddTeacherError] = useState('');
+  const [showTempCredentialModal, setShowTempCredentialModal] = useState(false);
+  const [tempCredentialData, setTempCredentialData] = useState({
+    role: '',
+    name: '',
+    mobile: '',
+    tempPassword: ''
+  });
   const [hodForm, setHodForm] = useState({
     name: '',
     mobile: '',
@@ -62,6 +84,11 @@ const UserManagement = () => {
     validFrom: '',
     validTill: ''
   });
+  const [showModifyHodModal, setShowModifyHodModal] = useState(false);
+  const [modifyHodUser, setModifyHodUser] = useState(null);
+  const [modifyHodBranches, setModifyHodBranches] = useState([]);
+  const [modifyHodLoading, setModifyHodLoading] = useState(false);
+  const [modifyHodError, setModifyHodError] = useState('');
 
   const location = useLocation();
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -249,7 +276,6 @@ const UserManagement = () => {
         setUsers(users.map(u => u._id === user._id ? { ...u, role } : u));
         setShowRoleModal(false);
         setSuccessMessage(`User role changed to ${role.toUpperCase()} successfully!`);
-        setTimeout(() => setSuccessMessage(''), 3000);
       } else {
         setErrorMessage(data.message || 'Failed to change role');
       }
@@ -275,7 +301,6 @@ const UserManagement = () => {
       if (response.ok && data.success) {
         setUsers(users.map((u) => (u._id === user._id ? { ...u, status } : u)));
         setSuccessMessage(`User ${status === 'active' ? 'unblocked' : 'blocked'} successfully!`);
-        setTimeout(() => setSuccessMessage(''), 3000);
       } else {
         setErrorMessage(data.message || 'Failed to update user status');
       }
@@ -301,7 +326,6 @@ const UserManagement = () => {
       if (response.ok && data.success) {
         setUsers(users.map((u) => (u._id === user._id ? { ...u, adminAccess } : u)));
         setSuccessMessage(adminAccess ? 'Admin access granted' : 'Admin access revoked');
-        setTimeout(() => setSuccessMessage(''), 3000);
       } else {
         setErrorMessage(data.message || 'Failed to update admin access');
       }
@@ -356,7 +380,6 @@ const UserManagement = () => {
       if (response.ok && data.success) {
         setShowCoordinatorModal(false);
         setSuccessMessage('Coordinator assigned successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
         fetchUsers();
       } else {
         setErrorMessage(data.message || 'Failed to assign coordinator');
@@ -380,7 +403,6 @@ const UserManagement = () => {
       const data = await response.json();
       if (response.ok && data.success) {
         setSuccessMessage('Coordinator revoked successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
         fetchUsers();
       } else {
         setErrorMessage(data.message || 'Failed to revoke coordinator');
@@ -414,7 +436,6 @@ const UserManagement = () => {
         setAdminForm({ name: '', mobile: '', email: '' });
         fetchUsers();
         setSuccessMessage('Admin created successfully. Share the temp password.');
-        setTimeout(() => setSuccessMessage(''), 3000);
       } else {
         setErrorMessage(data.message || 'Failed to create admin');
       }
@@ -457,7 +478,6 @@ const UserManagement = () => {
         setUsers(users.map(u => u._id === selectedUser._id ? { ...u, permissions: data.data.permissions } : u));
         setShowPermissionsModal(false);
         setSuccessMessage('Permissions updated successfully!');
-        setTimeout(() => setSuccessMessage(''), 3000);
       } else {
         setErrorMessage(data.message || 'Failed to update permissions');
       }
@@ -496,6 +516,7 @@ const UserManagement = () => {
   const fetchSubjectsForTeacher = useCallback(async (branchIds, semesterIds) => {
     if (branchIds.length === 0 || semesterIds.length === 0) {
       setTeacherSubjects([]);
+      setTeacherForm((prev) => ({ ...prev, selectedSubjects: [] }));
       return;
     }
 
@@ -513,7 +534,13 @@ const UserManagement = () => {
         return;
       }
       const data = await response.json();
-      setTeacherSubjects(data.subjects || []);
+      const subjects = data.subjects || [];
+      setTeacherSubjects(subjects);
+      const allowedIds = new Set(subjects.map((subject) => String(subject._id)));
+      setTeacherForm((prev) => ({
+        ...prev,
+        selectedSubjects: prev.selectedSubjects.filter((id) => allowedIds.has(String(id)))
+      }));
     } catch (error) {
       console.error('Error fetching teacher subjects:', error);
     }
@@ -622,8 +649,20 @@ const UserManagement = () => {
         setHodForm({ name: '', mobile: '', selectedBranches: [], selectedSemesters: [], selectedSubjects: [] });
         setHodSubjects([]);
         fetchUsers();
-        setSuccessMessage('HOD added successfully! Temporary credentials sent.');
-        setTimeout(() => setSuccessMessage(''), 3000);
+
+        const generatedTempPassword = data?.data?.tempPassword || '';
+        if (generatedTempPassword) {
+          setTempCredentialData({
+            role: 'HOD',
+            name: data?.data?.name || hodForm.name,
+            mobile: data?.data?.mobile || hodForm.mobile,
+            tempPassword: generatedTempPassword
+          });
+          setShowTempCredentialModal(true);
+          setSuccessMessage('HOD added successfully! Temporary password generated.');
+        } else {
+          setSuccessMessage('HOD added successfully! Temporary credentials sent.');
+        }
       } else {
         setAddHodError(data.message || 'Error adding HOD');
       }
@@ -635,22 +674,61 @@ const UserManagement = () => {
     }
   };
 
+  const handleCopyTempPassword = async () => {
+    try {
+      if (!tempCredentialData.tempPassword) return;
+      await navigator.clipboard.writeText(tempCredentialData.tempPassword);
+      setSuccessMessage('Temporary password copied to clipboard.');
+    } catch (error) {
+      setErrorMessage('Failed to copy temporary password.');
+    }
+  };
+
+  const handleModifyHodBranches = async () => {
+    setModifyHodError('');
+    if (!modifyHodBranches.length) {
+      setModifyHodError('Select at least one branch');
+      return;
+    }
+    setModifyHodLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/admin/hod/${modifyHodUser._id}/branches`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ branchIds: modifyHodBranches })
+      });
+      if (response.status === 401) { handleLogout(); return; }
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setShowModifyHodModal(false);
+        setModifyHodUser(null);
+        setModifyHodBranches([]);
+        fetchUsers();
+        setSuccessMessage('HOD branches updated successfully!');
+      } else {
+        setModifyHodError(data.message || 'Error updating HOD branches');
+      }
+    } catch (error) {
+      console.error('Error updating HOD branches:', error);
+      setModifyHodError('Error updating HOD branches');
+    } finally {
+      setModifyHodLoading(false);
+    }
+  };
+
+  const handleCloseTempCredentialModal = () => {
+    setShowTempCredentialModal(false);
+    setTempCredentialData({ role: '', name: '', mobile: '', tempPassword: '' });
+  };
+
   const handleCreateTeacher = async () => {
     setAddTeacherError('');
     if (!teacherForm.name || !teacherForm.mobile) {
       setAddTeacherError('Name and mobile number are required');
-      return;
-    }
-    if (teacherForm.selectedBranches.length === 0) {
-      setAddTeacherError('Select at least one branch');
-      return;
-    }
-    if (teacherForm.selectedSemesters.length === 0) {
-      setAddTeacherError('Select at least one semester');
-      return;
-    }
-    if (teacherForm.selectedSubjects.length === 0) {
-      setAddTeacherError('Select at least one subject');
       return;
     }
 
@@ -685,7 +763,6 @@ const UserManagement = () => {
         setTeacherSubjects([]);
         fetchUsers();
         setSuccessMessage('Teacher added successfully! Temporary credentials sent.');
-        setTimeout(() => setSuccessMessage(''), 3000);
       } else {
         setAddTeacherError(data.message || 'Error adding teacher');
       }
@@ -715,7 +792,6 @@ const UserManagement = () => {
         setUsers(users.filter(u => u._id !== user._id));
         setShowDeleteModal(false);
         setSuccessMessage('User deleted successfully!');
-        setTimeout(() => setSuccessMessage(''), 3000);
       } else {
         setErrorMessage(data.message || 'Failed to delete user');
       }
@@ -763,7 +839,6 @@ const UserManagement = () => {
         setUsers(users.map(u => u._id === selectedUser._id ? { ...u, branch: academicForm.branch, semester: academicForm.semester, status: academicForm.status } : u));
         setShowAcademicModal(false);
         setSuccessMessage('Student academic assignment updated successfully!');
-        setTimeout(() => setSuccessMessage(''), 3000);
         fetchUsers();
       } else {
         setErrorMessage(data.message || 'Failed to update academic assignment');
@@ -800,7 +875,6 @@ const UserManagement = () => {
           setUsers(users.map(u => u._id === selectedUser._id ? { ...u, profileUpdateRequired: required } : u));
           setShowProfileUpdateModal(false);
           setSuccessMessage(required ? 'Student will be prompted to update profile' : 'Profile update requirement cleared');
-          setTimeout(() => setSuccessMessage(''), 3000);
           fetchUsers();
         } else {
           setErrorMessage(data.message || 'Failed to update profile requirement');
@@ -826,7 +900,6 @@ const UserManagement = () => {
         if (response.ok && data.success) {
           setShowProfileUpdateModal(false);
           setSuccessMessage(`${data.data.modifiedCount || 0} student(s) updated successfully`);
-          setTimeout(() => setSuccessMessage(''), 3000);
           fetchUsers();
         } else {
           setErrorMessage(data.message || 'Failed to bulk update profile requirement');
@@ -881,6 +954,20 @@ const UserManagement = () => {
     return semester ? `Sem ${semester.semesterNumber}` : 'Unknown';
   };
 
+  // Build a map of branchId -> { hodId, hodName } for all currently assigned HOD branches
+  const takenBranchMap = useMemo(() => {
+    const map = {};
+    users.forEach((u) => {
+      if (u.role === 'hod') {
+        (Array.isArray(u.branches) ? u.branches : []).forEach((b) => {
+          const id = String(b?._id || b);
+          if (id && !map[id]) map[id] = { hodId: String(u._id), hodName: u.name };
+        });
+      }
+    });
+    return map;
+  }, [users]);
+
   const roleOptions = useMemo(() => {
     if (isAdminMode) {
       return [
@@ -916,6 +1003,38 @@ const UserManagement = () => {
   const canDeleteUser = () => true;
   const canEditAcademicAssignment = (user) => (isAdminMode || role === 'hod' || role === 'coordinator') && user.role === 'student';
   const canManageProfileUpdate = (user) => (isAdminMode || role === 'hod' || role === 'coordinator') && user.role === 'student';
+  const canViewTempPassword = (user) => isAdminMode && user?.passwordChangeRequired === true;
+
+  const handleViewTempPassword = async (user) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/admin/users/${user._id}/temp-password`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
+
+      const data = await response.json();
+
+      if (response.ok && data?.success && data?.data?.tempPassword) {
+        setTempCredentialData({
+          role: String(data.data.role || user.role || '').toUpperCase(),
+          name: data.data.name || user.name,
+          mobile: data.data.mobile || user.mobile,
+          tempPassword: data.data.tempPassword
+        });
+        setShowTempCredentialModal(true);
+      } else {
+        setErrorMessage(data?.message || 'Temporary password not available');
+      }
+    } catch (error) {
+      console.error('Error fetching temporary password:', error);
+      setErrorMessage('Error fetching temporary password');
+    }
+  };
 
   const adminCandidates = useMemo(() => {
     const term = adminSearch.trim().toLowerCase();
@@ -999,38 +1118,6 @@ const UserManagement = () => {
       panelLabel={panelLabel}
     >
       <div className="space-y-4 sm:space-y-5">
-        {/* Success/Error Messages */}
-        {successMessage && (
-          <div className="mb-4 p-4 bg-green-100 border-l-4 border-green-500 text-green-700 rounded-lg flex items-center justify-between">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              {successMessage}
-            </div>
-            <button onClick={() => setSuccessMessage('')} className="text-green-700 hover:text-green-900">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </button>
-          </div>
-        )}
-
-        {errorMessage && (
-          <div className="mb-4 p-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded-lg flex items-center justify-between">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              {errorMessage}
-            </div>
-            <button onClick={() => setErrorMessage('')} className="text-red-700 hover:text-red-900">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </button>
-          </div>
-        )}
 
         {/* Professional Header */}
         <div className="flex items-center gap-2.5 sm:gap-3">
@@ -1150,7 +1237,12 @@ const UserManagement = () => {
               )}
               {role === 'hod' && !isAdminMode && (
                 <button
-                  onClick={() => navigate('/hod/add-teacher')}
+                  onClick={() => {
+                    setAddTeacherError('');
+                    setTeacherForm({ name: '', mobile: '', selectedBranches: [], selectedSemesters: [], selectedSubjects: [] });
+                    setTeacherSubjects([]);
+                    setShowAddTeacherModal(true);
+                  }}
                   className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 hover:opacity-90 transition-all h-10 w-full sm:w-auto"
                 >
                   <span className="material-symbols-outlined text-xl">school</span>
@@ -1334,6 +1426,24 @@ const UserManagement = () => {
                               </svg>
                             </button>
                           )}
+                          {isAdminMode && user.role === 'hod' && (
+                            <button
+                              onClick={() => {
+                                const existingIds = (user.branches || []).map((b) => String(b?._id || b));
+                                setModifyHodUser(user);
+                                setModifyHodBranches(existingIds);
+                                setModifyHodError('');
+                                setShowModifyHodModal(true);
+                              }}
+                              className="p-1.5 text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
+                              title="Modify HOD Branches"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h4l2 2h8a2 2 0 012 2v5a2 2 0 01-2 2H3a2 2 0 01-2-2V9a2 2 0 012-2z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 3l3 3-9 9H7v-3l9-9z" />
+                              </svg>
+                            </button>
+                          )}
                           {canToggleStudentBlock(user) && (
                             <button
                               onClick={() => handleStatusChange(user, user.status === 'disabled' ? 'active' : 'disabled')}
@@ -1375,6 +1485,17 @@ const UserManagement = () => {
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.657 0 3-1.343 3-3V6a3 3 0 10-6 0v2c0 1.657 1.343 3 3 3zm0 0v3m0 4h.01M4 21h16a1 1 0 001-1v-2a7 7 0 10-14 0v2a1 1 0 001 1z" />
+                              </svg>
+                            </button>
+                          )}
+                          {canViewTempPassword(user) && (
+                            <button
+                              onClick={() => handleViewTempPassword(user)}
+                              className="p-1.5 text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                              title="View Temporary Password"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 .37-.042.73-.121 1.076A4 4 0 1016 16h2a2 2 0 002-2v-1a2 2 0 00-2-2h-1.17A6.003 6.003 0 006 12a6 6 0 106 6v-2" />
                               </svg>
                             </button>
                           )}
@@ -1697,24 +1818,40 @@ const UserManagement = () => {
 
       {/* Coordinator Assignment Modal */}
       {showCoordinatorModal && selectedUser && (isAdminMode || role === 'hod') && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-teal-600 to-emerald-500">
-              <h3 className="text-xl font-bold text-white">Coordinator Assignment</h3>
-              <p className="text-sm text-white/90 mt-1">
-                {selectedUser.name} • {selectedUser.role?.toUpperCase()}
-              </p>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-[60] p-0 sm:p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden border-0 sm:border border-gray-200 dark:border-gray-700">
+            {/* Header */}
+            <div className="relative p-5 sm:p-6 bg-gradient-to-r from-teal-500 via-emerald-500 to-green-500 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-white text-xl">admin_panel_settings</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Coordinator Assignment</h3>
+                    <p className="text-xs text-white/80 mt-0.5">{selectedUser.name} • {selectedUser.role?.toUpperCase()}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowCoordinatorModal(false)}
+                  className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+                >
+                  <span className="material-symbols-outlined text-white text-base">close</span>
+                </button>
+              </div>
             </div>
 
-            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
+              {/* Branch */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Branch *</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Branch *</label>
                 <select
                   value={coordinatorForm.branchId}
                   onChange={(e) => setCoordinatorForm((prev) => ({ ...prev, branchId: e.target.value }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                  className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-teal-500 focus:ring-0 outline-none transition-colors text-sm font-medium"
                 >
-                  <option value="">Select branch</option>
+                  <option value="">Select branch...</option>
                   {branches.map((branch) => (
                     <option key={branch._id} value={branch._id}>
                       {branch.name} ({branch.code})
@@ -1723,82 +1860,116 @@ const UserManagement = () => {
                 </select>
               </div>
 
+              {/* Semesters */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Semesters *</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {semesters.map((semester) => (
-                    <label key={semester._id} className="flex items-center gap-2 text-sm text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={coordinatorForm.semesterIds.includes(semester._id)}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setCoordinatorForm((prev) => {
-                            if (checked) {
-                              return { ...prev, semesterIds: [...prev.semesterIds, semester._id] };
-                            }
-                            return { ...prev, semesterIds: prev.semesterIds.filter((id) => id !== semester._id) };
-                          });
-                        }}
-                      />
-                      Sem {semester.semesterNumber}{semester.academicYear ? ` (${semester.academicYear})` : ''}
-                    </label>
-                  ))}
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Semesters *</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {semesters.map((semester) => {
+                    const checked = coordinatorForm.semesterIds.includes(semester._id);
+                    return (
+                      <label
+                        key={semester._id}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition-all text-sm font-medium select-none ${
+                          checked
+                            ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300'
+                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          checked={checked}
+                          onChange={(e) => {
+                            const isChecked = e.target.checked;
+                            setCoordinatorForm((prev) => ({
+                              ...prev,
+                              semesterIds: isChecked
+                                ? [...prev.semesterIds, semester._id]
+                                : prev.semesterIds.filter((id) => id !== semester._id)
+                            }));
+                          }}
+                        />
+                        <span className={`w-4 h-4 rounded flex-shrink-0 border-2 flex items-center justify-center transition-colors ${
+                          checked ? 'bg-teal-500 border-teal-500' : 'border-gray-300 dark:border-gray-600'
+                        }`}>
+                          {checked && <span className="material-symbols-outlined text-white text-[10px] font-bold">check</span>}
+                        </span>
+                        Sem {semester.semesterNumber}{semester.academicYear ? ` (${semester.academicYear})` : ''}
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Input
-                  label="Academic Year *"
+              {/* Academic Year */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Academic Year *</label>
+                <input
+                  type="text"
                   value={coordinatorForm.academicYear}
                   onChange={(e) => setCoordinatorForm((prev) => ({ ...prev, academicYear: e.target.value }))}
                   placeholder="2025-2026"
+                  className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-teal-500 focus:ring-0 outline-none transition-colors text-sm"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Input
-                  label="Valid From"
-                  type="date"
-                  value={coordinatorForm.validFrom}
-                  onChange={(e) => setCoordinatorForm((prev) => ({ ...prev, validFrom: e.target.value }))}
-                />
-                <Input
-                  label="Valid Till"
-                  type="date"
-                  value={coordinatorForm.validTill}
-                  onChange={(e) => setCoordinatorForm((prev) => ({ ...prev, validTill: e.target.value }))}
-                />
+              {/* Validity Dates */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Valid From</label>
+                  <input
+                    type="date"
+                    value={coordinatorForm.validFrom}
+                    onChange={(e) => setCoordinatorForm((prev) => ({ ...prev, validFrom: e.target.value }))}
+                    className="w-full px-3 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-teal-500 focus:ring-0 outline-none transition-colors text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Valid Till</label>
+                  <input
+                    type="date"
+                    value={coordinatorForm.validTill}
+                    onChange={(e) => setCoordinatorForm((prev) => ({ ...prev, validTill: e.target.value }))}
+                    className="w-full px-3 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-teal-500 focus:ring-0 outline-none transition-colors text-sm"
+                  />
+                </div>
               </div>
 
-              <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
-                <p className="text-xs text-amber-800">
+              {/* Info */}
+              <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                <span className="material-symbols-outlined text-amber-500 text-xl flex-shrink-0 mt-0.5">info</span>
+                <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
                   Coordinator access is limited to the selected branch and semesters. Validity dates auto-expire the role.
                 </p>
               </div>
             </div>
 
-            <div className="bg-gray-50 border-t border-gray-200 px-5 sm:px-6 py-4 flex flex-col-reverse sm:flex-row sm:flex-wrap gap-3 justify-end">
-              {selectedUser.role === 'coordinator' && (
-                <button
-                  onClick={() => handleRevokeCoordinator(selectedUser)}
-                  className="px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 font-semibold"
-                >
-                  Revoke
-                </button>
-              )}
-              <button
-                onClick={() => setShowCoordinatorModal(false)}
-                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAssignCoordinator}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:opacity-90 font-semibold"
-              >
-                Save Assignment
-              </button>
+            {/* Footer */}
+            <div className="flex-shrink-0 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 px-5 sm:px-6 py-4">
+              <div className="flex flex-col-reverse sm:flex-row gap-2.5">
+                {selectedUser.role === 'coordinator' && (
+                  <button
+                    onClick={() => handleRevokeCoordinator(selectedUser)}
+                    className="flex-1 sm:flex-none px-4 py-2.5 text-sm font-semibold text-red-600 dark:text-red-400 border-2 border-red-200 dark:border-red-800 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    Revoke Access
+                  </button>
+                )}
+                <div className="flex gap-2.5 flex-1 justify-end">
+                  <button
+                    onClick={() => setShowCoordinatorModal(false)}
+                    className="px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-300 border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAssignCoordinator}
+                    className="flex-1 sm:flex-none px-5 py-2.5 text-sm font-bold bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl hover:opacity-90 shadow-md shadow-teal-500/25 transition-all"
+                  >
+                    Save Assignment
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1855,9 +2026,9 @@ const UserManagement = () => {
 
       {/* Add HOD Modal */}
       {showAddHodModal && isAdminMode && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-500 to-pink-500">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-[60] p-0 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[92vh] border-0 sm:border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
+            <div className="sticky top-0 z-10 p-5 sm:p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-500 to-pink-500">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold text-white">Add New HOD</h3>
                 <button
@@ -1872,7 +2043,7 @@ const UserManagement = () => {
               <p className="text-sm text-white/90 mt-1">Create a new HOD account with branch and subject assignment.</p>
             </div>
 
-            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               {addHodError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
                   {addHodError}
@@ -1907,17 +2078,24 @@ const UserManagement = () => {
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">Assign Branches *</label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {branches.map((branch) => (
-                    <label key={branch._id} className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={hodForm.selectedBranches.includes(branch._id)}
-                        onChange={() => handleHodBranchToggle(branch._id)}
-                        className="w-4 h-4 text-purple-500 rounded"
-                      />
-                      <span className="ml-3 text-gray-700">{branch.name}</span>
-                    </label>
-                  ))}
+                  {branches.map((branch) => {
+                    const takenBy = takenBranchMap[branch._id];
+                    return (
+                      <label key={branch._id} className={`flex items-center p-3 border rounded-lg ${takenBy ? 'border-red-200 bg-red-50 opacity-70 cursor-not-allowed' : 'border-gray-300 hover:bg-gray-50 cursor-pointer'}`}>
+                        <input
+                          type="checkbox"
+                          checked={hodForm.selectedBranches.includes(branch._id)}
+                          onChange={() => !takenBy && handleHodBranchToggle(branch._id)}
+                          disabled={!!takenBy}
+                          className="w-4 h-4 text-purple-500 rounded"
+                        />
+                        <span className="ml-3 text-gray-700 text-sm">
+                          {branch.name}
+                          {takenBy && <span className="block text-xs text-red-500 mt-0.5">Assigned to {takenBy.hodName}</span>}
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1970,7 +2148,7 @@ const UserManagement = () => {
               </div>
             </div>
 
-            <div className="px-5 sm:px-6 py-4 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
+            <div className="sticky bottom-0 bg-white dark:bg-gray-800 px-5 sm:px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex flex-col-reverse sm:flex-row justify-end gap-3">
               <button
                 onClick={() => setShowAddHodModal(false)}
                 className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
@@ -1989,138 +2167,415 @@ const UserManagement = () => {
         </div>
       )}
 
-      {/* Add Teacher Modal */}
-      {showAddTeacherModal && isAdminMode && (
+      {/* Modify HOD Branches Modal */}
+      {showModifyHodModal && isAdminMode && modifyHodUser && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-500 to-cyan-500">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-white">Add New Teacher</h3>
-                <button
-                  onClick={() => setShowAddTeacherModal(false)}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-violet-500 to-purple-600 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-white">Modify HOD Branches</h3>
+                <p className="text-sm text-white/90 mt-1">{modifyHodUser.name}</p>
               </div>
-              <p className="text-sm text-white/90 mt-1">Create a new teacher account with branch and subject assignment.</p>
+              <button
+                onClick={() => setShowModifyHodModal(false)}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
 
-            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
-              {addTeacherError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
-                  {addTeacherError}
-                </div>
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              {modifyHodError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{modifyHodError}</div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
-                  <input
-                    value={teacherForm.name}
-                    onChange={(e) => setTeacherForm((prev) => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                    placeholder="Enter teacher name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Mobile Number *</label>
-                  <input
-                    value={teacherForm.mobile}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, '').slice(0, 10);
-                      setTeacherForm((prev) => ({ ...prev, mobile: value }));
-                    }}
-                    maxLength={10}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                    placeholder="1234567890"
-                  />
-                </div>
-              </div>
-
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">Select Branches *</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {branches.map((branch) => (
-                    <label key={branch._id} className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={teacherForm.selectedBranches.includes(branch._id)}
-                        onChange={() => handleTeacherBranchToggle(branch._id)}
-                        className="w-4 h-4 text-blue-500 rounded"
-                      />
-                      <span className="ml-3 text-gray-700">{branch.name}</span>
-                    </label>
-                  ))}
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Select Branches *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {branches.map((branch) => {
+                    const branchId = String(branch._id);
+                    const takenEntry = takenBranchMap[branchId];
+                    // Disable if taken by a DIFFERENT HOD
+                    const takenByOther = takenEntry && takenEntry.hodId !== String(modifyHodUser._id);
+                    return (
+                      <label key={branch._id} className={`flex items-center p-3 border rounded-lg ${takenByOther ? 'border-red-200 bg-red-50 opacity-60 cursor-not-allowed' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'}`}>
+                        <input
+                          type="checkbox"
+                          checked={modifyHodBranches.includes(branchId)}
+                          onChange={() => {
+                            if (takenByOther) return;
+                            setModifyHodBranches((prev) =>
+                              prev.includes(branchId)
+                                ? prev.filter((id) => id !== branchId)
+                                : [...prev, branchId]
+                            );
+                          }}
+                          disabled={takenByOther}
+                          className="w-4 h-4 text-violet-500 rounded"
+                        />
+                        <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">
+                          {branch.name}
+                          {takenByOther && (
+                            <span className="block text-xs text-red-500 mt-0.5">Assigned to {takenEntry.hodName}</span>
+                          )}
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-3">Select Semesters *</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {semesters.map((semester) => (
-                    <label key={semester._id} className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={teacherForm.selectedSemesters.includes(semester._id)}
-                        onChange={() => handleTeacherSemesterToggle(semester._id)}
-                        className="w-4 h-4 text-blue-500 rounded"
-                      />
-                      <span className="ml-3 text-gray-700">Sem {semester.semesterNumber}{semester.academicYear ? ` (${semester.academicYear})` : ''}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {teacherForm.selectedBranches.length > 0 && teacherForm.selectedSemesters.length > 0 && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Select Subjects *</label>
-                  {teacherSubjects.length === 0 ? (
-                    <p className="text-sm text-gray-600">No subjects available for selected branches and semesters</p>
-                  ) : (
-                    <div className="space-y-2 max-h-56 overflow-y-auto border border-gray-300 rounded-lg p-3">
-                      {teacherSubjects.map((subject) => (
-                        <label key={subject._id} className="flex items-center p-2 hover:bg-gray-50 cursor-pointer rounded">
-                          <input
-                            type="checkbox"
-                            checked={teacherForm.selectedSubjects.includes(subject._id)}
-                            onChange={() => handleTeacherSubjectToggle(subject._id)}
-                            className="w-4 h-4 text-blue-500 rounded"
-                          />
-                          <span className="ml-3 text-gray-700">{subject.name} ({subject.code})</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <p className="text-sm text-blue-800">
-                  Temporary credentials will be sent to the teacher's mobile number.
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-3">
+                <p className="text-xs text-amber-800 dark:text-amber-200">
+                  Removing a branch will affect this HOD's scope for subjects and semesters in that branch.
                 </p>
               </div>
             </div>
 
-            <div className="px-5 sm:px-6 py-4 border-t border-gray-200 flex flex-col-reverse sm:flex-row justify-end gap-3">
+            <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
               <button
-                onClick={() => setShowAddTeacherModal(false)}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                onClick={() => setShowModifyHodModal(false)}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 text-sm"
               >
                 Cancel
               </button>
               <button
-                onClick={handleCreateTeacher}
-                disabled={addTeacherLoading}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60"
+                onClick={handleModifyHodBranches}
+                disabled={modifyHodLoading}
+                className="px-4 py-2 bg-violet-600 text-white rounded-lg font-semibold hover:opacity-90 disabled:opacity-60 text-sm"
               >
-                {addTeacherLoading ? 'Adding...' : 'Add Teacher'}
+                {modifyHodLoading ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Temporary Credential Modal */}
+      {showTempCredentialModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-emerald-500 to-green-500">
+              <h3 className="text-xl font-bold text-white">{tempCredentialData.role} Created</h3>
+              <p className="text-sm text-white/90 mt-1">Share this temporary password securely.</p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Name</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{tempCredentialData.name || '-'}</p>
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mt-2">Mobile</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{tempCredentialData.mobile || '-'}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Temporary Password</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 rounded-lg bg-gray-900 px-4 py-3 border-2 border-emerald-400">
+                    <p className="text-lg font-mono font-bold text-emerald-300 tracking-wider text-center">
+                      {tempCredentialData.tempPassword || 'N/A'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyTempPassword}
+                    className="px-3 py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                    title="Copy password"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-3">
+                <p className="text-xs text-amber-800 dark:text-amber-200 font-semibold">
+                  First login required: user must change password after login.
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+              <button
+                onClick={handleCloseTempCredentialModal}
+                className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Teacher Modal */}
+      {showAddTeacherModal && (isAdminMode || (role === 'hod' && !isAdminMode)) && (
+        role === 'hod' && !isAdminMode ? (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+              <div className="p-4 md:p-5 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl md:text-2xl font-bold text-gray-900">Add Teacher</h2>
+                  <p className="text-xs md:text-sm text-gray-500">Create a teacher account for your branches</p>
+                </div>
+                <button
+                  onClick={() => setShowAddTeacherModal(false)}
+                  className="p-2 rounded-lg hover:bg-gray-100"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleCreateTeacher();
+                }}
+                className="p-4 md:p-5 space-y-4"
+              >
+                {addTeacherError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+                    {addTeacherError}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Full Name *</label>
+                    <input
+                      value={teacherForm.name}
+                      onChange={(e) => setTeacherForm((prev) => ({ ...prev, name: e.target.value }))}
+                      className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg"
+                      placeholder="Teacher name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mobile *</label>
+                    <input
+                      value={teacherForm.mobile}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setTeacherForm((prev) => ({ ...prev, mobile: value }));
+                      }}
+                      maxLength={10}
+                      className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg"
+                      placeholder="10-digit mobile"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Branches (Optional)</label>
+                    <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                      {branches.map((branch) => (
+                        <label key={branch._id} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={teacherForm.selectedBranches.includes(branch._id)}
+                            onChange={() => handleTeacherBranchToggle(branch._id)}
+                          />
+                          {branch.name}
+                        </label>
+                      ))}
+                      {branches.length === 0 && (
+                        <p className="text-xs text-gray-500">No branches available</p>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Semesters (Optional)</label>
+                    <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                      {semesters.map((semester) => (
+                        <label key={semester._id} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={teacherForm.selectedSemesters.includes(semester._id)}
+                            onChange={() => handleTeacherSemesterToggle(semester._id)}
+                          />
+                          {semester.name || `Semester ${semester.semesterNumber}`}
+                        </label>
+                      ))}
+                      {semesters.length === 0 && (
+                        <p className="text-xs text-gray-500">No semesters available</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {teacherForm.selectedBranches.length > 0 && teacherForm.selectedSemesters.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Subjects (Optional)</label>
+                    {teacherSubjects.length === 0 ? (
+                      <p className="text-xs text-gray-500">No subjects found for selected branch and semester.</p>
+                    ) : (
+                      <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                        {teacherSubjects.map((subject) => (
+                          <label key={subject._id} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={teacherForm.selectedSubjects.includes(subject._id)}
+                              onChange={() => handleTeacherSubjectToggle(subject._id)}
+                            />
+                            {subject.name} ({subject.code})
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddTeacherModal(false)}
+                    className="px-3.5 py-2 text-sm rounded-lg border border-gray-300 text-gray-700"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={addTeacherLoading}
+                    className="px-4 py-2 text-sm rounded-lg bg-teal-600 text-white font-semibold hover:opacity-90 disabled:opacity-60"
+                  >
+                    {addTeacherLoading ? 'Saving...' : 'Create Teacher'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-[60] p-0 sm:p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-t-3xl sm:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[92vh] border-0 sm:border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
+              <div className="sticky top-0 z-10 p-5 sm:p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-500 to-cyan-500">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold text-white">Add New Teacher</h3>
+                  <button
+                    onClick={() => setShowAddTeacherModal(false)}
+                    className="p-2 hover:bg-white/20 rounded-lg transition-colors text-white"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <p className="text-sm text-white/90 mt-1">Create a new teacher account with branch and subject assignment.</p>
+              </div>
+
+              <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+                {addTeacherError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                    {addTeacherError}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
+                    <input
+                      value={teacherForm.name}
+                      onChange={(e) => setTeacherForm((prev) => ({ ...prev, name: e.target.value }))}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      placeholder="Enter teacher name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Mobile Number *</label>
+                    <input
+                      value={teacherForm.mobile}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setTeacherForm((prev) => ({ ...prev, mobile: value }));
+                      }}
+                      maxLength={10}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      placeholder="1234567890"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">Select Branches (Optional)</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {branches.map((branch) => (
+                      <label key={branch._id} className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={teacherForm.selectedBranches.includes(branch._id)}
+                          onChange={() => handleTeacherBranchToggle(branch._id)}
+                          className="w-4 h-4 text-blue-500 rounded"
+                        />
+                        <span className="ml-3 text-gray-700">{branch.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">Select Semesters (Optional)</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {semesters.map((semester) => (
+                      <label key={semester._id} className="flex items-center p-3 border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={teacherForm.selectedSemesters.includes(semester._id)}
+                          onChange={() => handleTeacherSemesterToggle(semester._id)}
+                          className="w-4 h-4 text-blue-500 rounded"
+                        />
+                        <span className="ml-3 text-gray-700">Sem {semester.semesterNumber}{semester.academicYear ? ` (${semester.academicYear})` : ''}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {teacherForm.selectedBranches.length > 0 && teacherForm.selectedSemesters.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Select Subjects (Optional)</label>
+                    {teacherSubjects.length === 0 ? (
+                      <p className="text-sm text-gray-600">No subjects available for selected branches and semesters</p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto border border-gray-300 rounded-lg p-3">
+                        {teacherSubjects.map((subject) => (
+                          <label key={subject._id} className="flex items-center p-2 hover:bg-gray-50 cursor-pointer rounded">
+                            <input
+                              type="checkbox"
+                              checked={teacherForm.selectedSubjects.includes(subject._id)}
+                              onChange={() => handleTeacherSubjectToggle(subject._id)}
+                              className="w-4 h-4 text-blue-500 rounded"
+                            />
+                            <span className="ml-3 text-gray-700">{subject.name} ({subject.code})</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <p className="text-sm text-blue-800">
+                    Temporary credentials will be sent to the teacher's mobile number.
+                  </p>
+                </div>
+              </div>
+
+              <div className="sticky bottom-0 bg-white dark:bg-gray-800 px-5 sm:px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex flex-col-reverse sm:flex-row justify-end gap-3">
+                <button
+                  onClick={() => setShowAddTeacherModal(false)}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateTeacher}
+                  disabled={addTeacherLoading}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60"
+                >
+                  {addTeacherLoading ? 'Adding...' : 'Add Teacher'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
       )}
 
       {/* Add Admin Modal */}
@@ -2418,6 +2873,55 @@ const UserManagement = () => {
         </div>
       )}
 
+      {/* ── Toast Notifications ── */}
+      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2.5 pointer-events-none w-[calc(100vw-2rem)] max-w-sm sm:max-w-md">
+        {successMessage && (
+          <div
+            style={{ animation: 'toastIn 0.3s cubic-bezier(0.16,1,0.3,1)' }}
+            className="pointer-events-auto flex items-start gap-3 px-4 py-3.5 bg-white dark:bg-gray-900 border border-green-200 dark:border-green-800 rounded-2xl shadow-xl shadow-green-500/10"
+          >
+            <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-green-100 dark:bg-green-900/50 flex items-center justify-center mt-0.5">
+              <span className="material-symbols-outlined text-green-600 dark:text-green-400 text-lg">check_circle</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-green-700 dark:text-green-400 uppercase tracking-wide mb-0.5">Success</p>
+              <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">{successMessage}</p>
+            </div>
+            <button
+              onClick={() => setSuccessMessage('')}
+              className="flex-shrink-0 w-6 h-6 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors mt-0.5"
+            >
+              <span className="material-symbols-outlined text-gray-400 text-base">close</span>
+            </button>
+          </div>
+        )}
+        {errorMessage && (
+          <div
+            style={{ animation: 'toastIn 0.3s cubic-bezier(0.16,1,0.3,1)' }}
+            className="pointer-events-auto flex items-start gap-3 px-4 py-3.5 bg-white dark:bg-gray-900 border border-red-200 dark:border-red-800 rounded-2xl shadow-xl shadow-red-500/10"
+          >
+            <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-red-100 dark:bg-red-900/50 flex items-center justify-center mt-0.5">
+              <span className="material-symbols-outlined text-red-600 dark:text-red-400 text-lg">error</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-red-700 dark:text-red-400 uppercase tracking-wide mb-0.5">Error</p>
+              <p className="text-sm text-gray-800 dark:text-gray-200 leading-snug">{errorMessage}</p>
+            </div>
+            <button
+              onClick={() => setErrorMessage('')}
+              className="flex-shrink-0 w-6 h-6 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors mt-0.5"
+            >
+              <span className="material-symbols-outlined text-gray-400 text-base">close</span>
+            </button>
+          </div>
+        )}
+      </div>
+      <style>{`
+        @keyframes toastIn {
+          from { opacity: 0; transform: translateX(100%) scale(0.95); }
+          to   { opacity: 1; transform: translateX(0)    scale(1);    }
+        }
+      `}</style>
     </RoleLayout>
   );
 };

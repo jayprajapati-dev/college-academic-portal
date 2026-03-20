@@ -11,7 +11,7 @@ const RoleSemesters = () => {
   const [user, setUser] = useState(storedUser);
   const [role, setRole] = useState(storedUser?.role || 'admin');
   const { navItems, loading: navLoading } = useRoleNav(role);
-  const isAdmin = role === 'admin';
+  const isAdmin = role === 'admin' || user?.adminAccess === true;
 
   const [semesters, setSemesters] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -60,7 +60,8 @@ const RoleSemesters = () => {
       setUser(profileData.data);
       setRole(profileData.data.role);
 
-      if (profileData.data.role !== 'admin') {
+      // Allow if admin role OR has adminAccess flag (for HOD acting as admin)
+      if (profileData.data.role !== 'admin' && profileData.data.adminAccess !== true) {
         navigate('/login');
       }
     } catch (error) {

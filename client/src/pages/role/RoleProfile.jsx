@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Button, Card, Input, LandingFrame, LoadingSpinner, RoleLayout } from '../../components';
+import { Button, Input, LandingFrame, LoadingSpinner, RoleLayout } from '../../components';
 import useRoleNav from '../../hooks/useRoleNav';
+
+const isFallbackEmail = (email) => /^[0-9]{10}@college\.edu$/i.test(String(email || '').trim());
 
 const RoleProfile = () => {
   const navigate = useNavigate();
@@ -17,24 +19,20 @@ const RoleProfile = () => {
   const [editData, setEditData] = useState({});
   const [saving, setSaving] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [emailNotice, setEmailNotice] = useState('');
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
   const [subjects, setSubjects] = useState([]);
+  const [branchLookup, setBranchLookup] = useState({});
 
   const isAdmin = role === 'admin';
   const isHod = role === 'hod';
   const isCoordinator = role === 'coordinator';
   const isTeacher = role === 'teacher';
   const panelLabel = isAdmin ? 'Admin Panel' : isHod ? 'HOD Panel' : isCoordinator ? 'Coordinator Panel' : 'Teacher Panel';
-
-  const getLabel = (value) => {
-    if (!value) return '';
-    if (typeof value === 'string') return value;
-    return value.name || value.code || '';
-  };
 
   const fetchSubjects = useCallback(async (subjectIds) => {
     try {
@@ -90,7 +88,29 @@ const RoleProfile = () => {
 
   useEffect(() => {
     fetchProfile();
+    fetch('/api/academic/branches')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.success && Array.isArray(data.data)) {
+          const map = {};
+          data.data.forEach((b) => {
+            if (b._id) map[String(b._id)] = b.name || b.code || String(b._id);
+          });
+          setBranchLookup(map);
+        }
+      })
+      .catch(() => {});
   }, [fetchProfile]);
+
+  useEffect(() => {
+    if (!emailNotice) return undefined;
+
+    const timeoutId = setTimeout(() => {
+      setEmailNotice('');
+    }, 3000);
+
+    return () => clearTimeout(timeoutId);
+  }, [emailNotice]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -99,11 +119,15 @@ const RoleProfile = () => {
   };
 
   const handleEditToggle = () => {
+    setEmailNotice('');
     if (editMode) {
       setEditData({});
     } else {
+      const profileEmail = String(profile?.email || '').trim();
+      const shouldResetEmail = !profileEmail || (profile?.role !== 'student' && isFallbackEmail(profileEmail));
       const nextEditData = {
-        name: profile?.name || ''
+        name: profile?.name || '',
+        email: shouldResetEmail ? '' : profileEmail
       };
 
       setEditData(nextEditData);
@@ -115,6 +139,14 @@ const RoleProfile = () => {
     try {
       setSaving(true);
       const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Authentication expired. Please login again.');
+        setSaving(false);
+        return;
+      }
+
+      const previousEmail = String(profile?.email || '').trim().toLowerCase();
+      const nextEmail = String(editData?.email || '').trim().toLowerCase();
       const payload = { ...editData };
 
       const response = await fetch('/api/profile/me', {
@@ -126,12 +158,27 @@ const RoleProfile = () => {
         body: JSON.stringify(payload)
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        alert(errorData.message || `Error: ${response.status}`);
+        setSaving(false);
+        return;
+      }
+
       const data = await response.json();
-      if (data.success) {
-        setProfile({ ...profile, ...payload });
-        setEditMode(false);
-      } else {
+      if (!data.success || !data.data) {
         alert(data.message || 'Failed to update profile');
+        setSaving(false);
+        return;
+      }
+
+      const savedProfile = data.data;
+      setProfile(savedProfile);
+      localStorage.setItem('user', JSON.stringify(savedProfile));
+      setEditMode(false);
+
+      if (nextEmail && nextEmail !== previousEmail) {
+        setEmailNotice('✓ Email updated successfully');
       }
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -189,6 +236,117 @@ const RoleProfile = () => {
     return 'Teacher';
   }, [isAdmin, isHod, isCoordinator]);
 
+  const assignedBranches = useMemo(() => {
+    const rawCandidates = [
+      ...(Array.isArray(profile?.branches) ? profile.branches : []),
+      profile?.branch,
+      profile?.department
+    ].filter(Boolean);
+
+    const seen = new Set();
+    return rawCandidates
+      .map((item) => {
+        if (typeof item === 'object') {
+          const key = String(item._id || item.id || item.code || item.name || '').trim();
+          const label = String(item.name || item.code || '').trim();
+          if (!key || !label || seen.has(key)) return null;
+          seen.add(key);
+          return label;
+        }
+
+        // Plain string — try branchLookup map first, fallback to the raw value
+        const idStr = String(item).trim();
+        if (!idStr) return null;
+        if (seen.has(idStr)) return null;
+        seen.add(idStr);
+        return branchLookup[idStr] || null; // skip if not resolved yet
+      })
+      .filter(Boolean);
+  }, [profile, branchLookup]);
+
+  const visibleEmail = useMemo(() => {
+    const rawEmail = String(profile?.email || '').trim();
+    if (!rawEmail) return '—';
+    if (profile?.role !== 'student' && isFallbackEmail(rawEmail)) return '—';
+    return rawEmail;
+  }, [profile]);
+
+  const emailConfigured = useMemo(() => visibleEmail !== '—', [visibleEmail]);
+
+  const handleSaveEmailOnly = async () => {
+    const emailToSave = String(editData?.email || '').trim();
+    if (!emailToSave) {
+      alert('Please enter an email address');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailToSave)) {
+      alert('Please enter a valid email address');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Authentication expired. Please login again.');
+        setSaving(false);
+        return;
+      }
+
+      const response = await fetch('/api/profile/me', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ email: emailToSave })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        alert(errorData.message || `Error: ${response.status}`);
+        setSaving(false);
+        return;
+      }
+
+      const data = await response.json();
+      if (!data.success || !data.data) {
+        alert(data.message || 'Failed to save email');
+        setSaving(false);
+        return;
+      }
+
+      // Verify email was actually saved in response
+      const savedProfile = data.data;
+      const savedEmail = String(savedProfile?.email || '').trim().toLowerCase();
+      
+      if (savedEmail !== emailToSave.toLowerCase()) {
+        console.warn('Email mismatch:', { saved: savedEmail, attempted: emailToSave.toLowerCase() });
+        alert(`Email validation failed. ${emailToSave} was rejected by the server. Please verify the email format and try again.`);
+        setSaving(false);
+        return;
+      }
+
+      // Update profile state with the complete returned data
+      setProfile(savedProfile);
+      localStorage.setItem('user', JSON.stringify(savedProfile));
+      setEmailNotice('✓ Email added successfully');
+      
+      // Clear the email input field with updated profile name
+      setEditData(prev => ({ ...prev, email: '' }));
+      
+      setSaving(false);
+      alert('✓ Email saved successfully!');
+    } catch (error) {
+      console.error('Error saving email:', error);
+      alert(`Error: ${error.message || 'Failed to save email'}`);
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     if (isWebsiteView) {
       return (
@@ -222,54 +380,57 @@ const RoleProfile = () => {
   }
 
   const profileContent = (
-    <div className={`space-y-6 ${isWebsiteView ? 'max-w-6xl mx-auto px-6 py-10' : ''}`}>
-      <section className="rounded-3xl bg-gradient-to-r from-[#0b1220] to-[#1f3a8a] text-white p-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div className="flex items-center gap-5">
-            <div className="w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center text-3xl font-bold">
+    <div className={`${isWebsiteView ? 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8' : 'px-3 sm:px-4 py-4 sm:py-6'}`}>
+      {/* Header Card */}
+      <section className="rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white p-4 sm:p-6 mb-6 shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center text-2xl sm:text-3xl font-bold shadow-md">
               {profile?.name?.charAt(0)?.toUpperCase() || 'U'}
             </div>
-            <div>
-              <h1 className="text-3xl font-black">{profile?.name || 'User'}</h1>
-              <p className="text-sm text-blue-100">{profile?.email || '—'}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                <span className="px-3 py-1 rounded-full bg-white/15">{roleLabel}</span>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white truncate">{profile?.name || 'User'}</h1>
+              <p className="text-xs sm:text-sm text-slate-300 mt-1 truncate">
+                {emailConfigured ? visibleEmail : 'Email not configured yet'}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="px-2.5 py-1 rounded-lg bg-white/15 text-xs font-semibold whitespace-nowrap">{roleLabel}</span>
                 {profile?.mobile && (
-                  <span className="px-3 py-1 rounded-full bg-white/15">{profile.mobile}</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white/15 text-xs font-semibold whitespace-nowrap">{profile.mobile}</span>
                 )}
                 {isTeacher && subjects.length > 0 && (
-                  <span className="px-3 py-1 rounded-full bg-white/15">
-                    {subjects.length} Subjects Assigned
+                  <span className="px-2.5 py-1 rounded-lg bg-white/15 text-xs font-semibold whitespace-nowrap">
+                    {subjects.length} Subject{subjects.length !== 1 ? 's' : ''}
                   </span>
                 )}
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button
               onClick={handleEditToggle}
               variant="secondary"
-              className="bg-white text-[#0b1220] hover:bg-gray-100 shadow-lg shadow-black/10"
+              className="bg-white text-slate-900 hover:bg-gray-100 shadow-md text-sm sm:text-base flex-1 sm:flex-none"
             >
-              {editMode ? 'Cancel' : 'Edit Profile'}
+              {editMode ? 'Cancel' : 'Edit'}
             </Button>
             <Button
               onClick={() => setShowChangePassword((prev) => !prev)}
               variant="ghost"
-              className="bg-white/10 border border-white/40 text-white hover:bg-white/20"
+              className="bg-white/10 border border-white/30 text-white hover:bg-white/20 text-sm sm:text-base flex-1 sm:flex-none"
             >
-              Change Password
+              Password
             </Button>
           </div>
         </div>
       </section>
 
       {showChangePassword && (
-        <Card>
-          <h3 className="text-xl font-bold text-gray-900 mb-4">Change Password</h3>
+        <div className="rounded-2xl bg-white shadow-md p-4 sm:p-6 mb-6 border border-slate-100">
+          <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-4">Change Password</h3>
           <form onSubmit={handleChangePassword} className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-2">Current Password</label>
+              <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2">Current Password</label>
               <Input
                 type="password"
                 value={passwordData.currentPassword}
@@ -277,26 +438,28 @@ const RoleProfile = () => {
                 placeholder="Enter current password"
               />
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-2">New Password</label>
-              <Input
-                type="password"
-                value={passwordData.newPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                placeholder="Enter new password"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2">New Password</label>
+                <Input
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                  placeholder="Enter new password"
+                />
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-2">Confirm Password</label>
+                <Input
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                  placeholder="Confirm new password"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-2">Confirm New Password</label>
-              <Input
-                type="password"
-                value={passwordData.confirmPassword}
-                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                placeholder="Confirm new password"
-              />
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Button type="submit" disabled={saving} className="bg-[#111318]">
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <Button type="submit" disabled={saving} className="bg-slate-900 hover:bg-slate-800 flex-1 sm:flex-none text-sm sm:text-base">
                 {saving ? 'Updating...' : 'Update Password'}
               </Button>
               <Button
@@ -305,19 +468,21 @@ const RoleProfile = () => {
                   setShowChangePassword(false);
                   setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
                 }}
-                className="bg-gray-200 text-gray-900 hover:bg-gray-300"
+                className="bg-slate-100 text-slate-900 hover:bg-slate-200 flex-1 sm:flex-none text-sm sm:text-base"
               >
                 Cancel
               </Button>
             </div>
           </form>
-        </Card>
+        </div>
       )}
 
-      <Card title="Profile Information" subtitle="Keep your personal details updated">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Profile Information */}
+      <div className="rounded-2xl bg-white shadow-md p-4 sm:p-6 mb-6 border border-slate-100">
+        <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4">Profile Information</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-3">
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">Full Name</label>
+            <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">Full Name</label>
             {editMode ? (
               <Input
                 value={editData.name}
@@ -325,67 +490,128 @@ const RoleProfile = () => {
                 placeholder="Enter full name"
               />
             ) : (
-              <p className="text-gray-900 font-semibold">{profile?.name || '—'}</p>
+              <p className="text-sm sm:text-base text-slate-900 font-semibold">{profile?.name || '—'}</p>
             )}
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">Email</label>
-            <p className="text-gray-900 font-semibold">{profile?.email || '—'}</p>
+            <label className="block text-xs sm:text-sm font-semibold text-slate-700 mb-1.5">Email</label>
+            {editMode ? (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-3">
+                <Input
+                  type="email"
+                  value={editData?.email || ''}
+                  onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                  placeholder="Enter email address"
+                  className="mb-2"
+                />
+                <p className="text-xs text-slate-600 mb-3">
+                  {emailConfigured
+                    ? 'Update email along with name, then click Save Changes.'
+                    : 'Add email to login with email or continue with mobile.'}
+                </p>
+              </div>
+            ) : !emailConfigured ? (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-3">
+                <Input
+                  type="email"
+                  value={editData?.email || ''}
+                  onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                  placeholder="Enter email address"
+                  className="mb-2"
+                />
+                <p className="text-xs text-slate-600 mb-3">
+                  Add email to login with email or continue with mobile.
+                </p>
+                <Button 
+                  onClick={handleSaveEmailOnly} 
+                  disabled={saving || !editData?.email?.trim()} 
+                  className="bg-blue-600 hover:bg-blue-700 text-white w-full text-xs sm:text-sm py-2"
+                >
+                  {saving ? 'Saving...' : 'Save Email'}
+                </Button>
+              </div>
+            ) : (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 sm:p-4">
+                <p className="text-sm sm:text-base text-slate-900 font-semibold">{visibleEmail}</p>
+                {emailNotice ? <p className="text-xs text-emerald-600 mt-1">{emailNotice}</p> : null}
+              </div>
+            )}
           </div>
         </div>
         {editMode && (
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Button onClick={handleSaveProfile} disabled={saving} className="bg-[#111318]">
+          <div className="mt-4 flex flex-col sm:flex-row gap-2">
+            <Button onClick={handleSaveProfile} disabled={saving} className="bg-slate-900 hover:bg-slate-800 flex-1 text-sm sm:text-base">
               {saving ? 'Saving...' : 'Save Changes'}
             </Button>
             <Button
               onClick={handleEditToggle}
-              className="bg-gray-200 text-gray-900 hover:bg-gray-300"
+              className="bg-slate-100 text-slate-900 hover:bg-slate-200 flex-1 text-sm sm:text-base"
             >
               Cancel
             </Button>
           </div>
         )}
-      </Card>
+      </div>
 
-      <Card title="Role Details" subtitle="Role-specific information">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-2">Role</label>
-            <p className="text-gray-900 font-semibold">{roleLabel}</p>
+      {/* Role Details */}
+      <div className="rounded-2xl bg-white shadow-md p-4 sm:p-6 mb-6 border border-slate-100">
+        <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4">Role Details</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-3">
+          <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-3 sm:p-4 border border-slate-200">
+            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">Role</p>
+            <p className="text-sm sm:text-base text-slate-900 font-bold">{roleLabel}</p>
           </div>
           {isHod && (
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-2">Branch</label>
-              <p className="text-gray-900 font-semibold">{getLabel(profile?.branch) || '—'}</p>
+            <div className="sm:col-span-2 lg:col-span-1">
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 sm:p-4 border border-blue-200">
+                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1.5">Assigned Branches</p>
+                {assignedBranches.length > 0 ? (
+                  <div>
+                    <p className="text-sm sm:text-base font-bold text-slate-900 mb-2">{assignedBranches.length} branch{assignedBranches.length !== 1 ? 'es' : ''}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {assignedBranches.map((branchName, index) => (
+                        <span
+                          key={`${branchName}-${index}`}
+                          className="px-2 py-1 rounded-lg bg-blue-600 text-white text-xs font-semibold"
+                        >
+                          {index + 1}. {branchName}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs sm:text-sm text-slate-600">No assignment found</p>
+                )}
+              </div>
             </div>
           )}
           {isTeacher && (
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-2">Assigned Subjects</label>
-              <p className="text-gray-900 font-semibold">{subjects.length || 0}</p>
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-3 sm:p-4 border border-green-200">
+              <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1.5">Assigned Subjects</p>
+              <p className="text-sm sm:text-base font-bold text-slate-900">{subjects.length || 0} subject{subjects.length !== 1 ? 's' : ''}</p>
             </div>
           )}
           {isAdmin && (
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-2">Access</label>
-              <p className="text-gray-900 font-semibold">Full system administration</p>
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 sm:p-4 border border-purple-200">
+              <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-1.5">Access Level</p>
+              <p className="text-sm sm:text-base font-bold text-slate-900">Full Admin</p>
             </div>
           )}
         </div>
-      </Card>
+      </div>
 
       {isTeacher && subjects.length > 0 && (
-        <Card title="Assigned Subjects" subtitle="Subjects currently linked to your account">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="rounded-2xl bg-white shadow-md p-4 sm:p-6 border border-slate-100">
+          <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4">Assigned Subjects</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {subjects.map((subject) => (
-              <div key={subject._id || subject.id} className="p-4 border border-[#E6E9EF] rounded-2xl">
-                <p className="font-semibold text-gray-900">{subject.name}</p>
-                <p className="text-sm text-gray-500">{subject.code || '—'}</p>
+              <div key={subject._id || subject.id} className="p-3 border border-slate-200 rounded-xl hover:shadow-md hover:border-slate-300 transition-all">
+                <p className="font-semibold text-sm text-slate-900">{subject.name}</p>
+                <p className="text-xs text-slate-500 mt-1">{subject.code || '—'}</p>
               </div>
             ))}
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );

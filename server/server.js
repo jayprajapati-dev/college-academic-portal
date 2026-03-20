@@ -63,6 +63,7 @@ app.use('/api/library', require('./routes/library'));
 app.use('/api/exams', require('./routes/exam'));
 app.use('/api/projects', require('./routes/project'));
 app.use('/api/permissions', require('./routes/permissions'));
+app.use('/api/room', require('./routes/room'));
 
 // Error Handler Middleware
 const errorHandler = require('./middleware/errorHandler');

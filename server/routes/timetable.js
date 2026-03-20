@@ -5,232 +5,195 @@ const User = require('../models/User');
 const Subject = require('../models/Subject');
 const { protect, authorize } = require('../middleware/auth');
 
-// Helper: Check if user can modify timetable
-const canModifyTimetable = async (timetableId, userId, userRole) => {
-  const timetable = await Timetable.findById(timetableId);
-  if (!timetable) return false;
-
-  // Admin can always modify
-  if (userRole === 'admin') return true;
-
-  // Creator can modify
-  if (timetable.createdBy.equals(userId)) return true;
-
-  // Check if user is in canBeModifiedBy list
-  const hasPermission = timetable.canBeModifiedBy.some(
-    perm => perm.userId.equals(userId)
-  );
-
-  return hasPermission;
+const normalizeId = (value) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (value._id) return String(value._id);
+  return String(value);
 };
 
-// Helper: Check for conflicts
-const checkConflicts = async (
+const getHodBranchIds = (user) => Array.from(new Set([
+  normalizeId(user?.branch),
+  normalizeId(user?.department),
+  ...((user?.branches || []).map((branch) => normalizeId(branch)))
+].filter(Boolean)));
+
+// Helper: Check if user can modify timetable (Admin: all, HOD: own branch only)
+const canModifyTimetable = async (timetableId, user) => {
+  const timetable = await Timetable.findById(timetableId);
+  if (!timetable) return false;
+  const currentUserRole = user?.role;
+  if (currentUserRole === 'admin') return true;
+  if (currentUserRole === 'hod') {
+    const timetableBranchId = normalizeId(timetable.branchId);
+    const userBranchIds = new Set(getHodBranchIds(user));
+    if (userBranchIds.has(timetableBranchId)) return true;
+  }
+  return false;
+};
+
+
+// Helper: Check for slot-based conflicts with detailed information
+const checkSlotConflicts = async ({
   semesterId,
   branchId,
   dayOfWeek,
-  startTime,
-  endTime,
+  slot,
+  slotSpan,
   teacherId,
-  roomNo,
+  roomId,
   excludeId = null
-) => {
+}) => {
   const query = {
     semesterId,
     branchId,
     dayOfWeek,
-    status: { $ne: 'cancelled' }
+    status: 'active'
   };
-
-  if (excludeId) {
-    query._id = { $ne: excludeId };
+  if (excludeId) query._id = { $ne: excludeId };
+  const entries = await Timetable.find(query).populate('subjectId').populate('teacherId').populate('roomId').populate('branchId').populate('semesterId');
+  
+  // For labs, check all spanned slots
+  const slotsToCheck = [];
+  for (let i = 0; i < (slotSpan || 1); i++) slotsToCheck.push(slot + i);
+  let hasConflict = false;
+  let conflicts = [];
+  
+  for (const s of slotsToCheck) {
+    for (const entry of entries) {
+      // Check slot overlap
+      const entrySlots = [];
+      for (let j = 0; j < (entry.slotSpan || 1); j++) entrySlots.push(entry.slot + j);
+      if (!entrySlots.includes(s)) continue;
+      
+      // Teacher conflict
+      if (String(entry.teacherId._id) === String(teacherId)) {
+        hasConflict = true;
+        conflicts.push({
+          type: 'teacher',
+          message: `Teacher ${entry.teacherId.name} already assigned at slot ${s} (${entry.dayOfWeek}) for ${entry.subjectId.name}`,
+          details: {
+            teacher: entry.teacherId.name,
+            subject: entry.subjectId.name,
+            room: entry.roomId.roomNo,
+            branch: entry.branchId.name,
+            semester: entry.semesterId.name,
+            slot: s,
+            day: entry.dayOfWeek,
+            addedBy: entry.addedBy?.name || 'Unknown'
+          }
+        });
+      }
+      
+      // Room conflict
+      if (String(entry.roomId._id) === String(roomId)) {
+        hasConflict = true;
+        conflicts.push({
+          type: 'room',
+          message: `Room ${entry.roomId.roomNo} already booked at slot ${s} (${entry.dayOfWeek}) by ${entry.teacherId.name} for ${entry.subjectId.name}`,
+          details: {
+            room: entry.roomId.roomNo,
+            teacher: entry.teacherId.name,
+            subject: entry.subjectId.name,
+            branch: entry.branchId.name,
+            semester: entry.semesterId.name,
+            slot: s,
+            day: entry.dayOfWeek,
+            addedBy: entry.addedBy?.name || 'Unknown'
+          }
+        });
+      }
+    }
   }
-
-  const conflicts = await Timetable.find(query);
-
-  const timeConflicts = conflicts.filter(slot => {
-    // Check if times overlap
-    return !(endTime <= slot.startTime || startTime >= slot.endTime);
-  });
-
-  const result = {
-    hasConflict: false,
-    conflicts: []
-  };
-
-  // Check teacher conflict
-  const teacherConflict = timeConflicts.find(
-    slot => slot.teacherId.equals(teacherId)
-  );
-  if (teacherConflict) {
-    result.hasConflict = true;
-    result.conflicts.push({
-      type: 'teacher',
-      message: `Teacher already has class from ${teacherConflict.startTime} to ${teacherConflict.endTime}`,
-      subject: teacherConflict.subjectId?.name,
-      time: `${teacherConflict.startTime} - ${teacherConflict.endTime}`
-    });
-  }
-
-  // Check room conflict
-  const roomConflict = timeConflicts.find(slot => slot.roomNo === roomNo);
-  if (roomConflict) {
-    result.hasConflict = true;
-    result.conflicts.push({
-      type: 'room',
-      message: `Room ${roomNo} is already booked from ${roomConflict.startTime} to ${roomConflict.endTime}`,
-      subject: roomConflict.subjectId?.name,
-      time: `${roomConflict.startTime} - ${roomConflict.endTime}`
-    });
-  }
-
-  return result;
+  return { hasConflict, conflicts };
 };
 
 // ============ CREATE TIMETABLE ============
-router.post('/create', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
+
+// ============ CREATE TIMETABLE (slot-based) ============
+router.post('/create', protect, authorize('admin', 'hod'), async (req, res) => {
   try {
     const {
       semesterId,
       branchId,
       subjectId,
       teacherId,
-      roomNo,
+      roomId,
       dayOfWeek,
-      startTime,
-      endTime,
-      lectureType,
-      notes
+      slot,
+      lectureType
     } = req.body;
 
-    // Validation
-    if (
-      !semesterId ||
-      !branchId ||
-      !subjectId ||
-      !teacherId ||
-      !roomNo ||
-      !dayOfWeek ||
-      !startTime ||
-      !endTime
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: 'All required fields must be provided'
-      });
+    if (!semesterId || !branchId || !subjectId || !teacherId || !roomId || !dayOfWeek || !slot || !lectureType) {
+      return res.status(400).json({ success: false, message: 'All required fields must be provided' });
     }
 
-    // Check if teacher is valid
-    const teacher = await User.findById(teacherId);
-    if (!teacher || !['teacher', 'hod'].includes(teacher.role)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid teacher ID'
-      });
-    }
-
-    // Check for conflicts
-    const conflictCheck = await checkConflicts(
-      semesterId,
-      branchId,
-      dayOfWeek,
-      startTime,
-      endTime,
-      teacherId,
-      roomNo
-    );
-
-    if (conflictCheck.hasConflict) {
-      return res.status(400).json({
-        success: false,
-        message: 'Scheduling conflict detected',
-        conflicts: conflictCheck.conflicts
-      });
-    }
-
-    // Authorization: HOD can only create for their branch
+    // Only Admin/HOD for their branch
     if (req.user.role === 'hod') {
-      if (!req.user.branch.equals(branchId)) {
-        return res.status(403).json({
-          success: false,
-          message: 'HOD can only create timetables for their branch'
-        });
+      const hodBranchIds = getHodBranchIds(req.user);
+      if (!hodBranchIds.includes(normalizeId(branchId))) {
+        return res.status(403).json({ success: false, message: 'HOD can only create for their branch' });
       }
     }
 
-    // Create timetable
+    // Lab = 2 slots, Theory = 1 slot
+    const slotSpan = lectureType === 'Lab' ? 2 : 1;
+
+    // Conflict check
+    const conflictCheck = await checkSlotConflicts({
+      semesterId,
+      branchId,
+      dayOfWeek,
+      slot,
+      slotSpan,
+      teacherId,
+      roomId
+    });
+    if (conflictCheck.hasConflict) {
+      return res.status(400).json({ success: false, message: 'Conflict detected', conflicts: conflictCheck.conflicts });
+    }
+
+    // Prevent lab splitting
+    if (lectureType === 'Lab') {
+      // Check if next slot is available (no overflow)
+      if (slot >= 7) {
+        return res.status(400).json({ success: false, message: 'Lab cannot be placed at last slot' });
+      }
+    }
+
     const timetable = await Timetable.create({
       semesterId,
       branchId,
       subjectId,
       teacherId,
-      roomNo,
+      roomId,
       dayOfWeek,
-      startTime,
-      endTime,
-      lectureType: lectureType || 'Theory',
-      notes,
-      createdBy: req.user._id,
-      createdByRole: req.user.role
+      slot,
+      lectureType,
+      slotSpan,
+      status: 'active'
     });
-
-    res.status(201).json({
-      success: true,
-      message: 'Timetable entry created successfully',
-      data: timetable
-    });
+    res.status(201).json({ success: true, data: timetable });
   } catch (error) {
     console.error('Create timetable error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error creating timetable entry',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Error creating timetable entry', error: error.message });
   }
 });
 
 // ============ GET ALL TIMETABLES (Admin) ============
-router.get('/all', protect, authorize('admin'), async (req, res) => {
+router.get('/all', protect, authorize('admin', 'hod'), async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 20,
-      semesterId,
-      branchId,
-      subjectId,
-      dayOfWeek,
-      status = 'active'
-    } = req.query;
-
-    const query = { status };
+    const { semesterId, branchId, dayOfWeek } = req.query;
+    const query = { status: 'active' };
     if (semesterId) query.semesterId = semesterId;
     if (branchId) query.branchId = branchId;
-    if (subjectId) query.subjectId = subjectId;
     if (dayOfWeek) query.dayOfWeek = dayOfWeek;
-
-    const skip = (page - 1) * limit;
-
-    const timetables = await Timetable.find(query)
-      .populate('semesterId', 'name code')
-      .populate('branchId', 'name code')
-      .populate('subjectId', 'name code')
-      .populate('teacherId', 'name email')
-      .skip(skip)
-      .limit(parseInt(limit))
-      .sort({ dayOfWeek: 1, startTime: 1 });
-
-    const total = await Timetable.countDocuments(query);
-
-    res.status(200).json({
-      success: true,
-      data: timetables,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit)
-      }
-    });
+    // HOD: restrict to own branches
+    if (req.user.role === 'hod') {
+      query.branchId = { $in: getHodBranchIds(req.user) };
+    }
+    const timetables = await Timetable.find(query).sort({ dayOfWeek: 1, slot: 1 });
+    res.status(200).json({ success: true, data: timetables });
   } catch (error) {
     console.error('Get all timetables error:', error);
     res.status(500).json({
@@ -241,51 +204,21 @@ router.get('/all', protect, authorize('admin'), async (req, res) => {
 });
 
 // ============ GET TIMETABLE BY SEMESTER (Students/Teachers view) ============
+
+// ============ GET TIMETABLE BY SEMESTER (All roles, view only) ============
 router.get('/semester/:semesterId', protect, async (req, res) => {
   try {
     const { semesterId } = req.params;
-    const { dayOfWeek } = req.query;
-
-    const query = {
-      semesterId,
-      status: 'active'
-    };
-
-    // If student, filter by their branch
-    if (req.user.role === 'student') {
-      query.branchId = req.user.branch;
-    }
-
-    // If HOD, filter by their branch
-    if (req.user.role === 'hod') {
-      query.branchId = req.user.branch;
-    }
-
-    // If specific day requested
-    if (dayOfWeek) {
-      query.dayOfWeek = dayOfWeek;
-    }
-
-    const timetables = await Timetable.find(query)
-      .populate('semesterId', 'name code')
-      .populate('branchId', 'name code')
-      .populate('subjectId', 'name code')
-      .populate('teacherId', 'name email')
-      .sort({
-        dayOfWeek: 1,
-        startTime: 1
-      });
-
-    res.status(200).json({
-      success: true,
-      data: timetables
-    });
+    const { branchId, dayOfWeek } = req.query;
+    const query = { semesterId, status: 'active' };
+    if (branchId) query.branchId = branchId;
+    if (dayOfWeek) query.dayOfWeek = dayOfWeek;
+    // Students: restrict to own branch
+    if (req.user.role === 'student') query.branchId = req.user.branch;
+    const timetables = await Timetable.find(query).sort({ dayOfWeek: 1, slot: 1 });
+    res.status(200).json({ success: true, data: timetables });
   } catch (error) {
-    console.error('Get semester timetable error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching timetable'
-    });
+    res.status(500).json({ success: false, message: 'Error fetching timetable' });
   }
 });
 
@@ -293,16 +226,26 @@ router.get('/semester/:semesterId', protect, async (req, res) => {
 router.get('/subject/:subjectId', protect, async (req, res) => {
   try {
     const { subjectId } = req.params;
-
-    const timetables = await Timetable.find({
+    const query = {
       subjectId,
       status: 'active'
-    })
+    };
+
+    if (req.user.role === 'student') {
+      query.branchId = req.user.branch;
+      query.semesterId = req.user.semester;
+    }
+
+    if (req.user.role === 'hod') {
+      query.branchId = { $in: getHodBranchIds(req.user) };
+    }
+
+    const timetables = await Timetable.find(query)
       .populate('semesterId', 'name code')
       .populate('branchId', 'name code')
       .populate('subjectId', 'name code')
       .populate('teacherId', 'name email')
-      .sort({ dayOfWeek: 1, startTime: 1 });
+      .sort({ dayOfWeek: 1, slot: 1 });
 
     res.status(200).json({
       success: true,
@@ -323,12 +266,19 @@ router.get('/my-schedule', protect, async (req, res) => {
     let query = { status: 'active' };
 
     if (req.user.role === 'teacher') {
-      // Teachers see their assigned classes
       query.teacherId = req.user._id;
     } else if (req.user.role === 'student') {
-      // Students see their semester's classes
       query.semesterId = req.user.semester;
       query.branchId = req.user.branch;
+    } else if (req.user.role === 'hod') {
+      const hodBranchIds = getHodBranchIds(req.user);
+      if (hodBranchIds.length === 0) {
+        return res.status(200).json({
+          success: true,
+          data: []
+        });
+      }
+      query.branchId = { $in: hodBranchIds };
     }
 
     const timetables = await Timetable.find(query)
@@ -336,10 +286,7 @@ router.get('/my-schedule', protect, async (req, res) => {
       .populate('branchId', 'name code')
       .populate('subjectId', 'name code')
       .populate('teacherId', 'name email')
-      .sort({
-        dayOfWeek: 1,
-        startTime: 1
-      });
+      .sort({ dayOfWeek: 1, slot: 1 });
 
     res.status(200).json({
       success: true,
@@ -375,10 +322,21 @@ router.get('/day/:dayOfWeek', protect, async (req, res) => {
     if (semesterId) query.semesterId = semesterId;
     if (branchId) query.branchId = branchId;
 
-    // For students, auto-filter by their semester/branch
     if (req.user.role === 'student') {
       query.semesterId = req.user.semester;
       query.branchId = req.user.branch;
+    } else if (req.user.role === 'hod') {
+      const hodBranchIds = getHodBranchIds(req.user);
+      if (branchId) {
+        if (!hodBranchIds.includes(normalizeId(branchId))) {
+          return res.status(403).json({
+            success: false,
+            message: 'You are not authorized to access this branch timetable'
+          });
+        }
+      } else {
+        query.branchId = { $in: hodBranchIds };
+      }
     }
 
     const timetables = await Timetable.find(query)
@@ -386,7 +344,7 @@ router.get('/day/:dayOfWeek', protect, async (req, res) => {
       .populate('branchId', 'name code')
       .populate('subjectId', 'name code')
       .populate('teacherId', 'name email')
-      .sort({ startTime: 1 });
+      .sort({ dayOfWeek: 1, slot: 1 });
 
     res.status(200).json({
       success: true,
@@ -417,6 +375,16 @@ router.get('/:id', protect, async (req, res) => {
       });
     }
 
+    if (req.user.role === 'hod') {
+      const hodBranchIds = getHodBranchIds(req.user);
+      if (!hodBranchIds.includes(normalizeId(timetable.branchId))) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not authorized to access this timetable entry'
+        });
+      }
+    }
+
     res.status(200).json({
       success: true,
       data: timetable
@@ -431,25 +399,109 @@ router.get('/:id', protect, async (req, res) => {
 });
 
 // ============ UPDATE TIMETABLE ============
-router.put('/:id', protect, async (req, res) => {
+
+// ============ UPDATE TIMETABLE ============
+router.put('/:id', protect, authorize('admin', 'hod'), async (req, res) => {
+  try {
+    const timetableId = req.params.id;
+    const timetable = await Timetable.findById(timetableId);
+    if (!timetable) return res.status(404).json({ success: false, message: 'Not found' });
+    if (!(await canModifyTimetable(timetableId, req.user))) {
+      return res.status(403).json({ success: false, message: 'No permission' });
+    }
+    const { roomId, dayOfWeek, slot, lectureType, status } = req.body;
+    if (roomId) timetable.roomId = roomId;
+    if (dayOfWeek) timetable.dayOfWeek = dayOfWeek;
+    if (slot) timetable.slot = slot;
+    if (lectureType) {
+      timetable.lectureType = lectureType;
+      timetable.slotSpan = lectureType === 'Lab' ? 2 : 1;
+    }
+    if (status) timetable.status = status;
+    // Conflict check
+    const conflictCheck = await checkSlotConflicts({
+      semesterId: timetable.semesterId,
+      branchId: timetable.branchId,
+      dayOfWeek: timetable.dayOfWeek,
+      slot: timetable.slot,
+      slotSpan: timetable.slotSpan,
+      teacherId: timetable.teacherId,
+      roomId: timetable.roomId,
+      excludeId: timetable._id
+    });
+    if (conflictCheck.hasConflict) {
+      return res.status(400).json({ success: false, message: 'Conflict detected', conflicts: conflictCheck.conflicts });
+    }
+    // Prevent lab splitting
+    if (timetable.lectureType === 'Lab' && timetable.slot >= 7) {
+      return res.status(400).json({ success: false, message: 'Lab cannot be placed at last slot' });
+    }
+    await timetable.save();
+    res.json({ success: true, data: timetable });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error updating timetable' });
+  }
+});
+
+// ============ DELETE/CANCEL TIMETABLE ============
+
+// ============ DELETE TIMETABLE ============
+// Soft delete timetable (status = 'archived')
+router.delete('/:id', protect, authorize('admin', 'hod'), async (req, res) => {
+  try {
+    const timetableId = req.params.id;
+    const timetable = await Timetable.findById(timetableId);
+    if (!timetable) {
+      console.error(`[DELETE /api/timetable/${timetableId}] Not found`);
+      return res.status(404).json({ success: false, message: 'Not found' });
+    }
+    const canModify = await canModifyTimetable(timetableId, req.user);
+    if (!canModify) {
+      console.error(`[DELETE /api/timetable/${timetableId}] No permission for user ${req.user?._id}`);
+      return res.status(403).json({ success: false, message: 'No permission' });
+    }
+    timetable.status = 'archived';
+    // Log references for debugging
+    console.log('[Timetable Delete] References:', {
+      semesterId: timetable.semesterId,
+      branchId: timetable.branchId,
+      subjectId: timetable.subjectId,
+      teacherId: timetable.teacherId,
+      roomId: timetable.roomId
+    });
+    try {
+      await timetable.save({ validateBeforeSave: false });
+      res.json({ success: true, message: 'Timetable soft deleted (status=archived)' });
+    } catch (saveError) {
+      console.error('[Timetable Delete] Soft delete failed, attempting hard delete:', saveError);
+      await Timetable.deleteOne({ _id: timetableId });
+      res.json({ success: true, message: 'Timetable forcibly deleted due to reference error' });
+    }
+  } catch (error) {
+    console.error(`[DELETE /api/timetable/${req.params.id}] Error:`, error);
+    // Return full error for debugging
+    res.status(500).json({ success: false, message: 'Error deleting timetable', error: error.message, stack: error.stack });
+  }
+});
+
+// ============ TOGGLE TIMETABLE STATUS (On/Off/Archive) ============
+const updateTimetableStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      teacherId,
-      roomNo,
-      dayOfWeek,
-      startTime,
-      endTime,
-      lectureType,
-      notes
-    } = req.body;
+    const { status } = req.body;
 
-    // Check permission to modify
-    const canModify = await canModifyTimetable(id, req.user._id, req.user.role);
+    if (!['active', 'cancelled', 'archived'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status value'
+      });
+    }
+
+    const canModify = await canModifyTimetable(id, req.user, req.user.adminAccess);
     if (!canModify) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have permission to modify this timetable entry'
+        message: 'You do not have permission to update status for this timetable entry'
       });
     }
 
@@ -461,101 +513,49 @@ router.put('/:id', protect, async (req, res) => {
       });
     }
 
-    // If updating critical fields, check for conflicts
-    if (
-      (teacherId && !teacherId.equals(timetable.teacherId)) ||
-      roomNo !== timetable.roomNo ||
-      dayOfWeek !== timetable.dayOfWeek ||
-      startTime !== timetable.startTime ||
-      endTime !== timetable.endTime
-    ) {
+    if (status === 'active') {
       const conflictCheck = await checkConflicts(
         timetable.semesterId,
         timetable.branchId,
-        dayOfWeek || timetable.dayOfWeek,
-        startTime || timetable.startTime,
-        endTime || timetable.endTime,
-        teacherId || timetable.teacherId,
-        roomNo || timetable.roomNo,
-        id
+        timetable.dayOfWeek,
+        timetable.startTime,
+        timetable.endTime,
+        timetable.teacherId,
+        timetable.roomNo,
+        timetable._id
       );
 
       if (conflictCheck.hasConflict) {
         return res.status(400).json({
           success: false,
-          message: 'Scheduling conflict detected after update',
+          message: 'Cannot turn ON due to scheduling conflict',
           conflicts: conflictCheck.conflicts
         });
       }
     }
 
-    // Update fields
-    if (teacherId) timetable.teacherId = teacherId;
-    if (roomNo) timetable.roomNo = roomNo;
-    if (dayOfWeek) timetable.dayOfWeek = dayOfWeek;
-    if (startTime) timetable.startTime = startTime;
-    if (endTime) timetable.endTime = endTime;
-    if (lectureType) timetable.lectureType = lectureType;
-    if (notes) timetable.notes = notes;
-
+    timetable.status = status;
     timetable.updatedAt = Date.now();
     await timetable.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: 'Timetable entry updated successfully',
+      message: `Timetable status updated to ${status}`,
       data: timetable
     });
   } catch (error) {
-    console.error('Update timetable error:', error);
-    res.status(500).json({
+    console.error('Toggle timetable status error:', error);
+    return res.status(500).json({
       success: false,
-      message: 'Error updating timetable entry',
+      message: 'Error updating timetable status',
       error: error.message
     });
   }
-});
+};
 
-// ============ DELETE/CANCEL TIMETABLE ============
-router.delete('/:id', protect, async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Check permission
-    const canModify = await canModifyTimetable(id, req.user._id, req.user.role);
-    if (!canModify) {
-      return res.status(403).json({
-        success: false,
-        message: 'You do not have permission to delete this timetable entry'
-      });
-    }
-
-    const timetable = await Timetable.findByIdAndUpdate(
-      id,
-      { status: 'cancelled' },
-      { new: true }
-    );
-
-    if (!timetable) {
-      return res.status(404).json({
-        success: false,
-        message: 'Timetable entry not found'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Timetable entry cancelled successfully',
-      data: timetable
-    });
-  } catch (error) {
-    console.error('Delete timetable error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting timetable entry'
-    });
-  }
-});
+router.patch('/:id/status', protect, updateTimetableStatus);
+router.put('/:id/status', protect, updateTimetableStatus);
+router.post('/:id/status', protect, updateTimetableStatus);
 
 // ============ GRANT MODIFICATION PERMISSION ============
 router.post('/:id/grant-permission', protect, authorize('admin'), async (req, res) => {

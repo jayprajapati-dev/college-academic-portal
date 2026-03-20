@@ -48,7 +48,7 @@ const LoginPage = () => {
       }
 
       // Check if password change is required (first login)
-      if (data.passwordChangeRequired) {
+      if (data.user?.passwordChangeRequired) {
         navigate('/first-login');
       } else {
         const mustCompleteProfile = data.user?.role === 'student'
@@ -92,28 +92,28 @@ const LoginPage = () => {
   return (
     <div className="font-display bg-background-light dark:bg-background-dark min-h-screen flex flex-col mesh-background">
       <header className="fixed top-0 w-full z-50 glass-header">
-        <div className="max-w-[1280px] mx-auto px-6 h-20 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <div className="p-1.5 bg-primary rounded-lg text-white">
-              <svg className="size-6" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <div className="max-w-[1280px] mx-auto px-3 sm:px-4 h-12 sm:h-14 flex items-center justify-between gap-2">
+          <a href="/" className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity">
+            <div className="p-1 sm:p-1.5 bg-primary rounded-lg text-white shrink-0">
+              <svg className="size-4 sm:size-5" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                 <path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path>
               </svg>
             </div>
-            <h1 className="text-xl font-extrabold tracking-tight">SmartAcademics</h1>
+            <h1 className="text-sm sm:text-base font-extrabold tracking-tight truncate">SmartAcademics</h1>
           </a>
           <nav className="hidden md:flex items-center gap-8">
             <a className="text-sm font-semibold hover:text-primary transition-colors" href="/about">About Us</a>
             <a className="text-sm font-semibold hover:text-primary transition-colors" href="/contact">Contact Us</a>
           </nav>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <a
-              className="px-5 py-2 text-sm font-bold bg-[#f0f1f4] dark:bg-white/10 rounded-lg hover:bg-gray-200 transition-all"
+              className="px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold bg-[#f0f1f4] dark:bg-white/10 rounded-lg hover:bg-gray-200 transition-all"
               href="/"
             >
               Home
             </a>
             <a
-              className="px-5 py-2 text-sm font-bold bg-primary text-white rounded-lg shadow-lg shadow-primary/20 hover:scale-105 transition-all"
+              className="px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold bg-primary text-white rounded-lg shadow-lg shadow-primary/20 hover:scale-105 transition-all"
               href="/register"
             >
               Register
@@ -121,15 +121,15 @@ const LoginPage = () => {
           </div>
         </div>
       </header>
-      <main className="flex-1 flex items-center justify-center px-4 py-12 pt-28">
-        <div className="w-full max-w-[480px] space-y-8">
-          <div className="bg-white/80 dark:bg-[#1c2130]/80 backdrop-blur-xl border border-white/20 dark:border-white/5 rounded-[2.5rem] p-10 soft-ui-card">
-            <div className="text-center mb-10">
-              <div className="inline-flex items-center justify-center p-3 bg-primary/10 rounded-2xl mb-4">
-                <span className="material-symbols-outlined text-primary text-3xl">verified_user</span>
+      <main className="flex-1 flex items-center justify-center px-4 py-4 pt-14 sm:pt-16">
+        <div className="w-full max-w-[420px] space-y-5">
+          <div className="bg-white/80 dark:bg-[#1c2130]/80 backdrop-blur-xl border border-white/20 dark:border-white/5 rounded-2xl p-6 soft-ui-card">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center p-2.5 bg-primary/10 rounded-xl mb-3">
+                <span className="material-symbols-outlined text-primary" style={{fontSize:'24px'}}>verified_user</span>
               </div>
-              <h1 className="text-[#111318] dark:text-white text-3xl font-extrabold leading-tight">Secure Portal</h1>
-              <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">Enterprise Access Management</p>
+              <h1 className="text-[#111318] dark:text-white text-xl font-extrabold leading-tight">Secure Portal</h1>
+              <p className="text-gray-500 dark:text-gray-400 mt-1 text-xs font-medium">Enterprise Access Management</p>
             </div>
             
             {error && (
@@ -138,12 +138,12 @@ const LoginPage = () => {
               </div>
             )}
 
-            <form className="space-y-5" onSubmit={handleSubmit}>
+            <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="flex flex-col gap-2">
                 <label className="text-[#111318] dark:text-gray-200 text-sm font-bold ml-1">Email, Mobile, or Enrollment ID</label>
                 <div className="relative">
                   <input
-                    className="w-full rounded-xl border border-[#dcdee5] dark:border-white/10 bg-white/50 dark:bg-black/20 focus:ring-2 focus:ring-primary/20 focus:border-primary h-14 px-5 text-base text-[#111318] dark:text-white placeholder:text-[#636c88] transition-all"
+                    className="w-full rounded-xl border border-[#dcdee5] dark:border-white/10 bg-white/50 dark:bg-black/20 focus:ring-2 focus:ring-primary/20 focus:border-primary h-11 px-4 text-sm text-[#111318] dark:text-white placeholder:text-[#636c88] transition-all"
                     placeholder="Email, Mobile or Enrollment ID"
                     type="text"
                     value={identifier}
@@ -159,7 +159,7 @@ const LoginPage = () => {
                 <label className="text-[#111318] dark:text-gray-200 text-sm font-bold ml-1">Secure Password</label>
                 <div className="flex w-full items-stretch rounded-xl border border-[#dcdee5] dark:border-white/10 bg-white/50 dark:bg-black/20 overflow-hidden focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
                   <input
-                    className="flex-1 bg-transparent border-none focus:ring-0 h-14 px-5 text-base text-[#111318] dark:text-white placeholder:text-[#636c88]"
+                    className="flex-1 bg-transparent border-none focus:ring-0 h-11 px-4 text-sm text-[#111318] dark:text-white placeholder:text-[#636c88]"
                     placeholder="••••••••"
                     type={showPassword ? 'text' : 'password'}
                     value={password}

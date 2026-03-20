@@ -176,12 +176,62 @@ router.post('/add-hod', protect, authorize('admin'), async (req, res) => {
   }
 });
 
+// @route   PUT /api/admin/hod/:id/branches
+// @desc    Update HOD branch assignments (admin can add/remove branches)
+// @access  Private/Admin
+router.put('/hod/:id/branches', protect, authorize('admin'), async (req, res) => {
+  try {
+    const { branchIds = [] } = req.body;
+
+    if (!branchIds || branchIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please provide at least one branch' });
+    }
+
+    const branches = await Branch.find({ _id: { $in: branchIds } });
+    if (branches.length !== branchIds.length) {
+      return res.status(404).json({ success: false, message: 'One or more branches not found' });
+    }
+
+    const hod = await User.findOneAndUpdate(
+      { _id: req.params.id, role: 'hod' },
+      { branches: branchIds, department: branchIds[0] },
+      { new: true }
+    ).populate('branches department');
+
+    if (!hod) {
+      return res.status(404).json({ success: false, message: 'HOD not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'HOD branches updated successfully',
+      data: {
+        id: hod._id,
+        branches: hod.branches.map(b => ({ id: b._id, name: b.name })),
+        department: hod.department?.name
+      }
+    });
+  } catch (error) {
+    console.error('Update HOD branches error:', error);
+    res.status(500).json({ success: false, message: 'Error updating HOD branches' });
+  }
+});
+
 // @route   POST /api/admin/add-teacher
 // @desc    Create Teacher with temp password and assignments
 // @access  Private/Admin or HOD
 router.post('/add-teacher', protect, authorize('admin', 'hod'), async (req, res) => {
   try {
     const { name, mobile, email, branchIds = [], semesterIds = [], subjectIds = [] } = req.body;
+    const normalizedBranchIds = Array.isArray(branchIds)
+      ? Array.from(new Set(branchIds.filter(Boolean).map((id) => String(id))))
+      : [];
+    const normalizedSemesterIds = Array.isArray(semesterIds)
+      ? Array.from(new Set(semesterIds.filter(Boolean).map((id) => String(id))))
+      : [];
+    const normalizedSubjectIds = Array.isArray(subjectIds)
+      ? Array.from(new Set(subjectIds.filter(Boolean).map((id) => String(id))))
+      : [];
 
     // Validation
     if (!name || !mobile) {
@@ -208,51 +258,84 @@ router.post('/add-teacher', protect, authorize('admin', 'hod'), async (req, res)
       });
     }
 
-    // Verify at least one branch is provided
-    if (!branchIds || branchIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide at least one branch'
-      });
+    // Verify branches if provided
+    if (normalizedBranchIds.length > 0) {
+      const branches = await Branch.find({ _id: { $in: normalizedBranchIds } });
+      if (branches.length !== normalizedBranchIds.length) {
+        return res.status(404).json({
+          success: false,
+          message: 'One or more branches not found'
+        });
+      }
     }
 
-    // Verify all branches exist
-    const branches = await Branch.find({ _id: { $in: branchIds } });
-    if (branches.length !== branchIds.length) {
-      return res.status(404).json({
-        success: false,
-        message: 'One or more branches not found'
-      });
-    }
-
-    // Verify at least one semester is provided
-    if (!semesterIds || semesterIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide at least one semester'
-      });
-    }
-
-    // Verify all semesters exist
-    const semesters = await Semester.find({ _id: { $in: semesterIds } });
-    if (semesters.length !== semesterIds.length) {
-      return res.status(404).json({
-        success: false,
-        message: 'One or more semesters not found'
-      });
+    // Verify semesters if provided
+    if (normalizedSemesterIds.length > 0) {
+      const semesters = await Semester.find({ _id: { $in: normalizedSemesterIds } });
+      if (semesters.length !== normalizedSemesterIds.length) {
+        return res.status(404).json({
+          success: false,
+          message: 'One or more semesters not found'
+        });
+      }
     }
 
     // Verify subjects if provided
     let subjects = [];
-    if (subjectIds && subjectIds.length > 0) {
-      subjects = await Subject.find({ _id: { $in: subjectIds } });
-      if (subjects.length !== subjectIds.length) {
+    if (normalizedSubjectIds.length > 0) {
+      subjects = await Subject.find({ _id: { $in: normalizedSubjectIds } });
+      if (subjects.length !== normalizedSubjectIds.length) {
         return res.status(404).json({
           success: false,
           message: 'One or more subjects not found'
         });
       }
     }
+
+    if (req.user.role === 'hod') {
+      const branchScope = getHodBranchScope(req.user).map((id) => String(id));
+      if (normalizedBranchIds.some((id) => !branchScope.includes(id))) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only assign teachers within your branch scope'
+        });
+      }
+
+      const allowedSemesters = Array.isArray(req.user.semesters)
+        ? req.user.semesters.map((id) => String(id))
+        : [];
+      if (allowedSemesters.length > 0 && normalizedSemesterIds.some((id) => !allowedSemesters.includes(id))) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only assign teachers within your semester scope'
+        });
+      }
+
+      if (subjects.length > 0) {
+        const outOfScopeSubject = subjects.find((subject) => {
+          const inBranchScope = !subject.branchId || branchScope.includes(String(subject.branchId));
+          const inSemesterScope = allowedSemesters.length === 0 || !subject.semesterId || allowedSemesters.includes(String(subject.semesterId));
+          return !inBranchScope || !inSemesterScope;
+        });
+
+        if (outOfScopeSubject) {
+          return res.status(403).json({
+            success: false,
+            message: 'One or more selected subjects are outside your scope'
+          });
+        }
+      }
+    }
+
+    const derivedBranchIds = Array.from(new Set(
+      subjects.map((subject) => subject.branchId).filter(Boolean).map((id) => String(id))
+    ));
+    const derivedSemesterIds = Array.from(new Set(
+      subjects.map((subject) => subject.semesterId).filter(Boolean).map((id) => String(id))
+    ));
+
+    const finalBranchIds = Array.from(new Set([...normalizedBranchIds, ...derivedBranchIds]));
+    const finalSemesterIds = Array.from(new Set([...normalizedSemesterIds, ...derivedSemesterIds]));
 
     // Generate temp password
     const tempPassword = generateTempPassword();
@@ -263,9 +346,10 @@ router.post('/add-teacher', protect, authorize('admin', 'hod'), async (req, res)
       mobile,
       email: email || `${mobile}@college.edu`,
       role: 'teacher',
-      branches: branchIds,
-      semesters: semesterIds,
-      subjects: subjectIds,
+      branches: finalBranchIds,
+      semesters: finalSemesterIds,
+      subjects: normalizedSubjectIds,
+      assignedSubjects: normalizedSubjectIds,
       tempPassword: tempPassword,
       password: tempPassword, // Will be hashed, replaced during first login
       status: 'active',
@@ -275,15 +359,15 @@ router.post('/add-teacher', protect, authorize('admin', 'hod'), async (req, res)
     });
 
     // Update subjects with teacher assignment
-    if (subjectIds && subjectIds.length > 0) {
+    if (normalizedSubjectIds.length > 0) {
       await Subject.updateMany(
-        { _id: { $in: subjectIds } },
+        { _id: { $in: normalizedSubjectIds } },
         { teacher: teacher._id }
       );
     }
 
     // Populate relationships
-    await teacher.populate('branches semesters subjects');
+    await teacher.populate('branches semesters subjects assignedSubjects');
 
     res.status(201).json({
       success: true,
@@ -588,7 +672,7 @@ router.get('/users', protect, authorize('admin', 'hod', 'teacher', 'coordinator'
 
     // Execute query with pagination
     const users = await User.find(query)
-      .populate('branch semester assignedSubjects assignedHOD')
+      .populate('branch semester branches semesters subjects assignedSubjects assignedHOD department coordinator.branch coordinator.semesters')
       .select('-password -tempPassword -securityAnswer')
       .limit(limit * 1)
       .skip((page - 1) * limit)
@@ -620,7 +704,7 @@ router.get('/users', protect, authorize('admin', 'hod', 'teacher', 'coordinator'
 router.get('/user/:id', protect, authorize('admin'), async (req, res) => {
   try {
     const user = await User.findById(req.params.id)
-      .populate('branch semester assignedSubjects assignedHOD')
+      .populate('branch semester branches semesters subjects assignedSubjects assignedHOD department coordinator.branch coordinator.semesters')
       .select('-password -tempPassword -securityAnswer');
 
     if (!user) {
@@ -639,6 +723,48 @@ router.get('/user/:id', protect, authorize('admin'), async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error in fetching user'
+    });
+  }
+});
+
+// @route   GET /api/admin/users/:id/temp-password
+// @desc    Get temporary password for users who have not completed first login
+// @access  Private/Admin
+router.get('/users/:id/temp-password', protect, authorize('admin'), async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .select('+tempPassword passwordChangeRequired name mobile role');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (!user.passwordChangeRequired || !user.tempPassword) {
+      return res.status(404).json({
+        success: false,
+        message: 'Temporary password is not available (first login may already be completed).'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: user._id,
+        name: user.name,
+        mobile: user.mobile,
+        role: user.role,
+        tempPassword: user.tempPassword,
+        passwordChangeRequired: user.passwordChangeRequired
+      }
+    });
+  } catch (error) {
+    console.error('Get temporary password error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching temporary password'
     });
   }
 });

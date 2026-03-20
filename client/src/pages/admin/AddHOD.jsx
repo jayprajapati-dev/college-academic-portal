@@ -17,6 +17,7 @@ const AddHOD = () => {
 
   const [formData, setFormData] = useState({
     name: '',
+    email: '',
     mobile: '',
     selectedBranches: [],
     selectedSemesters: [],
@@ -29,7 +30,7 @@ const AddHOD = () => {
   // Only Admin can add HOD
   useEffect(() => {
     if (currentUser.role !== 'admin') {
-      navigate('/dashboard');
+      navigate('/admin/dashboard');
     }
   }, [currentUser.role, navigate]);
 
@@ -203,11 +204,7 @@ const AddHOD = () => {
   };
 
   return (
-    <AdminLayout title="Add HOD" onLogout={() => {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      navigate('/login');
-    }}>
+    <AdminLayout title="Add HOD" userName={currentUser.name || 'Admin'}>
       <>
         {showPasswordModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

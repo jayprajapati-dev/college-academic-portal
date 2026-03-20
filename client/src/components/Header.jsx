@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+const isFallbackEmail = (email) => /^[0-9]{10}@college\.edu$/i.test(String(email || '').trim());
+
 const Header = () => {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -65,17 +67,23 @@ const Header = () => {
   };
 
   const dashboardPath = getDashboardPath(currentUser);
+  const visibleCurrentUserEmail = (() => {
+    const rawEmail = String(currentUser?.email || '').trim();
+    if (!rawEmail) return '—';
+    if (currentUser?.role !== 'student' && isFallbackEmail(rawEmail)) return '—';
+    return rawEmail;
+  })();
 
   return (
     <header className="fixed top-0 w-full z-50 glass-header">
-      <div className="max-w-[1280px] mx-auto px-6 h-20 flex items-center justify-between">
+      <div className="max-w-[1320px] mx-auto px-3 sm:px-5 lg:px-6 h-12 sm:h-14 flex items-center justify-between">
         <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <div className="p-1.5 bg-primary rounded-lg text-white">
-            <svg className="size-6" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <div className="p-1.5 bg-[linear-gradient(135deg,#194ce6_0%,#0ea5e9_100%)] rounded-lg text-white shadow-[0_10px_24px_rgba(25,76,230,0.3)]">
+            <svg className="size-4 sm:size-5" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
               <path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path>
             </svg>
           </div>
-          <h1 className="text-xl font-extrabold tracking-tight">SmartAcademics</h1>
+          <h1 className="text-sm sm:text-base font-extrabold tracking-tight">SmartAcademics</h1>
         </a>
 
         <nav className="hidden md:flex items-center gap-8">
@@ -173,7 +181,7 @@ const Header = () => {
                   <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50">
                     <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                       <p className="font-bold text-sm">{currentUser?.name}</p>
-                      <p className="text-xs text-gray-500">{currentUser?.email}</p>
+                      <p className="text-xs text-gray-500">{visibleCurrentUserEmail}</p>
                       {userProfile && (
                         <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
                           {currentUser?.role === 'student' && (
@@ -228,13 +236,13 @@ const Header = () => {
           ) : (
             <>
               <a
-                className="px-5 py-2 text-sm font-bold bg-[#f0f1f4] dark:bg-white/10 rounded-lg hover:bg-gray-200 transition-all"
+                className="px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold bg-[#f0f1f4] dark:bg-white/10 rounded-xl hover:bg-gray-200 transition-all"
                 href="/login"
               >
                 Login
               </a>
               <a
-                className="px-5 py-2 text-sm font-bold bg-primary text-white rounded-lg shadow-lg shadow-primary/20 hover:scale-105 transition-all"
+                className="px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold bg-[linear-gradient(135deg,#194ce6_0%,#0ea5e9_100%)] text-white rounded-xl shadow-[0_12px_28px_rgba(25,76,230,0.3)] hover:brightness-110 transition-all"
                 href="/register"
               >
                 Register

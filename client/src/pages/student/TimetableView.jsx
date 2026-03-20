@@ -25,40 +25,64 @@ const StudentTimetableView = () => {
   ), []);
 
   useEffect(() => {
-    // Get user info
-    const userData = JSON.parse(localStorage.getItem('user') || '{}');
-    setUser(userData);
+    const localUserData = JSON.parse(localStorage.getItem('user') || '{}');
+    setUser(localUserData);
 
-    // Fetch timetable
+    // Fetch timetable strictly for authenticated student scope.
     const fetchTimetable = async () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        
-        const semesterId = userData?.semester?._id || userData?.semesterId || userData?.semester;
 
-        if (!semesterId) {
-          console.error('Semester not found in user data');
+        if (!token) {
+          window.location.href = '/login';
           setLoading(false);
           return;
         }
 
-        const res = await axios.get(`/api/timetable/semester/${semesterId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const [profileRes, subjectsRes, timetableRes] = await Promise.all([
+          axios.get('/api/profile/me', { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get('/api/academic/subjects/student', { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get('/api/timetable/my-schedule', { headers: { Authorization: `Bearer ${token}` } })
+        ]);
 
-        if (res.data.success) {
-          setTimetable(res.data.data);
-          
+        if (profileRes?.data?.success && profileRes?.data?.data) {
+          setUser(profileRes.data.data);
+        }
+
+        if (timetableRes?.data?.success) {
+          const studentSubjects = Array.isArray(subjectsRes?.data?.data) ? subjectsRes.data.data : [];
+          const allowedSubjectIds = new Set(
+            studentSubjects.map((subject) => String(subject?._id)).filter(Boolean)
+          );
+
+          const scopedTimetable = (Array.isArray(timetableRes.data.data) ? timetableRes.data.data : [])
+            .filter((slot) => {
+              if (allowedSubjectIds.size === 0) return false;
+              const subjectId = String(slot?.subjectId?._id || slot?.subjectId || '');
+              return allowedSubjectIds.has(subjectId);
+            });
+
+          setTimetable(scopedTimetable);
+
           // Auto-set today's day if available
           const today = new Date();
           const dayName = days[today.getDay() === 0 ? 6 : today.getDay() - 1];
-          if (res.data.data.some(t => t.dayOfWeek === dayName)) {
+          if (scopedTimetable.some((t) => t.dayOfWeek === dayName)) {
             setSelectedDay(dayName);
+          } else {
+            const firstActiveDay = days.find((day) => scopedTimetable.some((t) => t.dayOfWeek === day));
+            setSelectedDay(firstActiveDay || days[0]);
           }
         }
       } catch (error) {
         console.error('Error fetching timetable:', error);
+        if (error?.response?.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+          return;
+        }
       } finally {
         setLoading(false);
       }

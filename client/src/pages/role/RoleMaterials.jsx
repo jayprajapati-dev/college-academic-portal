@@ -39,6 +39,7 @@ const RoleMaterials = () => {
   };
 
   const isAdmin = role === 'admin';
+  const isHod = role === 'hod';
 
   const loadSubjects = useCallback(async (userId) => {
     try {
@@ -48,6 +49,10 @@ const RoleMaterials = () => {
       let res;
       if (isAdmin) {
         res = await fetch('/api/academic/subjects', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else if (isHod) {
+        res = await fetch('/api/academic/subjects/hod', {
           headers: { Authorization: `Bearer ${token}` }
         });
       } else {
@@ -74,7 +79,7 @@ const RoleMaterials = () => {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin, preferredSubjectId]);
+  }, [isAdmin, isHod, preferredSubjectId]);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -126,7 +131,7 @@ const RoleMaterials = () => {
         const dataSyllabus = await resSyllabus.json();
 
         if (dataMaterials?.success) {
-          if (isAdmin) {
+          if (isAdmin || isHod) {
             const materialsList = dataMaterials.materials || [];
             setMaterials(materialsList);
             setCategories(Array.from(new Set(materialsList.map((m) => m.category).filter(Boolean))));
@@ -153,7 +158,7 @@ const RoleMaterials = () => {
     };
 
     loadData();
-  }, [selectedSubject, isAdmin, user]);
+  }, [selectedSubject, isAdmin, isHod, user]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -201,7 +206,7 @@ const RoleMaterials = () => {
         });
         const dataMaterials = await resMaterials.json();
         if (dataMaterials?.success) {
-          if (isAdmin) {
+          if (isAdmin || isHod) {
             setMaterials(dataMaterials.materials || []);
           } else {
             const userId = user?._id || user?.id;

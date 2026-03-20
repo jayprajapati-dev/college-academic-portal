@@ -35,23 +35,24 @@ const LandingFrame = ({ children, isLoggedIn, currentUser, userProfile, notifica
   return (
     <div className="font-display bg-background-light dark:bg-background-dark text-[#111318] dark:text-white transition-colors duration-300">
       <header className="fixed top-0 w-full z-50 glass-header">
-        <div className="max-w-[1280px] mx-auto px-6 h-20 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <div className="p-1.5 bg-primary rounded-lg text-white">
-              <svg className="size-6" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <div className="max-w-[1280px] mx-auto px-3 sm:px-4 h-12 sm:h-14 flex items-center justify-between gap-2">
+          <a href="/" className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity">
+            <div className="p-1 sm:p-1.5 bg-primary rounded-lg text-white shrink-0">
+              <svg className="size-4 sm:size-5" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                 <path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path>
               </svg>
             </div>
-            <h1 className="text-xl font-extrabold tracking-tight">SmartAcademics</h1>
+            <h1 className="text-sm sm:text-base font-extrabold tracking-tight truncate">SmartAcademics</h1>
           </a>
           <nav className="hidden md:flex items-center gap-8">
             {isLoggedIn && (
               <a className="text-sm font-semibold hover:text-primary transition-colors" href={getDashboardPath(currentUser)}>Dashboard</a>
             )}
+            <a className="text-sm font-semibold hover:text-primary transition-colors" href="/academic-explorer">Academic Explorer</a>
             <a className="text-sm font-semibold hover:text-primary transition-colors" href="/about">About Us</a>
             <a className="text-sm font-semibold hover:text-primary transition-colors" href="/contact">Contact Us</a>
           </nav>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {isLoggedIn ? (
               <>
                 {currentUser?.role === 'student' && (
@@ -62,9 +63,9 @@ const LandingFrame = ({ children, isLoggedIn, currentUser, userProfile, notifica
                           setShowNotifications(!showNotifications);
                           setShowProfileDropdown(false);
                         }}
-                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-all relative"
+                        className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-all relative"
                       >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                         </svg>
                         {notifications?.length > 0 && (
@@ -119,9 +120,9 @@ const LandingFrame = ({ children, isLoggedIn, currentUser, userProfile, notifica
                           setShowProfileDropdown(!showProfileDropdown);
                           setShowNotifications(false);
                         }}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-all"
+                        className="flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-all"
                       >
-                        <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-xs sm:text-sm">
                           {currentUser?.name?.charAt(0).toUpperCase()}
                         </div>
                         <span className="hidden md:inline text-sm font-semibold">{currentUser?.name}</span>
@@ -175,13 +176,13 @@ const LandingFrame = ({ children, isLoggedIn, currentUser, userProfile, notifica
                   <>
                     <button
                       onClick={() => navigate(getProfilePath(currentUser))}
-                      className="px-4 py-2 text-sm font-bold bg-[#f0f1f4] dark:bg-white/10 rounded-lg hover:bg-gray-200 transition-all"
+                      className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold bg-[#f0f1f4] dark:bg-white/10 rounded-lg hover:bg-gray-200 transition-all"
                     >
                       Profile
                     </button>
                     <button
                       onClick={handleLogout}
-                      className="px-5 py-2 text-sm font-bold bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
+                      className="px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
                     >
                       Logout
                     </button>
@@ -191,13 +192,13 @@ const LandingFrame = ({ children, isLoggedIn, currentUser, userProfile, notifica
             ) : (
               <>
                 <a
-                  className="px-5 py-2 text-sm font-bold bg-[#f0f1f4] dark:bg-white/10 rounded-lg hover:bg-gray-200 transition-all"
+                  className="px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold bg-[#f0f1f4] dark:bg-white/10 rounded-lg hover:bg-gray-200 transition-all"
                   href="/login"
                 >
                   Login
                 </a>
                 <a
-                  className="px-5 py-2 text-sm font-bold bg-primary text-white rounded-lg shadow-lg shadow-primary/20 hover:scale-105 transition-all"
+                  className="px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold bg-primary text-white rounded-lg shadow-lg shadow-primary/20 hover:scale-105 transition-all"
                   href="/register"
                 >
                   Register
@@ -208,22 +209,31 @@ const LandingFrame = ({ children, isLoggedIn, currentUser, userProfile, notifica
         </div>
       </header>
 
-      <main className="pt-20 mesh-background min-h-screen">
+      <main className="pt-12 sm:pt-14 mesh-background min-h-screen">
+        <div className="md:hidden max-w-[1280px] mx-auto px-3 sm:px-4 pt-2.5">
+          <a
+            href="/academic-explorer"
+            className="inline-flex items-center justify-center gap-2 w-full rounded-xl bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 px-4 py-2 text-xs font-bold hover:border-primary/40 transition-colors"
+          >
+            <span className="material-symbols-outlined" style={{fontSize:'16px'}}>travel_explore</span>
+            Academic Explorer
+          </a>
+        </div>
         {children}
       </main>
 
-      <footer className="bg-white dark:bg-slate-900 border-t border-[#dcdee5] dark:border-[#2d3244] py-12">
-        <div className="max-w-[1200px] mx-auto px-6 lg:px-10">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-8">
+      <footer className="bg-white dark:bg-slate-900 border-t border-[#dcdee5] dark:border-[#2d3244] py-6">
+        <div className="max-w-[1200px] mx-auto px-4">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
               <div className="p-1 bg-primary rounded text-white">
-                <svg className="size-5" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <svg className="size-4" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                   <path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path>
                 </svg>
               </div>
-              <h2 className="text-lg font-bold tracking-tight">SmartAcademics</h2>
+              <h2 className="text-sm font-bold tracking-tight">SmartAcademics</h2>
             </a>
-            <div className="flex gap-8 text-sm text-[#636c88] dark:text-slate-400 font-medium">
+            <div className="flex gap-4 text-xs text-[#636c88] dark:text-slate-400 font-medium">
               <a className="hover:text-primary transition-colors" href="/privacy">Privacy Policy</a>
               <a className="hover:text-primary transition-colors" href="/terms">Terms of Service</a>
               <a className="hover:text-primary transition-colors" href="/disclaimer">Disclaimer</a>
@@ -258,7 +268,7 @@ const LandingFrame = ({ children, isLoggedIn, currentUser, userProfile, notifica
               </button>
             </div>
           </div>
-          <div className="mt-8 pt-8 border-t border-[#f0f1f4] dark:border-[#2d3244] text-center text-xs text-[#636c88] dark:text-slate-500">
+          <div className="mt-4 pt-4 border-t border-[#f0f1f4] dark:border-[#2d3244] text-center text-[10px] text-[#636c88] dark:text-slate-500">
             © 2026 SmartAcademics. All rights reserved.
           </div>
         </div>

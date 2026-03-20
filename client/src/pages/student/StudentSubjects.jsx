@@ -174,7 +174,9 @@ const StudentSubjects = () => {
 
                   <div className="flex flex-wrap gap-2">
                   <Button
-                    onClick={() => navigate(`/subjects/${subject._id}/materials`, { state: { subject } })}
+                    onClick={() => navigate(`/subjects/${subject._id}/materials?source=student-panel`, {
+                      state: { subject, source: 'student-panel' }
+                    })}
                     className="bg-[#194ce6] hover:bg-[#1e40af] text-sm flex-1 min-w-[108px]"
                   >
                     <span className="material-symbols-outlined text-[16px]">description</span>

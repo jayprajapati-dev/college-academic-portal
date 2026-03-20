@@ -201,19 +201,31 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { identifier, password } = req.body; // identifier can be email, mobile, or enrollment number
+    const normalizedIdentifier = String(identifier || '').trim();
+    const normalizedEmailIdentifier = normalizedIdentifier.toLowerCase();
+    const normalizedMobileIdentifier = normalizedIdentifier.replace(/\D/g, '').slice(0, 10);
 
     // Validation
-    if (!identifier || !password) {
+    if (!normalizedIdentifier || !password) {
       return res.status(400).json({
         success: false,
         message: 'Please provide email/mobile/enrollment and password'
       });
     }
 
-    // Find user by email or mobile
+    const loginOrFilters = [
+      { email: normalizedEmailIdentifier },
+      { enrollmentNumber: normalizedIdentifier }
+    ];
+
+    if (/^[0-9]{10}$/.test(normalizedMobileIdentifier)) {
+      loginOrFilters.push({ mobile: normalizedMobileIdentifier });
+    }
+
+    // Find user by email, mobile, or enrollment number
     const user = await User.findOne({
-      $or: [{ email: identifier }, { mobile: identifier }, { enrollmentNumber: identifier }]
-    }).select('+password +tempPassword');
+      $or: loginOrFilters
+    }).select('+password +tempPassword').populate('branch', '_id name code').populate('branches', '_id name code');
 
     if (!user) {
       return res.status(401).json({
@@ -285,6 +297,7 @@ router.post('/login', async (req, res) => {
           user.role === 'student' && (!user.branch || !user.semester || user.profileUpdateRequired === true),
         branch: user.branch,
         semester: user.semester,
+        branches: user.branches || [],
         assignedSubjects: user.assignedSubjects || [],
         coordinator: user.coordinator || null
       }

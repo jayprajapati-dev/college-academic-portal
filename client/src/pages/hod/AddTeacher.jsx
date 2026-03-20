@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { HodLayout } from '../../components';
+import { RoleLayout } from '../../components';
+import useRoleNav from '../../hooks/useRoleNav';
 
 const AddTeacher = () => {
   const navigate = useNavigate();
@@ -25,6 +26,7 @@ const AddTeacher = () => {
 
   const token = localStorage.getItem('token');
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const { navItems, loading: navLoading } = useRoleNav(currentUser.role || 'hod');
 
   const handleAuthError = useCallback((error) => {
     if (error.response?.status === 401) {
@@ -68,41 +70,47 @@ const AddTeacher = () => {
     fetchBranches();
   }, [fetchSemesters, fetchBranches]);
 
-  const fetchSubjects = useCallback(async () => {
-    if (formData.selectedBranches.length === 0 || formData.selectedSemesters.length === 0) {
+  const fetchSubjects = useCallback(async (branchIds, semesterIds) => {
+    if (branchIds.length === 0 || semesterIds.length === 0) {
       setSubjects([]);
+      setFormData((prev) => ({ ...prev, selectedSubjects: [] }));
       return;
     }
 
     try {
-      const response = await axios.get('/api/academic/subjects/admin/list?page=1&limit=100', {
+      const params = new URLSearchParams({ page: '1', limit: '200' });
+      branchIds.forEach((id) => params.append('branchId', id));
+      semesterIds.forEach((id) => params.append('semesterId', id));
+
+      const response = await axios.get(`/api/academic/subjects/admin/list?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      const allSubjects = response.data.subjects || [];
-      const filtered = allSubjects.filter(subject =>
-        formData.selectedBranches.includes(subject.branch) &&
-        formData.selectedSemesters.includes(subject.semester)
-      );
-      setSubjects(filtered);
+
+      const subjectList = response.data?.subjects || [];
+      setSubjects(subjectList);
+      const allowedIds = new Set(subjectList.map((subject) => String(subject._id)));
+      setFormData((prev) => ({
+        ...prev,
+        selectedSubjects: prev.selectedSubjects.filter((id) => allowedIds.has(String(id)))
+      }));
     } catch (error) {
       if (!handleAuthError(error)) {
         console.error('Error fetching subjects:', error);
       }
+      setSubjects([]);
     }
-  }, [formData.selectedBranches, formData.selectedSemesters, token, handleAuthError]);
+  }, [token, handleAuthError]);
 
   useEffect(() => {
-    fetchSubjects();
-  }, [fetchSubjects]);
+    fetchSubjects(formData.selectedBranches, formData.selectedSemesters);
+  }, [fetchSubjects, formData.selectedBranches, formData.selectedSemesters]);
 
   const handleBranchChange = (branchId) => {
     setFormData(prev => ({
       ...prev,
       selectedBranches: prev.selectedBranches.includes(branchId)
         ? prev.selectedBranches.filter(id => id !== branchId)
-        : [...prev.selectedBranches, branchId],
-      selectedSubjects: []
+        : [...prev.selectedBranches, branchId]
     }));
   };
 
@@ -111,17 +119,7 @@ const AddTeacher = () => {
       ...prev,
       selectedSemesters: prev.selectedSemesters.includes(semesterId)
         ? prev.selectedSemesters.filter(id => id !== semesterId)
-        : [...prev.selectedSemesters, semesterId],
-      selectedSubjects: []
-    }));
-  };
-
-  const handleSubjectChange = (subjectId) => {
-    setFormData(prev => ({
-      ...prev,
-      selectedSubjects: prev.selectedSubjects.includes(subjectId)
-        ? prev.selectedSubjects.filter(id => id !== subjectId)
-        : [...prev.selectedSubjects, subjectId]
+        : [...prev.selectedSemesters, semesterId]
     }));
   };
 
@@ -147,15 +145,6 @@ const AddTeacher = () => {
       setError('Valid 10-digit mobile number is required');
       return;
     }
-    if (formData.selectedBranches.length === 0) {
-      setError('Please select at least one branch');
-      return;
-    }
-    if (formData.selectedSemesters.length === 0) {
-      setError('Please select at least one semester');
-      return;
-    }
-
     setLoading(true);
     try {
       const payload = {
@@ -185,6 +174,7 @@ const AddTeacher = () => {
           selectedSemesters: [],
           selectedSubjects: []
         });
+        setSubjects([]);
       } else {
         setSuccess('Teacher created successfully!');
         setTimeout(() => {
@@ -213,11 +203,12 @@ const AddTeacher = () => {
   };
 
   return (
-    <HodLayout title="Add Teacher" userName={currentUser?.name || 'HOD'} onLogout={() => {
+    <RoleLayout title="Add Teacher" userName={currentUser?.name || 'HOD'} onLogout={() => {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       navigate('/login');
-    }}>
+    }} navItems={navItems} navLoading={navLoading} panelLabel="Add Teacher"
+      profileLinks={[{ label: 'Profile', to: `/${currentUser.role || 'hod'}/profile` }]}>
       <>
         {/* Password Modal */}
         {showPasswordModal && (
@@ -375,7 +366,7 @@ const AddTeacher = () => {
 
           {/* Branches */}
           <div className="mb-6">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Select Branches *</label>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Select Branches (Optional)</label>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg max-h-48 overflow-y-auto">
               {branches.map(branch => (
                 <label key={branch._id} className="flex items-center gap-3 cursor-pointer">
@@ -393,7 +384,7 @@ const AddTeacher = () => {
 
           {/* Semesters */}
           <div className="mb-6">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Select Semesters *</label>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Select Semesters (Optional)</label>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg max-h-48 overflow-y-auto">
               {semesters.map(semester => (
                 <label key={semester._id} className="flex items-center gap-3 cursor-pointer">
@@ -409,23 +400,33 @@ const AddTeacher = () => {
             </div>
           </div>
 
-          {/* Subjects */}
-          {subjects.length > 0 && (
+          {formData.selectedBranches.length > 0 && formData.selectedSemesters.length > 0 && (
             <div className="mb-6">
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Select Subjects</label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg max-h-48 overflow-y-auto">
-                {subjects.map(subject => (
-                  <label key={subject._id} className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.selectedSubjects.includes(subject._id)}
-                      onChange={() => handleSubjectChange(subject._id)}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-2"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">{subject.name}</span>
-                  </label>
-                ))}
-              </div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Select Subjects (Optional)</label>
+              {subjects.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400">No subjects found for selected branches and semesters.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg max-h-48 overflow-y-auto">
+                  {subjects.map(subject => (
+                    <label key={subject._id} className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.selectedSubjects.includes(subject._id)}
+                        onChange={() => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            selectedSubjects: prev.selectedSubjects.includes(subject._id)
+                              ? prev.selectedSubjects.filter((id) => id !== subject._id)
+                              : [...prev.selectedSubjects, subject._id]
+                          }));
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-2"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{subject.name} ({subject.code})</span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -467,7 +468,7 @@ const AddTeacher = () => {
         </form>
         </div>
       </>
-    </HodLayout>
+    </RoleLayout>
   );
 };
 

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AdminLayout from '../../components/AdminLayout';
 import Card from '../../components/Card';
@@ -7,7 +6,6 @@ import { StatsCard } from '../../components/Card';
 import Button from '../../components/Button';
 
 const ContactManagement = () => {
-  const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [stats, setStats] = useState({ total: 0, pending: 0, replied: 0 });
   const [loading, setLoading] = useState(true);
@@ -18,11 +16,7 @@ const ContactManagement = () => {
   const editorRef = useRef(null);
   const savedSelectionRef = useRef(null);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login');
-  };
+  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
 
   const fetchStats = async () => {
     try {
@@ -151,7 +145,7 @@ const ContactManagement = () => {
   const isReadOnlyReply = selectedMessage?.status === 'replied' && !!selectedMessage?.reply?.message;
 
   return (
-    <AdminLayout title="Contact Requests" onLogout={handleLogout}>
+    <AdminLayout title="Contact Requests" userName={storedUser.name || 'Admin'}>
       <div className="space-y-4 sm:space-y-5">
         <div className="rounded-2xl border border-indigo-100 dark:border-indigo-900/50 bg-gradient-to-r from-indigo-50 via-blue-50 to-cyan-50 dark:from-gray-800 dark:via-gray-800 dark:to-gray-700 p-4 sm:p-5">
           <div className="flex items-start justify-between gap-3">

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
 const StudentLayout = ({ title, children, userName = 'Student', onLogout = null }) => {
@@ -11,6 +11,15 @@ const StudentLayout = ({ title, children, userName = 'Student', onLogout = null 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [studentProfile, setStudentProfile] = useState(null);
+  const authRedirectedRef = useRef(false);
+
+  const handleUnauthorized = useCallback(() => {
+    if (authRedirectedRef.current) return;
+    authRedirectedRef.current = true;
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login', { replace: true });
+  }, [navigate]);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -19,7 +28,10 @@ const StudentLayout = ({ title, children, userName = 'Student', onLogout = null 
       try {
         setNotificationLoading(true);
         const token = localStorage.getItem('token');
-        if (!token) return;
+        if (!token) {
+          handleUnauthorized();
+          return;
+        }
 
         const [notifRes, profileRes] = await Promise.all([
           fetch('/api/notifications', {
@@ -29,6 +41,15 @@ const StudentLayout = ({ title, children, userName = 'Student', onLogout = null 
             headers: { Authorization: `Bearer ${token}` }
           })
         ]);
+
+        if (notifRes.status === 401 || profileRes.status === 401) {
+          handleUnauthorized();
+          return;
+        }
+
+        if (!notifRes.ok || !profileRes.ok) {
+          return;
+        }
 
         const data = await notifRes.json();
         const profileData = await profileRes.json();
@@ -54,7 +75,7 @@ const StudentLayout = ({ title, children, userName = 'Student', onLogout = null 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [handleUnauthorized]);
 
   const navItems = useMemo(() => ([
     { label: 'Dashboard', to: '/student/dashboard', icon: 'space_dashboard' },
@@ -123,7 +144,7 @@ const StudentLayout = ({ title, children, userName = 'Student', onLogout = null 
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FB] text-[#111318]">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(25,76,230,0.06),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.05),transparent_30%),#f4f7fb] text-[#111318]">
       {isMobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/30 md:hidden"
@@ -132,11 +153,11 @@ const StudentLayout = ({ title, children, userName = 'Student', onLogout = null 
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-[#E6E9EF] transform transition-transform duration-200 md:translate-x-0 flex flex-col ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white/95 border-r border-[#E6E9EF] shadow-[0_16px_40px_rgba(15,23,42,0.08)] transform transition-transform duration-200 md:translate-x-0 flex flex-col ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="h-16 flex items-center px-6 border-b border-[#E6E9EF]">
+        <div className="h-16 flex items-center px-5 border-b border-[#E6E9EF] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)]">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#111318] text-white flex items-center justify-center">
               <span className="material-symbols-outlined text-lg">school</span>
@@ -198,8 +219,8 @@ const StudentLayout = ({ title, children, userName = 'Student', onLogout = null 
         </div>
       </aside>
 
-      <header className="fixed top-0 left-0 right-0 z-30 h-16 bg-white border-b border-[#E6E9EF] md:pl-64">
-        <div className="h-full flex items-center justify-between px-4 sm:px-6">
+      <header className="fixed top-0 left-0 right-0 z-30 h-16 glass-header md:pl-64">
+        <div className="h-full flex items-center justify-between px-3 sm:px-5 lg:px-6">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <button
               className="md:hidden w-10 h-10 rounded-xl border border-[#E6E9EF] flex items-center justify-center"
@@ -328,8 +349,16 @@ const StudentLayout = ({ title, children, userName = 'Student', onLogout = null 
       </header>
 
       <main className="pt-16 md:pl-64">
-        <div className="px-4 sm:px-6 lg:px-8 py-6">
+        <div className="px-3 sm:px-5 lg:px-8 py-4 sm:py-6">
+          <div className="max-w-[1400px] mx-auto space-y-4 sm:space-y-5">
+            {title && (
+              <div className="premium-page-shell px-4 py-3 sm:px-5 sm:py-4">
+                <h1 className="text-base sm:text-xl font-black tracking-tight text-[#111318]">{title}</h1>
+                <p className="text-xs sm:text-sm text-[#6B7280] mt-1">Student Panel</p>
+              </div>
+            )}
           {children}
+          </div>
         </div>
       </main>
     </div>

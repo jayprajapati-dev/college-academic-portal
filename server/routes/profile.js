@@ -12,7 +12,7 @@ const { protect } = require('../middleware/auth');
 router.get('/me', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
-      .populate('branch semester assignedSubjects assignedHOD coordinator.branch coordinator.semesters')
+      .populate('branch branches department semester semesters subjects assignedSubjects assignedHOD coordinator.branch coordinator.semesters')
       .select('-password -tempPassword -securityAnswer');
 
     res.status(200).json({
@@ -46,7 +46,33 @@ router.put('/me', protect, async (req, res) => {
 
     // Update only editable fields
     if (name) user.name = name;
-    if (email && user.role === 'student') user.email = email; // Students can update email
+
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (normalizedEmail) {
+      // Support emails with letters, numbers, dots, hyphens, underscores
+      const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!emailRegex.test(normalizedEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid email address (e.g., user@example.com)'
+        });
+      }
+
+      const emailTakenByOther = await User.findOne({
+        email: normalizedEmail,
+        _id: { $ne: user._id }
+      }).select('_id');
+
+      if (emailTakenByOther) {
+        return res.status(400).json({
+          success: false,
+          message: 'This email is already in use by another account'
+        });
+      }
+
+      user.email = normalizedEmail;
+    }
+
     if (phone) user.phone = phone;
     if (dateOfBirth) user.dateOfBirth = dateOfBirth;
     if (gender) user.gender = gender;
@@ -98,7 +124,7 @@ router.put('/me', protect, async (req, res) => {
 
     // Get updated user with populated fields
     const updatedUser = await User.findById(user._id)
-      .populate('branch semester assignedSubjects assignedHOD coordinator.branch coordinator.semesters')
+      .populate('branch branches department semester semesters subjects assignedSubjects assignedHOD coordinator.branch coordinator.semesters')
       .select('-password -tempPassword -securityAnswer');
 
     res.status(200).json({
@@ -123,7 +149,7 @@ router.put('/complete-profile', protect, async (req, res) => {
     const { name, email, mobile, branch, semester } = req.body;
 
     const user = await User.findById(req.user._id)
-      .populate('branch semester assignedSubjects assignedHOD coordinator.branch coordinator.semesters');
+      .populate('branch branches department semester semesters subjects assignedSubjects assignedHOD coordinator.branch coordinator.semesters');
 
     if (!user) {
       return res.status(404).json({
@@ -135,19 +161,43 @@ router.put('/complete-profile', protect, async (req, res) => {
     // Update name if provided
     if (name) user.name = name;
 
-    if (user.role === 'student') {
-      if (email) user.email = String(email).trim().toLowerCase();
-
-      if (mobile) {
-        if (!/^[0-9]{10}$/.test(String(mobile))) {
-          return res.status(400).json({
-            success: false,
-            message: 'Please provide a valid 10-digit mobile number'
-          });
-        }
-        user.mobile = String(mobile);
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (normalizedEmail) {
+      const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!emailRegex.test(normalizedEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid email address (e.g., user@example.com)'
+        });
       }
 
+      const emailTakenByOther = await User.findOne({
+        email: normalizedEmail,
+        _id: { $ne: user._id }
+      }).select('_id');
+
+      if (emailTakenByOther) {
+        return res.status(400).json({
+          success: false,
+          message: 'This email is already in use by another account'
+        });
+      }
+
+      user.email = normalizedEmail;
+    }
+
+    if (mobile) {
+      const normalizedMobile = String(mobile).replace(/\D/g, '').slice(0, 10);
+      if (!/^[0-9]{10}$/.test(normalizedMobile)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid 10-digit mobile number'
+        });
+      }
+      user.mobile = normalizedMobile;
+    }
+
+    if (user.role === 'student') {
       if (!branch || !semester) {
         return res.status(400).json({
           success: false,

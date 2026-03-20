@@ -5,6 +5,7 @@ const ROLE_DEFAULTS = {
     'semesters',
     'branches',
     'subjects',
+    'rooms',
     'projects',
     'library',
     'timetable',
@@ -26,6 +27,7 @@ const ROLE_DEFAULTS = {
     'exams',
     'reports',
     'timetable',
+    'rooms',
     'users'
   ],
   teacher: [
@@ -44,6 +46,7 @@ const ROLE_DEFAULTS = {
     'tasks',
     'projects',
     'notices',
+    'exams',
     'profile',
     'users',
     'activity'
