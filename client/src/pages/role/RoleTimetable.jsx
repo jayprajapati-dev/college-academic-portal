@@ -27,8 +27,8 @@ const RoleTimetable = () => {
     roomId: '',
     division: 'General',
     dayOfWeek: 'Monday',
-    slot: '1',
-    slotSpan: '1',
+    startTime: '10:30',
+    endTime: '11:30',
     lectureType: 'Theory',
     ...overrides
   }), []);
@@ -47,8 +47,8 @@ const RoleTimetable = () => {
     roomId: '',
     division: 'General',
     dayOfWeek: 'Monday',
-    slot: '1',
-    slotSpan: '1',
+    startTime: '10:30',
+    endTime: '11:30',
     lectureType: 'Theory',
     notes: ''
   });
@@ -65,24 +65,25 @@ const RoleTimetable = () => {
     roomId: '',
     division: 'General',
     dayOfWeek: 'Monday',
-    slot: '1',
-    slotSpan: '1',
+    startTime: '10:30',
+    endTime: '11:30',
     lectureType: 'Theory',
     reason: ''
   });
   const [settingsData, setSettingsData] = useState({
-    dayStartTime: '08:00',
-    dayEndTime: '16:00',
+    dayStartTime: '10:30',
+    dayEndTime: '18:00',
     slotMinutes: 60,
     maxSlot: 8,
-    breakSlots: [4]
+    breakSlots: [],
+    breakWindows: [],
+    teacherMaxHoursPerDay: 6
   });
   const [settingsForm, setSettingsForm] = useState({
-    dayStartTime: '08:00',
-    dayEndTime: '16:00',
-    slotMinutes: '60',
-    maxSlot: '8',
-    breakSlotsText: '4'
+    dayStartTime: '10:30',
+    dayEndTime: '18:00',
+    teacherMaxHoursPerDay: '6',
+    breakWindows: []
   });
 
   const [filters, setFilters] = useState({
@@ -121,33 +122,43 @@ const RoleTimetable = () => {
     const minute = total % 60;
     return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
   }, []);
+  const minutesToDisplayTime = useCallback((value) => {
+    const total = Number(value);
+    if (!Number.isFinite(total) || total < 0) return '12:00 AM';
+    const hour24 = Math.floor(total / 60) % 24;
+    const minute = total % 60;
+    const suffix = hour24 >= 12 ? 'PM' : 'AM';
+    const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+    return `${String(hour12)}:${String(minute).padStart(2, '0')} ${suffix}`;
+  }, []);
+
+  const breaksOverlap = useCallback((startA, endA, startB, endB) => startA < endB && endA > startB, []);
 
   const SLOT_OPTIONS = useMemo(() => {
-    const startMinutes = toMinutes(settingsData.dayStartTime) ?? (8 * 60);
+    const startMinutes = toMinutes(settingsData.dayStartTime) ?? (10 * 60 + 30);
     const slotMinutes = Number(settingsData.slotMinutes) || 60;
     const maxSlot = Number(settingsData.maxSlot) || 8;
-    const breakSet = new Set((settingsData.breakSlots || []).map((item) => Number(item)));
+    const breakWindows = Array.isArray(settingsData.breakWindows) ? settingsData.breakWindows : [];
     const list = [];
 
     for (let slot = 1; slot <= maxSlot; slot += 1) {
       const start = startMinutes + ((slot - 1) * slotMinutes);
       const end = start + slotMinutes;
+      const isBreak = breakWindows.some((window) => {
+        const breakStart = toMinutes(window?.startTime);
+        const breakEnd = toMinutes(window?.endTime);
+        if (breakStart === null || breakEnd === null || breakEnd <= breakStart) return false;
+        return breaksOverlap(start, end, breakStart, breakEnd);
+      });
       list.push({
         value: slot,
-        isBreak: breakSet.has(slot),
-        label: `Slot ${slot} (${minutesToHHMM(start)} - ${minutesToHHMM(end)})${breakSet.has(slot) ? ' [Break]' : ''}`
+        isBreak,
+        label: `Slot ${slot} (${minutesToDisplayTime(start)} - ${minutesToDisplayTime(end)})${isBreak ? ' [Break]' : ''}`
       });
     }
 
     return list;
-  }, [minutesToHHMM, settingsData, toMinutes]);
-  const DURATION_OPTIONS = useMemo(() => {
-    const maxDuration = Math.min(4, Math.max(1, Number(settingsData.maxSlot) || 8));
-    return Array.from({ length: maxDuration }, (_, index) => {
-      const value = index + 1;
-      return { value, label: `${value} slot${value > 1 ? 's' : ''}` };
-    });
-  }, [settingsData.maxSlot]);
+  }, [breaksOverlap, minutesToDisplayTime, settingsData.breakWindows, settingsData.dayStartTime, settingsData.maxSlot, settingsData.slotMinutes, toMinutes]);
   const DIVISION_OPTIONS = useMemo(() => {
     const splitCount = Math.min(6, Math.max(1, Number(createMeta.splitCount) || 1));
     const toId = (value) => {
@@ -168,23 +179,76 @@ const RoleTimetable = () => {
     return options;
   }, [branches, createMeta.branchId, createMeta.splitCount]);
 
-  const getSlotWarning = useCallback((slot, slotSpan) => {
-    const numericSlot = Number(slot);
-    const numericSpan = Number(slotSpan);
-    const maxSlot = Number(settingsData.maxSlot) || 8;
-    if (!Number.isInteger(numericSlot) || !Number.isInteger(numericSpan)) return '';
-    if (numericSlot + numericSpan - 1 > maxSlot) {
-      return `Duration crosses end of day (max slot ${maxSlot}).`;
+  const getRangeWarning = useCallback((startTime, endTime, lectureType = 'Theory') => {
+    const dayStart = toMinutes(settingsData.dayStartTime);
+    const dayEnd = toMinutes(settingsData.dayEndTime);
+    const start = toMinutes(startTime);
+    const end = toMinutes(endTime);
+    const slotMinutes = Number(settingsData.slotMinutes) || 60;
+
+    if (dayStart === null || dayEnd === null || start === null || end === null) {
+      return 'Invalid time format. Use HH:MM.';
     }
-    const breakSet = new Set((settingsData.breakSlots || []).map((item) => Number(item)));
-    for (let offset = 0; offset < numericSpan; offset += 1) {
-      const target = numericSlot + offset;
-      if (breakSet.has(target)) {
-        return `Duration crosses fixed break slot ${target}.`;
+    if (end <= start) return 'End time must be after start time.';
+    if (start < dayStart || end > dayEnd) {
+      return `Time must stay inside working day (${settingsData.dayStartTime} to ${settingsData.dayEndTime}).`;
+    }
+    if ((start - dayStart) % slotMinutes !== 0 || (end - dayStart) % slotMinutes !== 0) {
+      return `Start/end must align to ${slotMinutes}-minute boundaries from ${settingsData.dayStartTime}.`;
+    }
+
+    const duration = end - start;
+    const normalizedType = String(lectureType || 'Theory').toLowerCase();
+
+    const breakWindows = Array.isArray(settingsData.breakWindows) ? settingsData.breakWindows : [];
+    let breakOverlapMinutes = 0;
+    const overlapsBreak = breakWindows.some((window) => {
+      const breakStart = toMinutes(window?.startTime);
+      const breakEnd = toMinutes(window?.endTime);
+      if (breakStart === null || breakEnd === null || breakEnd <= breakStart) return false;
+      if (!breaksOverlap(start, end, breakStart, breakEnd)) return false;
+      const overlapStart = Math.max(start, breakStart);
+      const overlapEnd = Math.min(end, breakEnd);
+      breakOverlapMinutes += Math.max(0, overlapEnd - overlapStart);
+      return true;
+    });
+
+    if (normalizedType === 'lab') {
+      const effectiveTeachingMinutes = duration - breakOverlapMinutes;
+      if (effectiveTeachingMinutes !== 120) {
+        return 'Lab must contain 2 hours of teaching time (break in between is allowed).';
       }
+      return '';
     }
+
+    if (duration !== 60) {
+      return 'Theory duration must be exactly 1 hour.';
+    }
+
+    if (overlapsBreak) {
+      return 'Class timing overlaps with a configured break window.';
+    }
+
     return '';
-  }, [settingsData.breakSlots, settingsData.maxSlot]);
+  }, [breaksOverlap, settingsData.breakWindows, settingsData.dayEndTime, settingsData.dayStartTime, settingsData.slotMinutes, toMinutes]);
+
+  const mapTimeRangeToSlot = useCallback((startTime, endTime, lectureType = 'Theory') => {
+    const warning = getRangeWarning(startTime, endTime, lectureType);
+    if (warning) return { error: warning };
+
+    const dayStart = toMinutes(settingsData.dayStartTime);
+    const start = toMinutes(startTime);
+    const end = toMinutes(endTime);
+    const slotMinutes = Number(settingsData.slotMinutes) || 60;
+
+    if (dayStart === null || start === null || end === null) {
+      return { error: 'Invalid time range.' };
+    }
+
+    const slot = Math.floor((start - dayStart) / slotMinutes) + 1;
+    const slotSpan = Math.floor((end - start) / slotMinutes);
+    return { slot, slotSpan };
+  }, [getRangeWarning, settingsData.dayStartTime, settingsData.slotMinutes, toMinutes]);
 
   useEffect(() => {
     if (!DIVISION_OPTIONS.length) return;
@@ -427,21 +491,36 @@ const RoleTimetable = () => {
       });
 
       if (res.data?.success) {
-        const dayStartTime = String(res.data.data?.dayStartTime || '08:00');
-        const dayEndTime = String(res.data.data?.dayEndTime || '16:00');
-        const slotMinutes = Number(res.data.data?.slotMinutes) || 60;
-        const maxSlot = Number(res.data.data?.maxSlot) || 8;
+        const dayStartTime = String(res.data.data?.dayStartTime || '10:30');
+        const dayEndTime = String(res.data.data?.dayEndTime || '18:00');
+        const slotMinutes = 60;
+        const explicitMaxSlot = Number(res.data.data?.maxSlot);
+        const dayStart = toMinutes(dayStartTime);
+        const dayEnd = toMinutes(dayEndTime);
+        const computedMaxSlot = dayStart !== null && dayEnd !== null && dayEnd > dayStart
+          ? Math.max(1, Math.floor((dayEnd - dayStart) / slotMinutes))
+          : 8;
+        const maxSlot = Number.isInteger(explicitMaxSlot) && explicitMaxSlot > 0 ? explicitMaxSlot : computedMaxSlot;
         const breakSlots = Array.isArray(res.data.data?.breakSlots)
           ? res.data.data.breakSlots.map((item) => Number(item)).filter((item) => Number.isInteger(item) && item > 0)
           : [];
+        const breakWindows = Array.isArray(res.data.data?.breakWindows)
+          ? res.data.data.breakWindows
+            .map((window) => ({
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              startTime: String(window?.startTime || ''),
+              endTime: String(window?.endTime || '')
+            }))
+            .filter((window) => window.startTime && window.endTime)
+          : [];
+        const teacherMaxHoursPerDay = Number(res.data.data?.teacherMaxHoursPerDay) || 6;
 
-        setSettingsData({ dayStartTime, dayEndTime, slotMinutes, maxSlot, breakSlots });
+        setSettingsData({ dayStartTime, dayEndTime, slotMinutes, maxSlot, breakSlots, breakWindows, teacherMaxHoursPerDay });
         setSettingsForm({
           dayStartTime,
           dayEndTime,
-          slotMinutes: String(slotMinutes),
-          maxSlot: String(maxSlot),
-          breakSlotsText: breakSlots.join(',')
+          teacherMaxHoursPerDay: String(teacherMaxHoursPerDay),
+          breakWindows: breakWindows.length ? breakWindows : [{ id: `break-${Date.now()}`, startTime: '', endTime: '' }]
         });
       }
     } catch (error) {
@@ -449,7 +528,7 @@ const RoleTimetable = () => {
         console.error('Error fetching timetable settings:', error);
       }
     }
-  }, [authFailed, handleAuthError, token]);
+  }, [authFailed, handleAuthError, toMinutes, token]);
 
   const fetchTimetables = useCallback(async (options = {}) => {
     const { silent = false } = options;
@@ -722,8 +801,8 @@ const RoleTimetable = () => {
         !row.roomId ||
         !row.division ||
         !row.dayOfWeek ||
-        !row.slot ||
-        !row.slotSpan
+        !row.startTime ||
+        !row.endTime
       ));
 
     if (invalidRows.length) {
@@ -739,6 +818,16 @@ const RoleTimetable = () => {
 
       for (let index = 0; index < createRows.length; index += 1) {
         const row = createRows[index];
+        const mapped = mapTimeRangeToSlot(row.startTime, row.endTime, row.lectureType);
+        if (mapped.error) {
+          failedRows.push({
+            rowId: row.id,
+            rowNumber: index + 1,
+            message: mapped.error
+          });
+          continue;
+        }
+
         const payload = {
           semesterId: createMeta.semesterId,
           branchId: createMeta.branchId,
@@ -747,8 +836,8 @@ const RoleTimetable = () => {
           roomId: row.roomId,
           division: row.division,
           dayOfWeek: row.dayOfWeek,
-          slot: Number(row.slot),
-          slotSpan: Number(row.slotSpan),
+          slot: mapped.slot,
+          slotSpan: mapped.slotSpan,
           lectureType: row.lectureType
         };
 
@@ -830,9 +919,16 @@ const RoleTimetable = () => {
       !formData.roomId ||
       !formData.dayOfWeek ||
       !formData.division ||
-      !formData.slot
+      !formData.startTime ||
+      !formData.endTime
     ) {
       alert('Please fill all required fields');
+      return;
+    }
+
+    const mapped = mapTimeRangeToSlot(formData.startTime, formData.endTime, formData.lectureType);
+    if (mapped.error) {
+      alert(mapped.error);
       return;
     }
 
@@ -844,8 +940,8 @@ const RoleTimetable = () => {
           roomId: formData.roomId,
           division: formData.division,
           dayOfWeek: formData.dayOfWeek,
-          slot: Number(formData.slot),
-          slotSpan: Number(formData.slotSpan),
+          slot: mapped.slot,
+          slotSpan: mapped.slotSpan,
           lectureType: formData.lectureType,
           status: formData.status
         },
@@ -1034,14 +1130,21 @@ const RoleTimetable = () => {
   };
 
   const openRequestModal = (entry, requestType = 'modify') => {
+    const entrySlot = Number(entry?.slot) || 1;
+    const entrySpan = Number(entry?.slotSpan) > 1 ? Number(entry.slotSpan) : 1;
+    const dayStart = toMinutes(settingsData.dayStartTime) ?? (10 * 60 + 30);
+    const slotMinutes = Number(settingsData.slotMinutes) || 60;
+    const startValue = minutesToHHMM(dayStart + ((entrySlot - 1) * slotMinutes));
+    const endValue = minutesToHHMM(dayStart + ((entrySlot - 1 + entrySpan) * slotMinutes));
+
     setSelectedRequestEntry(entry);
     setRequestData({
       requestType,
       roomId: getId(entry?.roomId),
       division: entry?.division || 'General',
       dayOfWeek: entry?.dayOfWeek || 'Monday',
-      slot: String(entry?.slot || 1),
-      slotSpan: String(entry?.slotSpan || 1),
+      startTime: startValue,
+      endTime: endValue,
       lectureType: entry?.lectureType || 'Theory',
       reason: ''
     });
@@ -1055,8 +1158,17 @@ const RoleTimetable = () => {
       return;
     }
 
-    if (requestData.requestType === 'modify' && (!requestData.roomId || !requestData.dayOfWeek || !requestData.slot || !requestData.slotSpan)) {
+    if (requestData.requestType === 'modify' && (!requestData.roomId || !requestData.dayOfWeek || !requestData.startTime || !requestData.endTime)) {
       alert('Please fill required proposed details');
+      return;
+    }
+
+    const mapped = requestData.requestType === 'modify'
+      ? mapTimeRangeToSlot(requestData.startTime, requestData.endTime, requestData.lectureType)
+      : null;
+
+    if (mapped?.error) {
+      alert(mapped.error);
       return;
     }
 
@@ -1070,8 +1182,8 @@ const RoleTimetable = () => {
             roomId: requestData.roomId,
             division: requestData.division || 'General',
             dayOfWeek: requestData.dayOfWeek,
-            slot: Number(requestData.slot),
-            slotSpan: Number(requestData.slotSpan),
+            slot: mapped.slot,
+            slotSpan: mapped.slotSpan,
             lectureType: requestData.lectureType
           }
           : undefined
@@ -1090,8 +1202,8 @@ const RoleTimetable = () => {
           roomId: '',
           division: 'General',
           dayOfWeek: 'Monday',
-          slot: '1',
-          slotSpan: '1',
+          startTime: '10:30',
+          endTime: '11:30',
           lectureType: 'Theory',
           reason: ''
         });
@@ -1141,21 +1253,36 @@ const RoleTimetable = () => {
   const handleSaveSettings = async () => {
     try {
       setSaving(true);
-      const numericMaxSlot = Number(settingsForm.maxSlot);
-      const numericSlotMinutes = Number(settingsForm.slotMinutes);
-      const breakSlots = Array.from(new Set(
-        String(settingsForm.breakSlotsText || '')
-          .split(',')
-          .map((item) => Number(item.trim()))
-          .filter((item) => Number.isInteger(item) && item > 0)
-      )).sort((a, b) => a - b);
+      const slotMinutes = 60;
+      const dayStart = toMinutes(settingsForm.dayStartTime);
+      const dayEnd = toMinutes(settingsForm.dayEndTime);
+      if (dayStart === null || dayEnd === null || dayEnd <= dayStart) {
+        alert('Please set a valid day start/end time.');
+        return;
+      }
+
+      const maxSlot = Math.max(1, Math.floor((dayEnd - dayStart) / slotMinutes));
+      const teacherMaxHoursPerDay = Number(settingsForm.teacherMaxHoursPerDay);
+      if (!Number.isInteger(teacherMaxHoursPerDay) || teacherMaxHoursPerDay < 1 || teacherMaxHoursPerDay > 12) {
+        alert('Teacher max hours per day must be between 1 and 12.');
+        return;
+      }
+
+      const breakWindows = (settingsForm.breakWindows || [])
+        .map((window) => ({
+          startTime: String(window?.startTime || '').trim(),
+          endTime: String(window?.endTime || '').trim()
+        }))
+        .filter((window) => window.startTime && window.endTime);
 
       const res = await axios.put('/api/timetable/settings', {
         dayStartTime: settingsForm.dayStartTime,
         dayEndTime: settingsForm.dayEndTime,
-        slotMinutes: numericSlotMinutes,
-        maxSlot: numericMaxSlot,
-        breakSlots
+        slotMinutes,
+        maxSlot,
+        breakSlots: [],
+        breakWindows,
+        teacherMaxHoursPerDay
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -1174,6 +1301,13 @@ const RoleTimetable = () => {
   };
 
   const openEditModal = (timetable) => {
+    const entrySlot = Number(timetable?.slot) || 1;
+    const entrySpan = Number(timetable?.slotSpan) > 1 ? Number(timetable.slotSpan) : 1;
+    const dayStart = toMinutes(settingsData.dayStartTime) ?? (10 * 60 + 30);
+    const slotMinutes = Number(settingsData.slotMinutes) || 60;
+    const startValue = minutesToHHMM(dayStart + ((entrySlot - 1) * slotMinutes));
+    const endValue = minutesToHHMM(dayStart + ((entrySlot - 1 + entrySpan) * slotMinutes));
+
     setSelectedTimetable(timetable);
     setFormData({
       semesterId: timetable.semesterId?._id || '',
@@ -1183,8 +1317,8 @@ const RoleTimetable = () => {
       roomId: timetable.roomId?._id || '',
       division: timetable.division || 'General',
       dayOfWeek: timetable.dayOfWeek,
-      slot: String(timetable.slot || 1),
-      slotSpan: String(timetable.slotSpan || 1),
+      startTime: startValue,
+      endTime: endValue,
       lectureType: timetable.lectureType,
       notes: timetable.notes || ''
     });
@@ -1402,7 +1536,7 @@ const RoleTimetable = () => {
               Sunday Holiday
             </span>
             <span className="px-3 py-1.5 text-xs rounded-full border border-blue-200 bg-blue-50 text-blue-700 font-semibold">
-              Working Time: {settingsData.dayStartTime} to {settingsData.dayEndTime}
+              Working Time: {minutesToDisplayTime(toMinutes(settingsData.dayStartTime) ?? 0)} to {minutesToDisplayTime(toMinutes(settingsData.dayEndTime) ?? 0)}
             </span>
           </div>
         </Card>
@@ -1413,12 +1547,12 @@ const RoleTimetable = () => {
               <div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">Timetable Settings</h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Configure total daily slots and fixed break slots. Break slots cannot be assigned to classes.
+                  Configure working hours, teacher max daily load, and break windows.
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Day Starts At</label>
                 <input
@@ -1438,42 +1572,74 @@ const RoleTimetable = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Slot Minutes</label>
-                <input
-                  type="number"
-                  min="30"
-                  max="180"
-                  value={settingsForm.slotMinutes}
-                  onChange={(e) => setSettingsForm((prev) => ({ ...prev, slotMinutes: e.target.value }))}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Maximum Slots Per Day</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Teacher Max Hours / Day</label>
                 <input
                   type="number"
                   min="1"
                   max="12"
-                  value={settingsForm.maxSlot}
-                  onChange={(e) => setSettingsForm((prev) => ({ ...prev, maxSlot: e.target.value }))}
+                  value={settingsForm.teacherMaxHoursPerDay}
+                  onChange={(e) => setSettingsForm((prev) => ({ ...prev, teacherMaxHoursPerDay: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
               </div>
-              <div className="md:col-span-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Break Slots (comma separated)</label>
-                <input
-                  type="text"
-                  value={settingsForm.breakSlotsText}
-                  onChange={(e) => setSettingsForm((prev) => ({ ...prev, breakSlotsText: e.target.value }))}
-                  placeholder="Example: 4,7"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
+              <div className="md:col-span-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Break Windows</label>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsForm((prev) => ({
+                      ...prev,
+                      breakWindows: [...(prev.breakWindows || []), { id: `break-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, startTime: '', endTime: '' }]
+                    }))}
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                  >
+                    + Add Break
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {(settingsForm.breakWindows || []).map((window, index) => (
+                    <div key={window.id || `break-${index}`} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                      <input
+                        type="time"
+                        value={window.startTime || ''}
+                        onChange={(e) => setSettingsForm((prev) => ({
+                          ...prev,
+                          breakWindows: (prev.breakWindows || []).map((item, itemIndex) => (
+                            itemIndex === index ? { ...item, startTime: e.target.value } : item
+                          ))
+                        }))}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                      <input
+                        type="time"
+                        value={window.endTime || ''}
+                        onChange={(e) => setSettingsForm((prev) => ({
+                          ...prev,
+                          breakWindows: (prev.breakWindows || []).map((item, itemIndex) => (
+                            itemIndex === index ? { ...item, endTime: e.target.value } : item
+                          ))
+                        }))}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setSettingsForm((prev) => ({
+                          ...prev,
+                          breakWindows: (prev.breakWindows || []).filter((_, itemIndex) => itemIndex !== index)
+                        }))}
+                        className="px-3 py-2 rounded-md text-xs font-semibold border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
             <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Active break slots: {(settingsData.breakSlots || []).length > 0 ? settingsData.breakSlots.join(', ') : 'None'}
+                Fixed slot size: 60 min | Max slots/day: {settingsData.maxSlot} | Teacher limit: {settingsData.teacherMaxHoursPerDay || 6}h/day
               </p>
               <Button onClick={handleSaveSettings} disabled={saving} className="bg-blue-600 hover:bg-blue-700">
                 {saving ? 'Saving...' : 'Save Settings'}
@@ -1534,7 +1700,7 @@ const RoleTimetable = () => {
                     )}
                     {request.requestType === 'modify' && (
                       <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
-                        Proposed: {request.proposed?.dayOfWeek || '-'} | {request.proposed?.division || 'General'} | Slot {request.proposed?.slot || '-'} | Duration {request.proposed?.slotSpan || 1} | Room {request.proposed?.roomId?.roomNo || '-'}
+                        Proposed: {request.proposed?.dayOfWeek || '-'} | {request.proposed?.division || 'General'} | {getSlotRange(request.proposed || {})} | Room {request.proposed?.roomId?.roomNo || '-'}
                       </p>
                     )}
                     {canReviewRequests && requestStatus === 'pending' && (
@@ -1847,8 +2013,8 @@ const RoleTimetable = () => {
                         <th className="text-left text-xs font-bold uppercase tracking-wide text-[#6b5b54] px-2">Day *</th>
                         <th className="text-left text-xs font-bold uppercase tracking-wide text-[#6b5b54] px-2">Room *</th>
                         <th className="text-left text-xs font-bold uppercase tracking-wide text-[#6b5b54] px-2">Section *</th>
-                        <th className="text-left text-xs font-bold uppercase tracking-wide text-[#6b5b54] px-2">Time Slot *</th>
-                        <th className="text-left text-xs font-bold uppercase tracking-wide text-[#6b5b54] px-2">Duration</th>
+                        <th className="text-left text-xs font-bold uppercase tracking-wide text-[#6b5b54] px-2">Start Time *</th>
+                        <th className="text-left text-xs font-bold uppercase tracking-wide text-[#6b5b54] px-2">End Time *</th>
                         <th className="text-left text-xs font-bold uppercase tracking-wide text-[#6b5b54] px-2">Type</th>
                         <th className="text-center text-xs font-bold uppercase tracking-wide text-[#6b5b54] px-2">Action</th>
                       </tr>
@@ -1915,28 +2081,22 @@ const RoleTimetable = () => {
                             </select>
                           </td>
                           <td className="p-2 align-top">
-                            <select
-                              value={row.slot}
-                              onChange={(e) => setCreateRows((prev) => prev.map((item) => item.id === row.id ? { ...item, slot: e.target.value } : item))}
+                            <input
+                              type="time"
+                              value={row.startTime}
+                              onChange={(e) => setCreateRows((prev) => prev.map((item) => item.id === row.id ? { ...item, startTime: e.target.value } : item))}
                               className="w-full h-10 px-3 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-white dark:bg-[#2d1e18] text-[#181311] dark:text-white"
-                            >
-                              {SLOT_OPTIONS.map((slot) => (
-                                <option key={slot.value} value={String(slot.value)} disabled={slot.isBreak}>{slot.label}</option>
-                              ))}
-                            </select>
+                            />
                           </td>
                           <td className="p-2 align-top">
-                            <select
-                              value={row.slotSpan}
-                              onChange={(e) => setCreateRows((prev) => prev.map((item) => item.id === row.id ? { ...item, slotSpan: e.target.value } : item))}
+                            <input
+                              type="time"
+                              value={row.endTime}
+                              onChange={(e) => setCreateRows((prev) => prev.map((item) => item.id === row.id ? { ...item, endTime: e.target.value } : item))}
                               className="w-full h-10 px-3 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-white dark:bg-[#2d1e18] text-[#181311] dark:text-white"
-                            >
-                              {DURATION_OPTIONS.map((duration) => (
-                                <option key={duration.value} value={String(duration.value)}>{duration.label}</option>
-                              ))}
-                            </select>
-                            {getSlotWarning(row.slot, row.slotSpan) && (
-                              <p className="text-[10px] text-red-600 mt-1">{getSlotWarning(row.slot, row.slotSpan)}</p>
+                            />
+                            {getRangeWarning(row.startTime, row.endTime, row.lectureType) && (
+                              <p className="text-[10px] text-red-600 mt-1">{getRangeWarning(row.startTime, row.endTime, row.lectureType)}</p>
                             )}
                           </td>
                           <td className="p-2 align-top">
@@ -2039,27 +2199,22 @@ const RoleTimetable = () => {
                           </select>
                         </div>
 
-                        <select
-                          value={row.slot}
-                          onChange={(e) => setCreateRows((prev) => prev.map((item) => item.id === row.id ? { ...item, slot: e.target.value } : item))}
-                          className="w-full h-10 px-3 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-white dark:bg-[#2d1e18] text-[#181311] dark:text-white"
-                        >
-                          {SLOT_OPTIONS.map((slot) => (
-                            <option key={slot.value} value={String(slot.value)} disabled={slot.isBreak}>{slot.label}</option>
-                          ))}
-                        </select>
-
-                        <select
-                          value={row.slotSpan}
-                          onChange={(e) => setCreateRows((prev) => prev.map((item) => item.id === row.id ? { ...item, slotSpan: e.target.value } : item))}
-                          className="w-full h-10 px-3 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-white dark:bg-[#2d1e18] text-[#181311] dark:text-white"
-                        >
-                          {DURATION_OPTIONS.map((duration) => (
-                            <option key={duration.value} value={String(duration.value)}>{duration.label}</option>
-                          ))}
-                        </select>
-                        {getSlotWarning(row.slot, row.slotSpan) && (
-                          <p className="text-[10px] text-red-600 mt-1">{getSlotWarning(row.slot, row.slotSpan)}</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <input
+                            type="time"
+                            value={row.startTime}
+                            onChange={(e) => setCreateRows((prev) => prev.map((item) => item.id === row.id ? { ...item, startTime: e.target.value } : item))}
+                            className="w-full h-10 px-3 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-white dark:bg-[#2d1e18] text-[#181311] dark:text-white"
+                          />
+                          <input
+                            type="time"
+                            value={row.endTime}
+                            onChange={(e) => setCreateRows((prev) => prev.map((item) => item.id === row.id ? { ...item, endTime: e.target.value } : item))}
+                            className="w-full h-10 px-3 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-white dark:bg-[#2d1e18] text-[#181311] dark:text-white"
+                          />
+                        </div>
+                        {getRangeWarning(row.startTime, row.endTime, row.lectureType) && (
+                          <p className="text-[10px] text-red-600 mt-1">{getRangeWarning(row.startTime, row.endTime, row.lectureType)}</p>
                         )}
 
                         <select
@@ -2163,30 +2318,24 @@ const RoleTimetable = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Time Slot *</label>
-                  <select
-                    value={formData.slot}
-                    onChange={(e) => setFormData(prev => ({ ...prev, slot: e.target.value }))}
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Start Time *</label>
+                  <input
+                    type="time"
+                    value={formData.startTime}
+                    onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    {SLOT_OPTIONS.map((slot) => (
-                      <option key={slot.value} value={String(slot.value)} disabled={slot.isBreak}>{slot.label}</option>
-                    ))}
-                  </select>
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Duration *</label>
-                  <select
-                    value={formData.slotSpan}
-                    onChange={(e) => setFormData(prev => ({ ...prev, slotSpan: e.target.value }))}
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">End Time *</label>
+                  <input
+                    type="time"
+                    value={formData.endTime}
+                    onChange={(e) => setFormData(prev => ({ ...prev, endTime: e.target.value }))}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  >
-                    {DURATION_OPTIONS.map((duration) => (
-                      <option key={duration.value} value={String(duration.value)}>{duration.label}</option>
-                    ))}
-                  </select>
-                  {getSlotWarning(formData.slot, formData.slotSpan) && (
-                    <p className="text-xs text-red-600 mt-1">{getSlotWarning(formData.slot, formData.slotSpan)}</p>
+                  />
+                  {getRangeWarning(formData.startTime, formData.endTime, formData.lectureType) && (
+                    <p className="text-xs text-red-600 mt-1">{getRangeWarning(formData.startTime, formData.endTime, formData.lectureType)}</p>
                   )}
                 </div>
               </div>
@@ -2296,33 +2445,27 @@ const RoleTimetable = () => {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Proposed Slot</label>
-                      <select
-                        value={requestData.slot}
-                        onChange={(e) => setRequestData((prev) => ({ ...prev, slot: e.target.value }))}
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Proposed Start</label>
+                      <input
+                        type="time"
+                        value={requestData.startTime}
+                        onChange={(e) => setRequestData((prev) => ({ ...prev, startTime: e.target.value }))}
                         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      >
-                        {SLOT_OPTIONS.map((slot) => (
-                          <option key={slot.value} value={String(slot.value)} disabled={slot.isBreak}>{slot.label}</option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Duration</label>
-                      <select
-                        value={requestData.slotSpan}
-                        onChange={(e) => setRequestData((prev) => ({ ...prev, slotSpan: e.target.value }))}
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Proposed End</label>
+                      <input
+                        type="time"
+                        value={requestData.endTime}
+                        onChange={(e) => setRequestData((prev) => ({ ...prev, endTime: e.target.value }))}
                         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      >
-                        {DURATION_OPTIONS.map((duration) => (
-                          <option key={duration.value} value={String(duration.value)}>{duration.label}</option>
-                        ))}
-                      </select>
-                      {getSlotWarning(requestData.slot, requestData.slotSpan) && (
-                        <p className="text-xs text-red-600 mt-1">{getSlotWarning(requestData.slot, requestData.slotSpan)}</p>
+                      />
+                      {getRangeWarning(requestData.startTime, requestData.endTime, requestData.lectureType) && (
+                        <p className="text-xs text-red-600 mt-1">{getRangeWarning(requestData.startTime, requestData.endTime, requestData.lectureType)}</p>
                       )}
                     </div>
                     <div>

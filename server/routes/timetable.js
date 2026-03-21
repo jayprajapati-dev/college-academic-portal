@@ -84,6 +84,7 @@ const sanitizeSettingsPayload = (source = {}) => {
     slotMinutes: 60,
     maxSlot: 7,
     breakSlots: [],
+    teacherMaxHoursPerDay: 6,
     breakWindows: [
       { startTime: '12:30', endTime: '13:00', label: 'Lunch Break' },
       { startTime: '16:00', endTime: '16:10', label: 'Short Break' }
@@ -124,13 +125,19 @@ const sanitizeSettingsPayload = (source = {}) => {
     ? breakWindows
     : normalizeBreakWindows(fallback.breakWindows, normalizedDayStart, normalizedDayEnd);
 
+  let teacherMaxHoursPerDay = Number(source.teacherMaxHoursPerDay);
+  if (!Number.isInteger(teacherMaxHoursPerDay) || teacherMaxHoursPerDay < 1 || teacherMaxHoursPerDay > 12) {
+    teacherMaxHoursPerDay = fallback.teacherMaxHoursPerDay;
+  }
+
   return {
     dayStartTime: normalizedDayStart,
     dayEndTime: normalizedDayEnd,
     slotMinutes,
     maxSlot,
     breakSlots: breakSlots.length ? breakSlots : fallback.breakSlots.filter((item) => item <= maxSlot),
-    breakWindows: finalBreakWindows
+    breakWindows: finalBreakWindows,
+    teacherMaxHoursPerDay
   };
 };
 
@@ -158,6 +165,7 @@ const getOrCreateSettings = async () => {
       endTime: String(item?.endTime || ''),
       label: String(item?.label || 'Break')
     }))) !== JSON.stringify(normalized.breakWindows)
+    || Number(rawSettings.teacherMaxHoursPerDay) !== Number(normalized.teacherMaxHoursPerDay)
   );
 
   if (hasDrift) {
@@ -176,12 +184,17 @@ const getOrCreateSettings = async () => {
 };
 
 const normalizeDuration = (value, lectureType) => {
-  return String(lectureType).toLowerCase() === 'lab' ? 2 : 1;
+  const normalizedType = String(lectureType || '').toLowerCase();
+  if (normalizedType !== 'lab') return 1;
+  const numeric = Number(value);
+  if (!Number.isInteger(numeric) || numeric < 1 || numeric > 4) return 2;
+  return numeric;
 };
 
-const validateSlotRangeAgainstSettings = ({ slot, slotSpan, maxSlot, breakSlots, dayStartTime, slotMinutes, breakWindows }) => {
+const validateSlotRangeAgainstSettings = ({ slot, slotSpan, maxSlot, breakSlots, dayStartTime, slotMinutes, breakWindows, lectureType }) => {
   const startSlot = Number(slot);
   const span = Number(slotSpan);
+  const normalizedLectureType = String(lectureType || '').toLowerCase();
 
   if (!Number.isInteger(startSlot) || startSlot < 1 || startSlot > maxSlot) {
     return `Invalid slot. Allowed values are 1 to ${maxSlot}.`;
@@ -211,13 +224,27 @@ const validateSlotRangeAgainstSettings = ({ slot, slotSpan, maxSlot, breakSlots,
   });
 
   if (slotRange && Array.isArray(breakWindows) && breakWindows.length > 0) {
+    let overlapMinutes = 0;
     for (const win of breakWindows) {
       const start = toMinutes(win?.startTime);
       const end = toMinutes(win?.endTime);
       if (start === null || end === null || end <= start) continue;
       const overlaps = slotRange.start < end && start < slotRange.end;
       if (overlaps) {
-        return `Selected class overlaps break window ${win.startTime}-${win.endTime}.`;
+        if (normalizedLectureType !== 'lab') {
+          return `Selected class overlaps break window ${win.startTime}-${win.endTime}.`;
+        }
+        const overlapStart = Math.max(slotRange.start, start);
+        const overlapEnd = Math.min(slotRange.end, end);
+        overlapMinutes += Math.max(0, overlapEnd - overlapStart);
+      }
+    }
+
+    if (normalizedLectureType === 'lab') {
+      const totalMinutes = slotRange.end - slotRange.start;
+      const effectiveTeachingMinutes = totalMinutes - overlapMinutes;
+      if (effectiveTeachingMinutes !== 120) {
+        return 'Lab must include exactly 2 hours of teaching time (break overlap allowed).';
       }
     }
   }
@@ -324,6 +351,38 @@ const checkSlotConflicts = async ({
   return { hasConflict, conflicts };
 };
 
+const checkTeacherDailyLoad = async ({ teacherId, dayOfWeek, slotSpan, slotMinutes, maxHoursPerDay, excludeId = null }) => {
+  const teacher = normalizeId(teacherId);
+  const day = String(dayOfWeek || '').trim();
+  const span = Number(slotSpan);
+  const perSlot = Number(slotMinutes);
+  const maxHours = Number(maxHoursPerDay);
+
+  if (!teacher || !day || !Number.isInteger(span) || !Number.isInteger(perSlot) || !Number.isInteger(maxHours)) {
+    return null;
+  }
+
+  const query = { teacherId: teacher, dayOfWeek: day, status: 'active' };
+  if (excludeId) query._id = { $ne: excludeId };
+
+  const entries = await Timetable.find(query).select('slotSpan');
+  const existingMinutes = entries.reduce((sum, item) => {
+    const itemSpan = Number(item?.slotSpan);
+    return sum + ((Number.isInteger(itemSpan) && itemSpan > 0 ? itemSpan : 1) * perSlot);
+  }, 0);
+
+  const requestedMinutes = span * perSlot;
+  const limitMinutes = maxHours * 60;
+
+  if (existingMinutes + requestedMinutes > limitMinutes) {
+    const currentHours = (existingMinutes / 60).toFixed(1);
+    const requestedHours = (requestedMinutes / 60).toFixed(1);
+    return `Teacher daily limit exceeded on ${day}. Current load ${currentHours}h, requested ${requestedHours}h, max ${maxHours}h.`;
+  }
+
+  return null;
+};
+
 // ============ CREATE TIMETABLE ============
 
 // ============ CREATE TIMETABLE (slot-based) ============
@@ -355,6 +414,7 @@ router.post('/create', protect, authorize('admin', 'hod'), async (req, res) => {
     const slotValidationError = validateSlotRangeAgainstSettings({
       slot: normalizedSlot,
       slotSpan: normalizedSlotSpan,
+      lectureType: normalizedLectureType,
       maxSlot: settings.maxSlot,
       breakSlots: settings.breakSlots,
       dayStartTime: settings.dayStartTime,
@@ -392,6 +452,17 @@ router.post('/create', protect, authorize('admin', 'hod'), async (req, res) => {
     });
     if (conflictCheck.hasConflict) {
       return res.status(400).json({ success: false, message: 'Conflict detected', conflicts: conflictCheck.conflicts });
+    }
+
+    const teacherLoadError = await checkTeacherDailyLoad({
+      teacherId,
+      dayOfWeek,
+      slotSpan: finalSlotSpan,
+      slotMinutes: settings.slotMinutes,
+      maxHoursPerDay: settings.teacherMaxHoursPerDay
+    });
+    if (teacherLoadError) {
+      return res.status(400).json({ success: false, message: teacherLoadError });
     }
 
     const timetable = await Timetable.create({
@@ -453,7 +524,8 @@ router.get('/settings', protect, async (req, res) => {
         slotMinutes: settings.slotMinutes || 60,
         maxSlot: settings.maxSlot,
         breakSlots: settings.breakSlots || [],
-        breakWindows: settings.breakWindows || []
+        breakWindows: settings.breakWindows || [],
+        teacherMaxHoursPerDay: Number(settings.teacherMaxHoursPerDay) || 6
       }
     });
   } catch (error) {
@@ -470,7 +542,8 @@ router.put('/settings', protect, authorize('admin', 'hod'), async (req, res) => 
       slotMinutes = 60,
       maxSlot,
       breakSlots,
-      breakWindows
+      breakWindows,
+      teacherMaxHoursPerDay = 6
     } = req.body;
 
     const normalizedDayStart = String(dayStartTime || '').trim();
@@ -512,6 +585,10 @@ router.put('/settings', protect, authorize('admin', 'hod'), async (req, res) => 
       .filter((item) => Number.isInteger(item) && item > 0 && item <= numericMaxSlot))).sort((a, b) => a - b);
 
     const normalizedBreakWindows = normalizeBreakWindows(breakWindows, normalizedDayStart, normalizedDayEnd);
+    const normalizedTeacherMaxHours = Number(teacherMaxHoursPerDay);
+    if (!Number.isInteger(normalizedTeacherMaxHours) || normalizedTeacherMaxHours < 1 || normalizedTeacherMaxHours > 12) {
+      return res.status(400).json({ success: false, message: 'teacherMaxHoursPerDay must be between 1 and 12.' });
+    }
 
     const nextSettings = {
       dayStartTime: normalizedDayStart,
@@ -520,6 +597,7 @@ router.put('/settings', protect, authorize('admin', 'hod'), async (req, res) => 
       maxSlot: numericMaxSlot,
       breakSlots: normalizedBreakSlots,
       breakWindows: normalizedBreakWindows,
+      teacherMaxHoursPerDay: normalizedTeacherMaxHours,
       updatedBy: req.user._id
     };
 
@@ -546,7 +624,8 @@ router.put('/settings', protect, authorize('admin', 'hod'), async (req, res) => 
         slotMinutes: nextSettings.slotMinutes,
         maxSlot: nextSettings.maxSlot,
         breakSlots: nextSettings.breakSlots,
-        breakWindows: nextSettings.breakWindows
+        breakWindows: nextSettings.breakWindows,
+        teacherMaxHoursPerDay: nextSettings.teacherMaxHoursPerDay
       }
     });
   } catch (error) {
@@ -758,6 +837,7 @@ router.post('/:id/change-request', protect, async (req, res) => {
       const slotValidationError = validateSlotRangeAgainstSettings({
         slot,
         slotSpan,
+        lectureType,
         maxSlot: settings.maxSlot,
         breakSlots: settings.breakSlots,
         dayStartTime: settings.dayStartTime,
@@ -771,6 +851,18 @@ router.post('/:id/change-request', protect, async (req, res) => {
       const room = await Room.findOne({ _id: roomId, isActive: true });
       if (!room) {
         return res.status(400).json({ success: false, message: 'Selected proposed room is inactive or not found.' });
+      }
+
+      const teacherLoadError = await checkTeacherDailyLoad({
+        teacherId: timetable.teacherId,
+        dayOfWeek,
+        slotSpan,
+        slotMinutes: settings.slotMinutes,
+        maxHoursPerDay: settings.teacherMaxHoursPerDay,
+        excludeId: timetable._id
+      });
+      if (teacherLoadError) {
+        return res.status(400).json({ success: false, message: teacherLoadError });
       }
 
       normalizedProposal = { division, roomId, dayOfWeek, slot, lectureType, slotSpan };
@@ -923,6 +1015,7 @@ router.put('/change-requests/:requestId/review', protect, authorize('admin', 'ho
         const slotValidationError = validateSlotRangeAgainstSettings({
           slot: nextSlot,
           slotSpan: nextSlotSpan,
+          lectureType: nextLectureType,
           maxSlot: settings.maxSlot,
           breakSlots: settings.breakSlots,
           dayStartTime: settings.dayStartTime,
@@ -955,6 +1048,18 @@ router.put('/change-requests/:requestId/review', protect, authorize('admin', 'ho
             message: 'Cannot approve request due to current timetable conflict',
             conflicts: conflictCheck.conflicts
           });
+        }
+
+        const teacherLoadError = await checkTeacherDailyLoad({
+          teacherId: timetable.teacherId,
+          dayOfWeek: nextDay,
+          slotSpan: nextSlotSpan,
+          slotMinutes: settings.slotMinutes,
+          maxHoursPerDay: settings.teacherMaxHoursPerDay,
+          excludeId: timetable._id
+        });
+        if (teacherLoadError) {
+          return res.status(400).json({ success: false, message: teacherLoadError });
         }
 
         timetable.roomId = nextRoomId;
@@ -1046,6 +1151,7 @@ router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, re
     const slotValidationError = validateSlotRangeAgainstSettings({
       slot: normalizedSlot,
       slotSpan: normalizedSlotSpan,
+      lectureType: normalizedLectureType,
       maxSlot: settings.maxSlot,
       breakSlots: settings.breakSlots,
       dayStartTime: settings.dayStartTime,
@@ -1083,6 +1189,19 @@ router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, re
     if (conflictCheck.hasConflict) {
       return res.status(400).json({ success: false, message: 'Conflict detected', conflicts: conflictCheck.conflicts });
     }
+
+    const teacherLoadError = await checkTeacherDailyLoad({
+      teacherId: timetable.teacherId,
+      dayOfWeek: timetable.dayOfWeek,
+      slotSpan: timetable.slotSpan,
+      slotMinutes: settings.slotMinutes,
+      maxHoursPerDay: settings.teacherMaxHoursPerDay,
+      excludeId: timetable._id
+    });
+    if (teacherLoadError) {
+      return res.status(400).json({ success: false, message: teacherLoadError });
+    }
+
     await timetable.save();
     res.json({ success: true, data: timetable });
   } catch (error) {

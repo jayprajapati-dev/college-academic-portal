@@ -66,6 +66,12 @@ const timetableSettingsSchema = new mongoose.Schema(
         { startTime: '16:00', endTime: '16:10', label: 'Short Break' }
       ]
     },
+    teacherMaxHoursPerDay: {
+      type: Number,
+      min: 1,
+      max: 12,
+      default: 6
+    },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
