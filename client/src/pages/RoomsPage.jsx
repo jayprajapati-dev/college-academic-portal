@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
@@ -173,30 +173,56 @@ const RoomsPage = () => {
 
   const getLayoutDescription = () => {
     if (userRole === 'hod') {
-      return `Manage rooms for ${storedUser.branch?.name || 'your branch'} - classrooms and laboratories for timetable scheduling`;
+      return `Manage rooms for ${storedUser.branch?.name || 'your branch'} for timetable scheduling.`;
     }
-    return 'Manage classrooms and laboratories for timetable scheduling';
+    return 'Manage classrooms and laboratories for timetable scheduling.';
   };
 
-  // Content component that will be wrapped by different layouts
-  const RoomsContent = () => (
+  const roomStats = useMemo(() => {
+    const total = rooms.length;
+    const active = rooms.filter((room) => room.isActive !== false).length;
+    const labs = rooms.filter((room) => String(room.type).toLowerCase() === 'lab').length;
+    const classes = total - labs;
+    return { total, active, labs, classes };
+  }, [rooms]);
+
+  // Keep content as stable JSX to avoid remounting nested component on each keystroke.
+  const roomsContent = (
     <div className="max-w-7xl mx-auto">
       {/* Header Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 md:p-6 mb-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{getLayoutTitle()}</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">{getLayoutDescription()}</p>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white">{getLayoutTitle()}</h1>
+            <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1">{getLayoutDescription()}</p>
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+            className="inline-flex items-center justify-center gap-2 whitespace-nowrap px-5 py-2.5 bg-gradient-to-r from-primary to-orange-500 hover:to-primary text-white text-sm font-bold rounded-xl transition-all shadow-md shadow-primary/20 hover:shadow-lg"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
+            <span className="material-symbols-outlined text-lg">add_circle</span>
             Add New Room
           </button>
+        </div>
+      </div>
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 mb-5 sm:mb-6">
+        <div className="rounded-lg sm:rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 sm:p-4 shadow-sm">
+          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Total Rooms</p>
+          <p className="mt-1.5 sm:mt-2 text-2xl sm:text-3xl font-black text-gray-900 dark:text-white">{roomStats.total}</p>
+        </div>
+        <div className="rounded-lg sm:rounded-xl border border-green-100 dark:border-green-900/50 bg-green-50/70 dark:bg-green-900/10 p-3 sm:p-4 shadow-sm">
+          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-green-700 dark:text-green-400">Active</p>
+          <p className="mt-1.5 sm:mt-2 text-2xl sm:text-3xl font-black text-green-700 dark:text-green-400">{roomStats.active}</p>
+        </div>
+        <div className="rounded-lg sm:rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/70 dark:bg-blue-900/10 p-3 sm:p-4 shadow-sm">
+          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-400">Classrooms</p>
+          <p className="mt-1.5 sm:mt-2 text-2xl sm:text-3xl font-black text-blue-700 dark:text-blue-400">{roomStats.classes}</p>
+        </div>
+        <div className="rounded-lg sm:rounded-xl border border-purple-100 dark:border-purple-900/50 bg-purple-50/70 dark:bg-purple-900/10 p-3 sm:p-4 shadow-sm">
+          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wide text-purple-700 dark:text-purple-400">Labs</p>
+          <p className="mt-1.5 sm:mt-2 text-2xl sm:text-3xl font-black text-purple-700 dark:text-purple-400">{roomStats.labs}</p>
         </div>
       </div>
 
@@ -213,8 +239,8 @@ const RoomsPage = () => {
         </div>
       )}
 
-      {/* Rooms Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+      {/* Rooms View */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -236,7 +262,51 @@ const RoomsPage = () => {
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="md:hidden p-3 space-y-3">
+            {rooms.map((room) => (
+              <div key={`mobile-${room._id}`} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-900/30 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-black text-gray-900 dark:text-white">{room.roomNo}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{room.buildingName || 'Building N/A'} • {room.floor || 'Ground'}</p>
+                  </div>
+                  <span className={`inline-flex px-2 py-1 text-[11px] font-semibold rounded-full ${
+                    room.isActive
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                      : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+                  }`}>
+                    {room.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <span className={`inline-flex px-2 py-1 text-[11px] font-semibold rounded-full ${
+                    room.type === 'Lab'
+                      ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400'
+                      : 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
+                  }`}>
+                    {room.type}
+                  </span>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    onClick={() => handleEdit(room)}
+                    className="flex-1 px-3 py-2 text-xs font-bold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(room._id)}
+                    className="flex-1 px-3 py-2 text-xs font-bold rounded-lg bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-300"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-900">
                 <tr>
@@ -350,31 +420,31 @@ const RoomsPage = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       {editingRoom === room._id ? (
-                        <div className="flex gap-2">
+                        <div className="flex flex-nowrap gap-2">
                           <button
                             onClick={handleEditSubmit}
-                            className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+                            className="whitespace-nowrap text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
                           >
                             Save
                           </button>
                           <button
                             onClick={cancelEdit}
-                            className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300"
+                            className="whitespace-nowrap text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300"
                           >
                             Cancel
                           </button>
                         </div>
                       ) : (
-                        <div className="flex gap-2">
+                        <div className="flex flex-nowrap gap-2">
                           <button
                             onClick={() => handleEdit(room)}
-                            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                            className="whitespace-nowrap px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300 font-semibold"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleDelete(room._id)}
-                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                            className="whitespace-nowrap px-3 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-300 font-semibold"
                           >
                             Delete
                           </button>
@@ -386,13 +456,14 @@ const RoomsPage = () => {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 
       {/* Add Room Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-lg w-full p-5 md:p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Add New Room</h2>
             
             <form onSubmit={handleAddRoom} className="space-y-4">
@@ -527,7 +598,7 @@ const RoomsPage = () => {
   if (isAdminRoute) {
     return (
       <AdminLayout title={getLayoutTitle()} userName={storedUser.name || 'Admin'}>
-        <RoomsContent />
+        {roomsContent}
       </AdminLayout>
     );
   } else {
@@ -540,7 +611,7 @@ const RoomsPage = () => {
         navLoading={navLoading}
         panelLabel={`${userRole.charAt(0).toUpperCase() + userRole.slice(1)} Panel`}
       >
-        <RoomsContent />
+        {roomsContent}
       </RoleLayout>
     );
   }

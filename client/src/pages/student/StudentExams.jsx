@@ -7,7 +7,6 @@ const StudentExams = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [schedules, setSchedules] = useState([]);
-  const [results, setResults] = useState([]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -19,13 +18,11 @@ const StudentExams = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const [scheduleRes, resultRes] = await Promise.all([
-        axios.get('/api/exams/student/schedules', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('/api/exams/student/results', { headers: { Authorization: `Bearer ${token}` } })
-      ]);
+      const scheduleRes = await axios.get('/api/exams/student/schedules', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
       if (scheduleRes.data?.success) setSchedules(scheduleRes.data.data || []);
-      if (resultRes.data?.success) setResults(resultRes.data.data || []);
     } catch (error) {
       console.error('Error fetching exam data:', error);
     } finally {
@@ -53,23 +50,18 @@ const StudentExams = () => {
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-indigo-100">Exam Desk</p>
               <h1 className="text-2xl md:text-3xl font-black mt-1">Exams</h1>
-              <p className="text-sm text-indigo-100 mt-1">Check schedules and results in one place.</p>
+              <p className="text-sm text-indigo-100 mt-1">Check your upcoming exam schedules.</p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs font-semibold">
               <span className="px-3 py-1 rounded-full bg-white/15">Schedules: {schedules.length}</span>
-              <span className="px-3 py-1 rounded-full bg-white/15">Results: {results.length}</span>
             </div>
           </div>
         </section>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
             <p className="text-xs text-[#6B7280]">Upcoming Exams</p>
             <p className="text-2xl font-black text-[#4338ca] mt-1">{schedules.length}</p>
-          </div>
-          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
-            <p className="text-xs text-[#6B7280]">Published Results</p>
-            <p className="text-2xl font-black text-[#7c3aed] mt-1">{results.length}</p>
           </div>
         </div>
 
@@ -105,43 +97,6 @@ const StudentExams = () => {
           )}
         </Card>
 
-        <Card className="border border-[#E5E7EB]">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Results</h2>
-          {results.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">No results available yet.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Exam</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Subject</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Marks</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Grade</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.map((result) => (
-                    <tr key={result._id} className="border-t border-gray-200">
-                      <td className="px-4 py-3 text-sm text-gray-900 font-medium">{result.examId?.examName || 'Exam'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{result.subjectId?.name || 'Subject'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {result.marksObtained} / {result.totalMarks}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{result.grade || 'N/A'}</td>
-                      <td className={`px-4 py-3 text-sm font-semibold ${
-                        result.status === 'pass' ? 'text-emerald-600' : 'text-red-500'
-                      }`}>
-                        {result.status}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
       </div>
     </StudentLayout>
   );

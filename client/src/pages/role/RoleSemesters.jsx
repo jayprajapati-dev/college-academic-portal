@@ -22,6 +22,7 @@ const RoleSemesters = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingSemester, setEditingSemester] = useState(null);
   const [stats, setStats] = useState({ total: 0, active: 0 });
+  const [statusUpdatingId, setStatusUpdatingId] = useState(null);
 
   const [formData, setFormData] = useState({
     semesterNumber: '',
@@ -165,6 +166,23 @@ const RoleSemesters = () => {
       } catch (error) {
         alert(error.response?.data?.message || 'Error deleting semester');
       }
+    }
+  };
+
+  const handleToggleStatus = async (semester) => {
+    if (!semester?._id) return;
+    setStatusUpdatingId(semester._id);
+    try {
+      await axios.put(
+        `/api/academic/semesters/${semester._id}`,
+        { isActive: !semester.isActive },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      await fetchSemesters(currentPage);
+    } catch (error) {
+      alert(error.response?.data?.message || 'Error updating semester status');
+    } finally {
+      setStatusUpdatingId(null);
     }
   };
 
@@ -362,16 +380,26 @@ const RoleSemesters = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-center">
-                        <span
-                          className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-[11px] font-black uppercase tracking-wide ${
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(semester)}
+                          disabled={statusUpdatingId === semester._id}
+                          className={`inline-flex items-center gap-2 h-8 px-3 rounded-full text-[11px] font-black uppercase tracking-wide transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                             semester.isActive
-                              ? 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400'
-                              : 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400'
+                              ? 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-500/20'
+                              : 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20'
                           }`}
+                          title="Click to toggle status"
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full ${semester.isActive ? 'bg-green-500' : 'bg-red-500'}`} />
-                          {semester.isActive ? 'Active' : 'Inactive'}
-                        </span>
+                          <span
+                            className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${semester.isActive ? 'bg-green-500' : 'bg-red-500'}`}
+                          >
+                            <span
+                              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${semester.isActive ? 'translate-x-3.5' : 'translate-x-0.5'}`}
+                            />
+                          </span>
+                          {statusUpdatingId === semester._id ? 'Updating...' : semester.isActive ? 'Active' : 'Inactive'}
+                        </button>
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-2">

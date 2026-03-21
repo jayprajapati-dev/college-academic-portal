@@ -2,7 +2,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const router = express.Router();
 const ExamSchedule = require('../models/ExamSchedule');
-const ExamResult = require('../models/ExamResult');
 const Subject = require('../models/Subject');
 const User = require('../models/User');
 const { protect, authorize } = require('../middleware/auth');
@@ -629,131 +628,11 @@ router.delete('/schedules/:id', protect, authorize('admin', 'hod', 'teacher', 'c
     }
 
     await ExamSchedule.findByIdAndDelete(id);
-    await ExamResult.deleteMany({ examId: id });
 
     res.json({ success: true, message: 'Exam schedule deleted' });
   } catch (error) {
     console.error('Delete exam schedule error:', error);
     res.status(500).json({ success: false, message: 'Error deleting exam schedule' });
-  }
-});
-
-router.post('/results/bulk', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
-  try {
-    const { examId, subjectId, results = [] } = req.body;
-
-    if (!examId || !subjectId) {
-      return res.status(400).json({ success: false, message: 'Exam and subject are required' });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(examId) || !mongoose.Types.ObjectId.isValid(subjectId)) {
-      return res.status(400).json({ success: false, message: 'Invalid exam or subject id' });
-    }
-
-    const schedule = await ExamSchedule.findById(examId);
-    if (!schedule) {
-      return res.status(404).json({ success: false, message: 'Exam schedule not found' });
-    }
-
-    const access = await ensureSubjectAccess({
-      subjectId,
-      user: req.user,
-      branchId: String(schedule.branchId),
-      semesterId: String(schedule.semesterId)
-    });
-    if (access.error) {
-      return res.status(403).json({ success: false, message: access.error });
-    }
-
-    const payload = results.map((item) => ({
-      examId,
-      subjectId,
-      studentId: item.studentId,
-      marksObtained: item.marksObtained,
-      totalMarks: item.totalMarks,
-      grade: item.grade,
-      status: item.status || 'pass',
-      remarks: item.remarks,
-      recordedBy: req.user._id,
-      recordedByRole: req.user.role
-    }));
-
-    const operations = payload.map((item) => ({
-      updateOne: {
-        filter: { examId, studentId: item.studentId },
-        update: item,
-        upsert: true
-      }
-    }));
-
-    if (operations.length > 0) {
-      await ExamResult.bulkWrite(operations);
-    }
-
-    res.json({ success: true, message: 'Results saved successfully' });
-  } catch (error) {
-    console.error('Save exam results error:', error);
-    res.status(500).json({ success: false, message: 'Error saving exam results' });
-  }
-});
-
-router.get('/results', protect, authorize('admin', 'hod', 'teacher', 'coordinator'), async (req, res) => {
-  try {
-    const { examId, subjectId, studentId } = req.query;
-    const query = {};
-
-    if (examId) query.examId = examId;
-    if (subjectId) query.subjectId = subjectId;
-    if (studentId) query.studentId = studentId;
-
-    if (req.user.role === 'teacher') {
-      const assignedIds = normalizeIdList(req.user.assignedSubjects || []);
-      if (assignedIds.length === 0) {
-        return res.json({ success: true, count: 0, data: [] });
-      }
-      if (query.subjectId && !assignedIds.includes(String(query.subjectId))) {
-        return res.status(403).json({ success: false, message: 'You can only access results for your assigned subjects' });
-      }
-      query.subjectId = query.subjectId || { $in: assignedIds };
-    }
-
-    if (req.user.role === 'hod') {
-      const allowedBranches = buildBranchScope(req.user);
-      const subjectQuery = { branchId: { $in: allowedBranches } };
-      if (subjectId) subjectQuery._id = subjectId;
-      const subjects = await Subject.find(subjectQuery).select('_id');
-      const subjectIds = subjects.map((subject) => subject._id);
-      query.subjectId = { $in: subjectIds };
-    }
-
-    if (req.user.role === 'coordinator') {
-      const scope = getCoordinatorScope(req.user);
-      if (!scope) {
-        return res.json({ success: true, count: 0, data: [] });
-      }
-
-      const subjectQuery = {
-        branchId: scope.branchId
-      };
-      if (scope.semesterIds.length > 0) {
-        subjectQuery.semesterId = { $in: scope.semesterIds };
-      }
-
-      const subjects = await Subject.find(subjectQuery).select('_id');
-      const subjectIds = subjects.map((subject) => subject._id);
-      query.subjectId = { $in: subjectIds };
-    }
-
-    const results = await ExamResult.find(query)
-      .populate('examId', 'examName examType date')
-      .populate('subjectId', 'name code')
-      .populate('studentId', 'name email enrollmentNumber')
-      .sort({ createdAt: -1 });
-
-    res.json({ success: true, count: results.length, data: results });
-  } catch (error) {
-    console.error('Get exam results error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching exam results' });
   }
 });
 
@@ -773,20 +652,6 @@ router.get('/student/schedules', protect, authorize('student'), async (req, res)
   } catch (error) {
     console.error('Student exam schedules error:', error);
     res.status(500).json({ success: false, message: 'Error fetching exam schedules' });
-  }
-});
-
-router.get('/student/results', protect, authorize('student'), async (req, res) => {
-  try {
-    const results = await ExamResult.find({ studentId: req.user._id })
-      .populate('examId', 'examName examType date')
-      .populate('subjectId', 'name code')
-      .sort({ createdAt: -1 });
-
-    res.json({ success: true, count: results.length, data: results });
-  } catch (error) {
-    console.error('Student exam results error:', error);
-    res.status(500).json({ success: false, message: 'Error fetching exam results' });
   }
 });
 

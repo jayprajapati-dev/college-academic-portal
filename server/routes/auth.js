@@ -317,7 +317,9 @@ router.post('/login', async (req, res) => {
 router.post('/first-login', protect, async (req, res) => {
   try {
     const { newPassword, securityQuestion, securityAnswer, caseInsensitiveAnswer } = req.body;
-    const normalizedQuestion = normalizeSecurityQuestion(securityQuestion);
+    const rawQuestion = String(securityQuestion || '').trim();
+    // Accept predefined questions and also custom question text entered by user.
+    const normalizedQuestion = normalizeSecurityQuestion(rawQuestion) || rawQuestion;
 
     // Validation
     if (!newPassword || !normalizedQuestion || !securityAnswer) {

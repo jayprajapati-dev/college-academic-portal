@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Timetable = require('../models/Timetable');
+const TimetableSettings = require('../models/TimetableSettings');
+const Room = require('../models/Room');
 const User = require('../models/User');
 const Subject = require('../models/Subject');
 const { protect, authorize } = require('../middleware/auth');
@@ -18,18 +20,234 @@ const getHodBranchIds = (user) => Array.from(new Set([
   ...((user?.branches || []).map((branch) => normalizeId(branch)))
 ].filter(Boolean)));
 
-// Helper: Check if user can modify timetable (Admin: all, HOD: own branch only)
+const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const MAX_SLOT_LIMIT = 24;
+
+const toMinutes = (timeValue) => {
+  const value = String(timeValue || '');
+  if (!TIME_PATTERN.test(value)) return null;
+  const [hour, minute] = value.split(':').map((item) => Number(item));
+  return (hour * 60) + minute;
+};
+
+const normalizeDivision = (value, fallback = 'General') => {
+  const normalized = String(value || '').trim();
+  if (!normalized) return fallback;
+  return normalized.slice(0, 30);
+};
+
+const normalizeBreakWindows = (items, dayStartTime, dayEndTime) => {
+  const dayStart = toMinutes(dayStartTime);
+  const dayEnd = toMinutes(dayEndTime);
+
+  const normalized = (Array.isArray(items) ? items : [])
+    .map((item) => ({
+      startTime: String(item?.startTime || '').trim(),
+      endTime: String(item?.endTime || '').trim(),
+      label: String(item?.label || 'Break').trim() || 'Break'
+    }))
+    .filter((item) => TIME_PATTERN.test(item.startTime) && TIME_PATTERN.test(item.endTime))
+    .filter((item) => {
+      const start = toMinutes(item.startTime);
+      const end = toMinutes(item.endTime);
+      if (start === null || end === null || end <= start) return false;
+      if (dayStart === null || dayEnd === null) return true;
+      return start >= dayStart && end <= dayEnd;
+    });
+
+  const seen = new Set();
+  return normalized.filter((item) => {
+    const key = `${item.startTime}-${item.endTime}-${item.label}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const getSlotTimeRange = ({ slot, slotSpan, dayStartTime, slotMinutes }) => {
+  const startSlot = Number(slot);
+  const span = Number(slotSpan);
+  const dayStart = toMinutes(dayStartTime);
+  const duration = Number(slotMinutes);
+  if (!Number.isInteger(startSlot) || !Number.isInteger(span) || dayStart === null || !Number.isInteger(duration)) {
+    return null;
+  }
+  const start = dayStart + ((startSlot - 1) * duration);
+  const end = start + (span * duration);
+  return { start, end };
+};
+
+const sanitizeSettingsPayload = (source = {}) => {
+  const fallback = {
+    dayStartTime: '10:30',
+    dayEndTime: '18:00',
+    slotMinutes: 60,
+    maxSlot: 7,
+    breakSlots: [],
+    breakWindows: [
+      { startTime: '12:30', endTime: '13:00', label: 'Lunch Break' },
+      { startTime: '16:00', endTime: '16:10', label: 'Short Break' }
+    ]
+  };
+
+  const normalizedDayStart = TIME_PATTERN.test(String(source.dayStartTime || ''))
+    ? String(source.dayStartTime)
+    : fallback.dayStartTime;
+  const normalizedDayEnd = TIME_PATTERN.test(String(source.dayEndTime || ''))
+    ? String(source.dayEndTime)
+    : fallback.dayEndTime;
+
+  let slotMinutes = Number(source.slotMinutes);
+  if (!Number.isInteger(slotMinutes) || slotMinutes < 10 || slotMinutes > 180) {
+    slotMinutes = fallback.slotMinutes;
+  }
+
+  const startMinutes = toMinutes(normalizedDayStart) ?? (10 * 60 + 30);
+  const endMinutes = toMinutes(normalizedDayEnd) ?? (18 * 60);
+  const availableMinutes = Math.max(slotMinutes, endMinutes - startMinutes);
+  const derivedMax = Math.max(1, Math.min(MAX_SLOT_LIMIT, Math.floor(availableMinutes / slotMinutes)));
+
+  let maxSlot = Number(source.maxSlot);
+  if (!Number.isInteger(maxSlot) || maxSlot < 1 || maxSlot > MAX_SLOT_LIMIT) {
+    maxSlot = Math.min(fallback.maxSlot, derivedMax);
+  }
+  maxSlot = Math.min(maxSlot, derivedMax);
+
+  const breakSlots = Array.from(new Set(
+    (Array.isArray(source.breakSlots) ? source.breakSlots : [])
+      .map((item) => Number(item))
+      .filter((item) => Number.isInteger(item) && item > 0 && item <= maxSlot)
+  )).sort((a, b) => a - b);
+
+  const breakWindows = normalizeBreakWindows(source.breakWindows, normalizedDayStart, normalizedDayEnd);
+  const finalBreakWindows = breakWindows.length
+    ? breakWindows
+    : normalizeBreakWindows(fallback.breakWindows, normalizedDayStart, normalizedDayEnd);
+
+  return {
+    dayStartTime: normalizedDayStart,
+    dayEndTime: normalizedDayEnd,
+    slotMinutes,
+    maxSlot,
+    breakSlots: breakSlots.length ? breakSlots : fallback.breakSlots.filter((item) => item <= maxSlot),
+    breakWindows: finalBreakWindows
+  };
+};
+
+const getOrCreateSettings = async () => {
+  const rawSettings = await TimetableSettings.collection.findOne({}, { sort: { updatedAt: -1, createdAt: -1 } });
+  if (!rawSettings) {
+    const defaults = sanitizeSettingsPayload();
+    await TimetableSettings.collection.insertOne({
+      ...defaults,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    return defaults;
+  }
+
+  const normalized = sanitizeSettingsPayload(rawSettings);
+  const hasDrift = (
+    String(rawSettings.dayStartTime || '') !== normalized.dayStartTime
+    || String(rawSettings.dayEndTime || '') !== normalized.dayEndTime
+    || Number(rawSettings.slotMinutes) !== normalized.slotMinutes
+    || Number(rawSettings.maxSlot) !== normalized.maxSlot
+    || JSON.stringify((rawSettings.breakSlots || []).map((item) => Number(item)).sort((a, b) => a - b)) !== JSON.stringify(normalized.breakSlots)
+    || JSON.stringify((rawSettings.breakWindows || []).map((item) => ({
+      startTime: String(item?.startTime || ''),
+      endTime: String(item?.endTime || ''),
+      label: String(item?.label || 'Break')
+    }))) !== JSON.stringify(normalized.breakWindows)
+  );
+
+  if (hasDrift) {
+    await TimetableSettings.collection.updateOne(
+      { _id: rawSettings._id },
+      {
+        $set: {
+          ...normalized,
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+
+  return normalized;
+};
+
+const normalizeDuration = (value, lectureType) => {
+  return String(lectureType).toLowerCase() === 'lab' ? 2 : 1;
+};
+
+const validateSlotRangeAgainstSettings = ({ slot, slotSpan, maxSlot, breakSlots, dayStartTime, slotMinutes, breakWindows }) => {
+  const startSlot = Number(slot);
+  const span = Number(slotSpan);
+
+  if (!Number.isInteger(startSlot) || startSlot < 1 || startSlot > maxSlot) {
+    return `Invalid slot. Allowed values are 1 to ${maxSlot}.`;
+  }
+
+  if (!Number.isInteger(span) || span < 1 || span > 4) {
+    return 'Invalid duration. Allowed values are 1 to 4 slots.';
+  }
+
+  if (startSlot + span - 1 > maxSlot) {
+    return `Selected duration exceeds max slot ${maxSlot}.`;
+  }
+
+  const breakSet = new Set((breakSlots || []).map((item) => Number(item)));
+  for (let offset = 0; offset < span; offset += 1) {
+    const targetSlot = startSlot + offset;
+    if (breakSet.has(targetSlot)) {
+      return `Slot ${targetSlot} is configured as fixed break time.`;
+    }
+  }
+
+  const slotRange = getSlotTimeRange({
+    slot: startSlot,
+    slotSpan: span,
+    dayStartTime,
+    slotMinutes
+  });
+
+  if (slotRange && Array.isArray(breakWindows) && breakWindows.length > 0) {
+    for (const win of breakWindows) {
+      const start = toMinutes(win?.startTime);
+      const end = toMinutes(win?.endTime);
+      if (start === null || end === null || end <= start) continue;
+      const overlaps = slotRange.start < end && start < slotRange.end;
+      if (overlaps) {
+        return `Selected class overlaps break window ${win.startTime}-${win.endTime}.`;
+      }
+    }
+  }
+
+  return null;
+};
+
+// Helper: Check if user can modify timetable directly (Admin, scoped HOD, granted user)
 const canModifyTimetable = async (timetableId, user) => {
   const timetable = await Timetable.findById(timetableId);
   if (!timetable) return false;
   const currentUserRole = user?.role;
+  const currentUserId = normalizeId(user?._id);
+
   if (currentUserRole === 'admin') return true;
   if (currentUserRole === 'hod') {
     const timetableBranchId = normalizeId(timetable.branchId);
     const userBranchIds = new Set(getHodBranchIds(user));
     if (userBranchIds.has(timetableBranchId)) return true;
   }
-  return false;
+
+  return (timetable.canBeModifiedBy || []).some((perm) => normalizeId(perm.userId) === currentUserId);
+};
+
+const canReviewTimetableRequest = (timetable, user) => {
+  const role = user?.role;
+  if (role === 'admin') return true;
+  if (role !== 'hod') return false;
+  const hodBranchIds = new Set(getHodBranchIds(user));
+  return hodBranchIds.has(normalizeId(timetable.branchId));
 };
 
 
@@ -45,8 +263,6 @@ const checkSlotConflicts = async ({
   excludeId = null
 }) => {
   const query = {
-    semesterId,
-    branchId,
     dayOfWeek,
     status: 'active'
   };
@@ -121,11 +337,37 @@ router.post('/create', protect, authorize('admin', 'hod'), async (req, res) => {
       roomId,
       dayOfWeek,
       slot,
-      lectureType
+      lectureType,
+      slotSpan,
+      division
     } = req.body;
 
     if (!semesterId || !branchId || !subjectId || !teacherId || !roomId || !dayOfWeek || !slot || !lectureType) {
       return res.status(400).json({ success: false, message: 'All required fields must be provided' });
+    }
+
+    const normalizedLectureType = String(lectureType).toLowerCase() === 'lab' ? 'Lab' : 'Theory';
+    const normalizedSlot = Number(slot);
+    const normalizedSlotSpan = normalizeDuration(slotSpan, normalizedLectureType);
+    const normalizedDivision = normalizeDivision(division);
+
+    const settings = await getOrCreateSettings();
+    const slotValidationError = validateSlotRangeAgainstSettings({
+      slot: normalizedSlot,
+      slotSpan: normalizedSlotSpan,
+      maxSlot: settings.maxSlot,
+      breakSlots: settings.breakSlots,
+      dayStartTime: settings.dayStartTime,
+      slotMinutes: settings.slotMinutes,
+      breakWindows: settings.breakWindows
+    });
+    if (slotValidationError) {
+      return res.status(400).json({ success: false, message: slotValidationError });
+    }
+
+    const room = await Room.findOne({ _id: roomId, isActive: true });
+    if (!room) {
+      return res.status(400).json({ success: false, message: 'Selected room is not active or does not exist.' });
     }
 
     // Only Admin/HOD for their branch
@@ -136,29 +378,20 @@ router.post('/create', protect, authorize('admin', 'hod'), async (req, res) => {
       }
     }
 
-    // Lab = 2 slots, Theory = 1 slot
-    const slotSpan = lectureType === 'Lab' ? 2 : 1;
+    const finalSlotSpan = normalizedSlotSpan;
 
     // Conflict check
     const conflictCheck = await checkSlotConflicts({
       semesterId,
       branchId,
       dayOfWeek,
-      slot,
-      slotSpan,
+      slot: normalizedSlot,
+      slotSpan: finalSlotSpan,
       teacherId,
       roomId
     });
     if (conflictCheck.hasConflict) {
       return res.status(400).json({ success: false, message: 'Conflict detected', conflicts: conflictCheck.conflicts });
-    }
-
-    // Prevent lab splitting
-    if (lectureType === 'Lab') {
-      // Check if next slot is available (no overflow)
-      if (slot >= 7) {
-        return res.status(400).json({ success: false, message: 'Lab cannot be placed at last slot' });
-      }
     }
 
     const timetable = await Timetable.create({
@@ -168,9 +401,10 @@ router.post('/create', protect, authorize('admin', 'hod'), async (req, res) => {
       teacherId,
       roomId,
       dayOfWeek,
-      slot,
-      lectureType,
-      slotSpan,
+      division: normalizedDivision,
+      slot: normalizedSlot,
+      lectureType: normalizedLectureType,
+      slotSpan: finalSlotSpan,
       status: 'active'
     });
     res.status(201).json({ success: true, data: timetable });
@@ -183,8 +417,13 @@ router.post('/create', protect, authorize('admin', 'hod'), async (req, res) => {
 // ============ GET ALL TIMETABLES (Admin) ============
 router.get('/all', protect, authorize('admin', 'hod'), async (req, res) => {
   try {
-    const { semesterId, branchId, dayOfWeek } = req.query;
-    const query = { status: 'active' };
+    const { semesterId, branchId, dayOfWeek, status } = req.query;
+    const query = {};
+    if (status && status !== 'all') {
+      query.status = status;
+    } else if (!status) {
+      query.status = 'active';
+    }
     if (semesterId) query.semesterId = semesterId;
     if (branchId) query.branchId = branchId;
     if (dayOfWeek) query.dayOfWeek = dayOfWeek;
@@ -200,6 +439,119 @@ router.get('/all', protect, authorize('admin', 'hod'), async (req, res) => {
       success: false,
       message: 'Error fetching timetables'
     });
+  }
+});
+
+router.get('/settings', protect, async (req, res) => {
+  try {
+    const settings = await getOrCreateSettings();
+    return res.json({
+      success: true,
+      data: {
+        dayStartTime: settings.dayStartTime || '10:30',
+        dayEndTime: settings.dayEndTime || '18:00',
+        slotMinutes: settings.slotMinutes || 60,
+        maxSlot: settings.maxSlot,
+        breakSlots: settings.breakSlots || [],
+        breakWindows: settings.breakWindows || []
+      }
+    });
+  } catch (error) {
+    console.error('Get timetable settings error:', error);
+    return res.status(500).json({ success: false, message: 'Error fetching timetable settings' });
+  }
+});
+
+router.put('/settings', protect, authorize('admin', 'hod'), async (req, res) => {
+  try {
+    const {
+      dayStartTime = '10:30',
+      dayEndTime = '18:00',
+      slotMinutes = 60,
+      maxSlot,
+      breakSlots,
+      breakWindows
+    } = req.body;
+
+    const normalizedDayStart = String(dayStartTime || '').trim();
+    const normalizedDayEnd = String(dayEndTime || '').trim();
+    const normalizedSlotMinutes = Number(slotMinutes);
+
+    if (!TIME_PATTERN.test(normalizedDayStart) || !TIME_PATTERN.test(normalizedDayEnd)) {
+      return res.status(400).json({ success: false, message: 'dayStartTime and dayEndTime must be in HH:MM format.' });
+    }
+
+    if (!Number.isInteger(normalizedSlotMinutes) || normalizedSlotMinutes < 10 || normalizedSlotMinutes > 180) {
+      return res.status(400).json({ success: false, message: 'slotMinutes must be between 10 and 180.' });
+    }
+
+    const startMinutes = toMinutes(normalizedDayStart);
+    const endMinutes = toMinutes(normalizedDayEnd);
+    if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+      return res.status(400).json({ success: false, message: 'dayEndTime must be greater than dayStartTime.' });
+    }
+
+    const rangeMinutes = endMinutes - startMinutes;
+    const derivedMaxSlot = Math.floor(rangeMinutes / normalizedSlotMinutes);
+    if (derivedMaxSlot < 1) {
+      return res.status(400).json({ success: false, message: 'Configured range is too short for selected slotMinutes.' });
+    }
+
+    const cappedDerivedMaxSlot = Math.min(MAX_SLOT_LIMIT, derivedMaxSlot);
+    let numericMaxSlot = cappedDerivedMaxSlot;
+    if (maxSlot !== undefined && maxSlot !== null && String(maxSlot).trim() !== '') {
+      const requestedMax = Number(maxSlot);
+      if (!Number.isInteger(requestedMax) || requestedMax < 1 || requestedMax > cappedDerivedMaxSlot) {
+        return res.status(400).json({ success: false, message: `maxSlot must be between 1 and ${cappedDerivedMaxSlot} for configured time range.` });
+      }
+      numericMaxSlot = requestedMax;
+    }
+
+    const normalizedBreakSlots = Array.from(new Set((Array.isArray(breakSlots) ? breakSlots : [])
+      .map((item) => Number(item))
+      .filter((item) => Number.isInteger(item) && item > 0 && item <= numericMaxSlot))).sort((a, b) => a - b);
+
+    const normalizedBreakWindows = normalizeBreakWindows(breakWindows, normalizedDayStart, normalizedDayEnd);
+
+    const nextSettings = {
+      dayStartTime: normalizedDayStart,
+      dayEndTime: normalizedDayEnd,
+      slotMinutes: normalizedSlotMinutes,
+      maxSlot: numericMaxSlot,
+      breakSlots: normalizedBreakSlots,
+      breakWindows: normalizedBreakWindows,
+      updatedBy: req.user._id
+    };
+
+    const existing = await TimetableSettings.collection.findOne({}, { sort: { updatedAt: -1, createdAt: -1 } });
+    if (existing?._id) {
+      await TimetableSettings.collection.updateOne(
+        { _id: existing._id },
+        { $set: { ...nextSettings, updatedAt: new Date() } }
+      );
+    } else {
+      await TimetableSettings.collection.insertOne({
+        ...nextSettings,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Timetable settings updated successfully',
+      data: {
+        dayStartTime: nextSettings.dayStartTime,
+        dayEndTime: nextSettings.dayEndTime,
+        slotMinutes: nextSettings.slotMinutes,
+        maxSlot: nextSettings.maxSlot,
+        breakSlots: nextSettings.breakSlots,
+        breakWindows: nextSettings.breakWindows
+      }
+    });
+  } catch (error) {
+    console.error('Update timetable settings error:', error);
+    return res.status(500).json({ success: false, message: 'Error updating timetable settings' });
   }
 });
 
@@ -359,6 +711,280 @@ router.get('/day/:dayOfWeek', protect, async (req, res) => {
   }
 });
 
+// ============ CREATE CHANGE REQUEST (for users without direct control) ============
+router.post('/:id/change-request', protect, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { requestType, reason, proposed = {} } = req.body;
+
+    if (!['modify', 'delete'].includes(requestType)) {
+      return res.status(400).json({ success: false, message: 'requestType must be modify or delete' });
+    }
+
+    const timetable = await Timetable.findById(id);
+    if (!timetable) {
+      return res.status(404).json({ success: false, message: 'Timetable entry not found' });
+    }
+
+    if (await canModifyTimetable(id, req.user)) {
+      return res.status(400).json({
+        success: false,
+        message: 'You already have direct control on this timetable. Use Modify/Delete directly.'
+      });
+    }
+
+    const duplicatePending = (timetable.changeRequests || []).some(
+      (item) => item.status === 'pending' && normalizeId(item.requesterId) === normalizeId(req.user._id)
+    );
+
+    if (duplicatePending) {
+      return res.status(400).json({ success: false, message: 'You already have a pending request for this entry.' });
+    }
+
+    let normalizedProposal = {};
+    if (requestType === 'modify') {
+      const division = normalizeDivision(proposed.division || timetable.division || 'General');
+      const roomId = proposed.roomId || timetable.roomId;
+      const dayOfWeek = proposed.dayOfWeek || timetable.dayOfWeek;
+      const slot = Number(proposed.slot || timetable.slot);
+      const lectureType = String(proposed.lectureType || timetable.lectureType).toLowerCase() === 'lab' ? 'Lab' : 'Theory';
+      const slotSpan = normalizeDuration(proposed.slotSpan || timetable.slotSpan, lectureType);
+
+      if (!roomId || !dayOfWeek || !slot || !lectureType) {
+        return res.status(400).json({ success: false, message: 'Incomplete proposed changes for modify request.' });
+      }
+
+      const settings = await getOrCreateSettings();
+      const slotValidationError = validateSlotRangeAgainstSettings({
+        slot,
+        slotSpan,
+        maxSlot: settings.maxSlot,
+        breakSlots: settings.breakSlots,
+        dayStartTime: settings.dayStartTime,
+        slotMinutes: settings.slotMinutes,
+        breakWindows: settings.breakWindows
+      });
+      if (slotValidationError) {
+        return res.status(400).json({ success: false, message: slotValidationError });
+      }
+
+      const room = await Room.findOne({ _id: roomId, isActive: true });
+      if (!room) {
+        return res.status(400).json({ success: false, message: 'Selected proposed room is inactive or not found.' });
+      }
+
+      normalizedProposal = { division, roomId, dayOfWeek, slot, lectureType, slotSpan };
+    }
+
+    timetable.changeRequests.push({
+      requesterId: req.user._id,
+      requestType,
+      reason: String(reason || '').trim(),
+      proposed: normalizedProposal,
+      status: 'pending'
+    });
+
+    await timetable.save();
+
+    return res.status(201).json({
+      success: true,
+      message: 'Change request submitted to Admin/HOD for approval.'
+    });
+  } catch (error) {
+    console.error('Create timetable change request error:', error);
+    return res.status(500).json({ success: false, message: 'Error creating change request' });
+  }
+});
+
+// ============ LIST CHANGE REQUESTS ============
+router.get('/change-requests/list', protect, async (req, res) => {
+  try {
+    const { status = 'pending' } = req.query;
+    const query = {};
+    if (['pending', 'approved', 'rejected'].includes(status)) {
+      query['changeRequests.status'] = status;
+    }
+
+    const userRole = req.user.role;
+    if (userRole === 'admin') {
+      const entries = await Timetable.find(query)
+        .populate('changeRequests.requesterId', 'name email role')
+        .populate('changeRequests.reviewedBy', 'name role')
+        .populate('changeRequests.proposed.roomId', 'roomNo type')
+        .sort({ updatedAt: -1 });
+
+      const items = [];
+      entries.forEach((entry) => {
+        (entry.changeRequests || []).forEach((request) => {
+          if (status && status !== 'all' && request.status !== status) return;
+          items.push({
+            request,
+            timetable: entry
+          });
+        });
+      });
+
+      return res.json({ success: true, data: items });
+    }
+
+    if (userRole === 'hod') {
+      const hodBranchIds = getHodBranchIds(req.user);
+      const entries = await Timetable.find({
+        ...query,
+        branchId: { $in: hodBranchIds }
+      })
+        .populate('changeRequests.requesterId', 'name email role')
+        .populate('changeRequests.reviewedBy', 'name role')
+        .populate('changeRequests.proposed.roomId', 'roomNo type')
+        .sort({ updatedAt: -1 });
+
+      const items = [];
+      entries.forEach((entry) => {
+        (entry.changeRequests || []).forEach((request) => {
+          if (status && status !== 'all' && request.status !== status) return;
+          items.push({
+            request,
+            timetable: entry
+          });
+        });
+      });
+
+      return res.json({ success: true, data: items });
+    }
+
+    const entries = await Timetable.find({
+      ...query,
+      'changeRequests.requesterId': req.user._id
+    })
+      .populate('changeRequests.requesterId', 'name email role')
+      .populate('changeRequests.reviewedBy', 'name role')
+      .populate('changeRequests.proposed.roomId', 'roomNo type')
+      .sort({ updatedAt: -1 });
+
+    const items = [];
+    entries.forEach((entry) => {
+      (entry.changeRequests || []).forEach((request) => {
+        if (normalizeId(request.requesterId) !== normalizeId(req.user._id)) return;
+        if (status && status !== 'all' && request.status !== status) return;
+        items.push({
+          request,
+          timetable: entry
+        });
+      });
+    });
+
+    return res.json({ success: true, data: items });
+  } catch (error) {
+    console.error('List timetable change requests error:', error);
+    return res.status(500).json({ success: false, message: 'Error fetching change requests' });
+  }
+});
+
+// ============ REVIEW CHANGE REQUEST ============
+router.put('/change-requests/:requestId/review', protect, authorize('admin', 'hod'), async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { decision, reviewNote = '' } = req.body;
+
+    if (!['approved', 'rejected'].includes(decision)) {
+      return res.status(400).json({ success: false, message: 'decision must be approved or rejected' });
+    }
+
+    const timetable = await Timetable.findOne({ 'changeRequests._id': requestId });
+    if (!timetable) {
+      return res.status(404).json({ success: false, message: 'Change request not found' });
+    }
+
+    if (!canReviewTimetableRequest(timetable, req.user)) {
+      return res.status(403).json({ success: false, message: 'No permission to review this request' });
+    }
+
+    const request = timetable.changeRequests.id(requestId);
+    if (!request) {
+      return res.status(404).json({ success: false, message: 'Change request not found' });
+    }
+
+    if (request.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'This request is already reviewed' });
+    }
+
+    if (decision === 'approved') {
+      if (request.requestType === 'delete') {
+        timetable.status = 'archived';
+      } else {
+        const nextRoomId = request.proposed?.roomId || timetable.roomId;
+        const nextDay = request.proposed?.dayOfWeek || timetable.dayOfWeek;
+        const nextSlot = Number(request.proposed?.slot || timetable.slot);
+        const nextDivision = normalizeDivision(request.proposed?.division || timetable.division || 'General');
+        const nextLectureType = String(request.proposed?.lectureType || timetable.lectureType).toLowerCase() === 'lab' ? 'Lab' : 'Theory';
+        const nextSlotSpan = normalizeDuration(request.proposed?.slotSpan || timetable.slotSpan, nextLectureType);
+
+        const settings = await getOrCreateSettings();
+        const slotValidationError = validateSlotRangeAgainstSettings({
+          slot: nextSlot,
+          slotSpan: nextSlotSpan,
+          maxSlot: settings.maxSlot,
+          breakSlots: settings.breakSlots,
+          dayStartTime: settings.dayStartTime,
+          slotMinutes: settings.slotMinutes,
+          breakWindows: settings.breakWindows
+        });
+        if (slotValidationError) {
+          return res.status(400).json({ success: false, message: slotValidationError });
+        }
+
+        const room = await Room.findOne({ _id: nextRoomId, isActive: true });
+        if (!room) {
+          return res.status(400).json({ success: false, message: 'Requested room is inactive or not available.' });
+        }
+
+        const conflictCheck = await checkSlotConflicts({
+          semesterId: timetable.semesterId,
+          branchId: timetable.branchId,
+          dayOfWeek: nextDay,
+          slot: nextSlot,
+          slotSpan: nextSlotSpan,
+          teacherId: timetable.teacherId,
+          roomId: nextRoomId,
+          excludeId: timetable._id
+        });
+
+        if (conflictCheck.hasConflict) {
+          return res.status(400).json({
+            success: false,
+            message: 'Cannot approve request due to current timetable conflict',
+            conflicts: conflictCheck.conflicts
+          });
+        }
+
+        timetable.roomId = nextRoomId;
+        timetable.dayOfWeek = nextDay;
+        timetable.division = nextDivision;
+        timetable.slot = nextSlot;
+        timetable.lectureType = nextLectureType;
+        timetable.slotSpan = nextSlotSpan;
+      }
+    }
+
+    request.status = decision;
+    request.reviewedBy = req.user._id;
+    request.reviewNote = String(reviewNote || '').trim();
+    request.reviewedAt = new Date();
+
+    await timetable.save();
+
+    return res.json({
+      success: true,
+      message: decision === 'approved'
+        ? 'Request approved and timetable updated successfully.'
+        : 'Request rejected successfully.'
+    });
+  } catch (error) {
+    console.error('Review timetable change request error:', error);
+    return res.status(500).json({ success: false, message: 'Error reviewing change request' });
+  }
+});
+
 // ============ GET SINGLE TIMETABLE ============
 router.get('/:id', protect, async (req, res) => {
   try {
@@ -401,7 +1027,7 @@ router.get('/:id', protect, async (req, res) => {
 // ============ UPDATE TIMETABLE ============
 
 // ============ UPDATE TIMETABLE ============
-router.put('/:id', protect, authorize('admin', 'hod'), async (req, res) => {
+router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
     const timetableId = req.params.id;
     const timetable = await Timetable.findById(timetableId);
@@ -409,14 +1035,39 @@ router.put('/:id', protect, authorize('admin', 'hod'), async (req, res) => {
     if (!(await canModifyTimetable(timetableId, req.user))) {
       return res.status(403).json({ success: false, message: 'No permission' });
     }
-    const { roomId, dayOfWeek, slot, lectureType, status } = req.body;
-    if (roomId) timetable.roomId = roomId;
-    if (dayOfWeek) timetable.dayOfWeek = dayOfWeek;
-    if (slot) timetable.slot = slot;
-    if (lectureType) {
-      timetable.lectureType = lectureType;
-      timetable.slotSpan = lectureType === 'Lab' ? 2 : 1;
+    const { roomId, dayOfWeek, division, slot, lectureType, slotSpan, status } = req.body;
+    const normalizedSlot = slot === undefined ? timetable.slot : Number(slot);
+    const normalizedLectureType = lectureType
+      ? (String(lectureType).toLowerCase() === 'lab' ? 'Lab' : 'Theory')
+      : timetable.lectureType;
+    const normalizedSlotSpan = normalizeDuration(slotSpan === undefined ? timetable.slotSpan : slotSpan, normalizedLectureType);
+
+    const settings = await getOrCreateSettings();
+    const slotValidationError = validateSlotRangeAgainstSettings({
+      slot: normalizedSlot,
+      slotSpan: normalizedSlotSpan,
+      maxSlot: settings.maxSlot,
+      breakSlots: settings.breakSlots,
+      dayStartTime: settings.dayStartTime,
+      slotMinutes: settings.slotMinutes,
+      breakWindows: settings.breakWindows
+    });
+    if (slotValidationError) {
+      return res.status(400).json({ success: false, message: slotValidationError });
     }
+
+    if (roomId) {
+      const room = await Room.findOne({ _id: roomId, isActive: true });
+      if (!room) {
+        return res.status(400).json({ success: false, message: 'Selected room is not active or does not exist.' });
+      }
+      timetable.roomId = roomId;
+    }
+    if (dayOfWeek) timetable.dayOfWeek = dayOfWeek;
+    if (division !== undefined) timetable.division = normalizeDivision(division, timetable.division || 'General');
+    timetable.slot = normalizedSlot;
+    timetable.lectureType = normalizedLectureType;
+    timetable.slotSpan = normalizedSlotSpan;
     if (status) timetable.status = status;
     // Conflict check
     const conflictCheck = await checkSlotConflicts({
@@ -432,10 +1083,6 @@ router.put('/:id', protect, authorize('admin', 'hod'), async (req, res) => {
     if (conflictCheck.hasConflict) {
       return res.status(400).json({ success: false, message: 'Conflict detected', conflicts: conflictCheck.conflicts });
     }
-    // Prevent lab splitting
-    if (timetable.lectureType === 'Lab' && timetable.slot >= 7) {
-      return res.status(400).json({ success: false, message: 'Lab cannot be placed at last slot' });
-    }
     await timetable.save();
     res.json({ success: true, data: timetable });
   } catch (error) {
@@ -447,7 +1094,7 @@ router.put('/:id', protect, authorize('admin', 'hod'), async (req, res) => {
 
 // ============ DELETE TIMETABLE ============
 // Soft delete timetable (status = 'archived')
-router.delete('/:id', protect, authorize('admin', 'hod'), async (req, res) => {
+router.delete('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, res) => {
   try {
     const timetableId = req.params.id;
     const timetable = await Timetable.findById(timetableId);
@@ -514,16 +1161,16 @@ const updateTimetableStatus = async (req, res) => {
     }
 
     if (status === 'active') {
-      const conflictCheck = await checkConflicts(
-        timetable.semesterId,
-        timetable.branchId,
-        timetable.dayOfWeek,
-        timetable.startTime,
-        timetable.endTime,
-        timetable.teacherId,
-        timetable.roomNo,
-        timetable._id
-      );
+      const conflictCheck = await checkSlotConflicts({
+        semesterId: timetable.semesterId,
+        branchId: timetable.branchId,
+        dayOfWeek: timetable.dayOfWeek,
+        slot: timetable.slot,
+        slotSpan: timetable.slotSpan,
+        teacherId: timetable.teacherId,
+        roomId: timetable.roomId,
+        excludeId: timetable._id
+      });
 
       if (conflictCheck.hasConflict) {
         return res.status(400).json({

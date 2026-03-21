@@ -24,8 +24,8 @@ const RoleHODSubjects = () => {
     const toIdSet = (list) => new Set((list || []).map((item) => String(getIdValue(item))));
     return new Set([
       ...toIdSet(user?.branches),
-      ...(user?.branch ? [String(user.branch)] : []),
-      ...(user?.department ? [String(user.department)] : [])
+      ...(user?.branch ? [String(getIdValue(user.branch))] : []),
+      ...(user?.department ? [String(getIdValue(user.department))] : [])
     ]);
   }, [user]);
 
@@ -199,6 +199,14 @@ const RoleHODSubjects = () => {
       totalCredits: subjects.reduce((sum, s) => sum + (s.credits || 0), 0)
     };
   }, [subjects]);
+
+  const activeSemesters = useMemo(
+    () => semesters.filter((sem) => {
+      const value = sem?.isActive;
+      return ![false, 'false', 0, '0', null].includes(value);
+    }),
+    [semesters]
+  );
 
   // Open Add Modal
   const handleAddSubject = () => {
@@ -508,7 +516,7 @@ const RoleHODSubjects = () => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All Semesters</option>
-                {semesters.map((sem) => (
+                {activeSemesters.map((sem) => (
                   <option key={sem._id} value={sem._id}>
                     Sem {sem.semesterNumber}
                   </option>
@@ -821,7 +829,7 @@ const RoleHODSubjects = () => {
                       className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                     >
                       <option value="">Select semester</option>
-                      {semesters.map((sem) => (
+                      {activeSemesters.map((sem) => (
                         <option key={sem._id} value={sem._id}>
                           Semester {sem.semesterNumber}
                         </option>

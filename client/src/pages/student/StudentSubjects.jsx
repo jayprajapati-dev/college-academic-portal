@@ -8,6 +8,8 @@ const StudentSubjects = () => {
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [semesterFilter, setSemesterFilter] = useState('All');
+  const [typeFilter, setTypeFilter] = useState('All');
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -58,6 +60,16 @@ const StudentSubjects = () => {
 
   const filtered = useMemo(() => {
     return subjects.filter((subject) => {
+      if (semesterFilter !== 'All') {
+        const semNo = String(subject?.semesterId?.semesterNumber || 'N/A');
+        if (semNo !== semesterFilter) return false;
+      }
+
+      if (typeFilter !== 'All') {
+        const normalizedType = String(subject?.type || '').toLowerCase();
+        if (!normalizedType.includes(typeFilter.toLowerCase())) return false;
+      }
+
       if (!searchTerm) return true;
       const term = searchTerm.toLowerCase();
       return (
@@ -65,7 +77,17 @@ const StudentSubjects = () => {
         subject.code?.toLowerCase().includes(term)
       );
     });
-  }, [searchTerm, subjects]);
+  }, [searchTerm, semesterFilter, subjects, typeFilter]);
+
+  const semesterOptions = useMemo(
+    () => Array.from(new Set(subjects.map((subject) => String(subject?.semesterId?.semesterNumber || 'N/A')))).sort((a, b) => Number(a) - Number(b)),
+    [subjects]
+  );
+
+  const typeOptions = useMemo(
+    () => Array.from(new Set(subjects.map((subject) => String(subject?.type || 'N/A')))),
+    [subjects]
+  );
 
   const subjectStats = useMemo(() => {
     const total = subjects.length;
@@ -119,18 +141,42 @@ const StudentSubjects = () => {
           </div>
         </section>
 
-        <div className="flex items-center justify-between px-1">
-          <p className="text-sm font-semibold text-[#475569]">
-            {filtered.length} subject{filtered.length === 1 ? '' : 's'} visible
-          </p>
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="text-xs font-semibold text-[#194ce6] hover:underline"
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-1">
+          <p className="text-sm font-semibold text-[#475569]">{filtered.length} subject{filtered.length === 1 ? '' : 's'} visible</p>
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={semesterFilter}
+              onChange={(e) => setSemesterFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-[#CBD5E1] rounded-lg bg-white"
             >
-              Clear Search
-            </button>
-          )}
+              <option value="All">All Semesters</option>
+              {semesterOptions.map((value) => (
+                <option key={value} value={value}>{value === 'N/A' ? 'Semester N/A' : `Semester ${value}`}</option>
+              ))}
+            </select>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-[#CBD5E1] rounded-lg bg-white"
+            >
+              <option value="All">All Types</option>
+              {typeOptions.map((value) => (
+                <option key={value} value={value}>{value}</option>
+              ))}
+            </select>
+            {(searchTerm || semesterFilter !== 'All' || typeFilter !== 'All') && (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setSemesterFilter('All');
+                  setTypeFilter('All');
+                }}
+                className="text-xs font-semibold text-[#194ce6] hover:underline px-2"
+              >
+                Reset Filters
+              </button>
+            )}
+          </div>
         </div>
 
         {filtered.length === 0 ? (
@@ -172,33 +218,21 @@ const StudentSubjects = () => {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
+                    <span className="px-2.5 py-1 rounded-full bg-[#E0E7FF] text-[#3730A3]">Materials</span>
+                    <span className="px-2.5 py-1 rounded-full bg-[#DBEAFE] text-[#1D4ED8]">Tasks</span>
+                    <span className="px-2.5 py-1 rounded-full bg-[#DCFCE7] text-[#166534]">Library</span>
+                    <span className="px-2.5 py-1 rounded-full bg-[#F3E8FF] text-[#7E22CE]">Timetable</span>
+                  </div>
+
                   <Button
                     onClick={() => navigate(`/subjects/${subject._id}/materials?source=student-panel`, {
-                      state: { subject, source: 'student-panel' }
+                      state: { subject, source: 'student-panel', openMode: 'workspace' }
                     })}
-                    className="bg-[#194ce6] hover:bg-[#1e40af] text-sm flex-1 min-w-[108px]"
+                    className="bg-[#194ce6] hover:bg-[#1e40af] text-sm w-full"
                   >
-                    <span className="material-symbols-outlined text-[16px]">description</span>
-                    Materials
+                    Open Subject Workspace
                   </Button>
-                  <Button
-                    onClick={() => navigate(`/subjects/${subject._id}/tasks`)}
-                    variant="secondary"
-                    className="text-sm flex-1 min-w-[88px]"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">assignment</span>
-                    Tasks
-                  </Button>
-                  <Button
-                    onClick={() => navigate(`/student/library?subjectId=${subject._id}`)}
-                    variant="secondary"
-                    className="text-sm flex-1 min-w-[94px]"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">local_library</span>
-                    Library
-                  </Button>
-                </div>
                 </div>
               </Card>
             ))}

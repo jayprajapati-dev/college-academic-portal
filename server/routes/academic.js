@@ -56,6 +56,22 @@ const uniqueObjectIds = (values) => {
   return out;
 };
 
+const autoDeactivateExpiredSemesters = async () => {
+  const now = new Date();
+  await Semester.updateMany(
+    {
+      isActive: true,
+      endDate: { $type: 'date', $lt: now }
+    },
+    {
+      $set: {
+        isActive: false,
+        updatedAt: now
+      }
+    }
+  );
+};
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -95,13 +111,16 @@ const upload = multer({
 // ======================
 
 // @route   GET /api/academic/semesters
-// @desc    Get all semesters (PUBLIC - for landing page)
+// @desc    Get active semesters (PUBLIC - for landing page/forms)
 // @access  Public
 router.get('/semesters', async (req, res) => {
   try {
-    const semesters = await Semester.find()
+    await autoDeactivateExpiredSemesters();
+    const semesters = await Semester.find({
+      isActive: { $nin: [false, 'false', 0, '0', null] }
+    })
       .sort({ semesterNumber: 1 })
-      .select('_id name semesterNumber startDate endDate');
+      .select('_id name semesterNumber startDate endDate isActive');
 
     res.json({
       success: true,
@@ -484,6 +503,7 @@ router.get('/branch-stats', protect, authorize('admin', 'hod'), async (req, res)
 // @access  Private/Admin/HOD
 router.get('/semesters/admin/list', protect, authorize('admin', 'hod'), async (req, res) => {
   try {
+    await autoDeactivateExpiredSemesters();
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;

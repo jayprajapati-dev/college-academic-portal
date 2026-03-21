@@ -22,8 +22,8 @@ const RoleSubjects = () => {
     const toIdSet = (list) => new Set((list || []).map((item) => String(getIdValue(item))));
     return new Set([
       ...toIdSet(user?.branches),
-      ...(user?.branch ? [String(user.branch)] : []),
-      ...(user?.department ? [String(user.department)] : [])
+      ...(user?.branch ? [String(getIdValue(user.branch))] : []),
+      ...(user?.department ? [String(getIdValue(user.department))] : [])
     ]);
   }, [isHod, user]);
 
@@ -495,7 +495,11 @@ const RoleSubjects = () => {
   }, [branches, hodBranchIds, isHod]);
 
   const visibleSemesters = useMemo(() => {
-    if (!isHod) return semesters;
+    const isSemesterActive = (sem) => ![false, 'false', 0, '0', null].includes(sem?.isActive);
+
+    if (!isHod) {
+      return semesters.filter((sem) => isSemesterActive(sem));
+    }
     if (hodBranchIds.size === 0) return [];
 
     const getIdValue = (value) => (value && typeof value === 'object' ? value._id : value);
@@ -507,7 +511,7 @@ const RoleSubjects = () => {
     );
 
     if (allowedSemesterIds.size === 0) return [];
-    return semesters.filter((sem) => allowedSemesterIds.has(String(sem._id)));
+    return semesters.filter((sem) => allowedSemesterIds.has(String(sem._id)) && isSemesterActive(sem));
   }, [branches, hodBranchIds, isHod, semesters]);
 
   return (

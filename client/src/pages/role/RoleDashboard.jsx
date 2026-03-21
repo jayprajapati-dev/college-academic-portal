@@ -660,33 +660,33 @@ const RoleDashboard = () => {
           <div className="absolute right-0 top-0 h-52 w-52 translate-x-12 -translate-y-10 rounded-full bg-[#86efac]/20 blur-3xl" />
           <div className="absolute bottom-0 left-1/3 h-24 w-48 translate-y-10 rounded-full bg-black/25 blur-2xl" />
 
-          <div className="relative z-10 grid gap-6 lg:grid-cols-[1.2fr_0.95fr] lg:items-center">
-            <div className="space-y-5">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.32em] text-cyan-50 shadow-[0_12px_28px_rgba(15,118,110,0.22)] backdrop-blur-md sm:px-4 sm:text-[11px]">
-                Department Command Deck
+          <div className="relative z-10 grid gap-6">
+            <div className="space-y-4 md:space-y-5 max-w-4xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-50 shadow-[0_12px_28px_rgba(15,118,110,0.22)] backdrop-blur-md sm:px-4 sm:text-[11px]">
+                Department Dashboard
               </div>
 
               <div className="space-y-3">
-                <h2 className="text-2xl font-black tracking-tight sm:text-3xl md:text-5xl">
-                  Control view for {activeBranchName || user?.branch?.name || 'your branch'}
+                <h2 className="text-2xl font-black tracking-tight sm:text-3xl md:text-4xl lg:text-5xl">
+                  Department Overview
                 </h2>
                 <p className="hidden sm:block max-w-2xl text-sm leading-6 text-cyan-50/90 md:text-base">
-                  Welcome, {user?.name || 'HOD'}. Track faculty strength, content readiness, student load, and branch activity from one clean dashboard surface.
+                  Welcome, {user?.name || 'HOD'}. Review faculty strength, content status, student count, and key branch updates in one place.
                 </p>
                 <p className="sm:hidden text-xs text-cyan-50/85">
-                  Welcome, {user?.name || 'HOD'}. Branch operations at a glance.
+                  Welcome, {user?.name || 'HOD'}. Branch overview at a glance.
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-2 overflow-x-auto pb-1 text-[11px] font-semibold text-white/90 sm:overflow-visible sm:gap-3 sm:text-xs">
-                <span className="shrink-0 whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-3 py-1.5 shadow-[0_10px_24px_rgba(15,118,110,0.16)] backdrop-blur-md">
+              <div className="flex flex-nowrap gap-1.5 overflow-x-auto pb-1 text-[10px] font-semibold text-white/90 sm:flex-wrap sm:overflow-visible sm:gap-3 sm:text-xs">
+                <span className="shrink-0 whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-2.5 py-1.5 shadow-[0_10px_24px_rgba(15,118,110,0.16)] backdrop-blur-md sm:px-3">
                   Branch: {activeBranchName || user?.branch?.name || 'N/A'}
                 </span>
-                <span className="shrink-0 whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-3 py-1.5 shadow-[0_10px_24px_rgba(15,118,110,0.16)] backdrop-blur-md">
-                  {hodStats.teachers} teachers active
+                <span className="shrink-0 whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-2.5 py-1.5 shadow-[0_10px_24px_rgba(15,118,110,0.16)] backdrop-blur-md sm:px-3">
+                  Faculty: {hodStats.teachers}
                 </span>
-                <span className="shrink-0 whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-3 py-1.5 shadow-[0_10px_24px_rgba(15,118,110,0.16)] backdrop-blur-md">
-                  {unreadCount} unread alerts
+                <span className="shrink-0 whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-2.5 py-1.5 shadow-[0_10px_24px_rgba(15,118,110,0.16)] backdrop-blur-md sm:px-3">
+                  Alerts: {unreadCount}
                 </span>
               </div>
 
@@ -695,7 +695,7 @@ const RoleDashboard = () => {
                   onClick={() => navigate('/hod/manage-teachers')}
                   className="rounded-2xl bg-white px-3 py-2 text-xs font-black text-[#0f766e] shadow-[0_18px_40px_rgba(7,89,133,0.25)] transition duration-200 hover:-translate-y-1 sm:px-4 sm:py-2.5 sm:text-sm"
                 >
-                  Manage Teachers
+                  Manage Faculty
                 </button>
                 <button
                   onClick={() => navigate('/hod/reports')}
@@ -729,68 +729,68 @@ const RoleDashboard = () => {
               </div>
             </div>
 
-            {/* Desktop Stats Cards */}
-            <div className="hidden lg:grid gap-4 xl:grid-cols-1">
-              <div className="rounded-[1.9rem] border border-white/15 bg-white/10 p-5 shadow-[0_22px_55px_rgba(8,47,73,0.24)] backdrop-blur-xl">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-100/80">Signal Grid</p>
-                    <p className="mt-2 text-xl font-black">Branch systems</p>
-                    <p className="mt-1 text-sm text-cyan-50/75">A quick look at teacher, content, and student coverage.</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-left sm:text-right backdrop-blur-md">
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-white/60">Content Units</p>
-                    <p className="mt-1 text-3xl font-black leading-none">{hodStats.content}</p>
-                    <p className="mt-2 text-xs text-white/65">Subjects and content mapped to the branch.</p>
-                  </div>
-                </div>
+          </div>
+        </section>
 
-                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded-[1.35rem] border border-white/12 bg-[#ecfeff]/10 p-4">
-                    <p className="text-xs text-cyan-100/75">Teachers</p>
-                    <p className="mt-2 text-4xl font-black leading-none text-white">{hodStats.teachers}</p>
-                    <p className="mt-2 text-xs text-cyan-100/65">Faculty mapped</p>
-                  </div>
-                  <div className="rounded-[1.35rem] border border-white/12 bg-[#f5f3ff]/10 p-4">
-                    <p className="text-xs text-cyan-100/75">Students</p>
-                    <p className="mt-2 text-4xl font-black leading-none text-white">{hodStats.students}</p>
-                    <p className="mt-2 text-xs text-cyan-100/65">Branch strength</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-[1.5rem] border border-white/12 bg-black/12 px-4 py-4">
-                  <p className="text-xs text-cyan-100/75">Operational balance</p>
-                  <p className="mt-1 text-base font-black text-white">Keep faculty, content, and student flow aligned.</p>
-                </div>
+        <section className="hidden lg:grid lg:grid-cols-2 gap-4">
+          <div className="rounded-[1.9rem] border border-white/15 bg-[linear-gradient(135deg,#073b4c_0%,#0b3954_40%,#116466_100%)] p-5 text-white shadow-[0_22px_55px_rgba(8,47,73,0.24)] backdrop-blur-xl">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-100/80">Signal Grid</p>
+                <p className="mt-2 text-xl font-black">Branch systems</p>
+                <p className="mt-1 text-sm text-cyan-50/75">A quick look at teacher, content, and student coverage.</p>
               </div>
-
-              <div className="rounded-[1.9rem] border border-white/15 bg-white/10 p-5 shadow-[0_22px_55px_rgba(4,28,50,0.24)] backdrop-blur-xl">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.28em] text-emerald-100/80">Branch Pulse</p>
-                    <p className="mt-2 text-xl font-black">Operational focus</p>
-                    <p className="mt-1 text-sm text-emerald-50/75">Core branch indicators that need your attention.</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/12 bg-white/10 px-4 py-3 text-left sm:text-right">
-                    <p className="text-[10px] uppercase tracking-[0.18em] text-white/60">Unread Alerts</p>
-                    <p className="mt-1 text-3xl font-black leading-none text-white">{unreadCount}</p>
-                  </div>
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  {hodPulseMetrics.map((item) => (
-                    <div
-                      key={item.label}
-                      className="rounded-[1.35rem] border border-white/12 bg-black/10 p-4"
-                    >
-                      <div className={`h-1.5 w-16 rounded-full bg-gradient-to-r ${item.surface}`} />
-                      <p className="mt-3 text-[11px] uppercase tracking-[0.2em] text-white/65">{item.label}</p>
-                      <p className="mt-2 text-3xl font-black leading-none text-white">{item.value}</p>
-                      <p className="mt-2 text-xs text-white/65">{item.caption}</p>
-                    </div>
-                  ))}
-                </div>
+              <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-left sm:text-right backdrop-blur-md">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-white/60">Content Units</p>
+                <p className="mt-1 text-3xl font-black leading-none">{hodStats.content}</p>
+                <p className="mt-2 text-xs text-white/65">Subjects and content mapped to the branch.</p>
               </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-[1.35rem] border border-white/12 bg-[#ecfeff]/10 p-4">
+                <p className="text-xs text-cyan-100/75">Teachers</p>
+                <p className="mt-2 text-4xl font-black leading-none text-white">{hodStats.teachers}</p>
+                <p className="mt-2 text-xs text-cyan-100/65">Faculty mapped</p>
+              </div>
+              <div className="rounded-[1.35rem] border border-white/12 bg-[#f5f3ff]/10 p-4">
+                <p className="text-xs text-cyan-100/75">Students</p>
+                <p className="mt-2 text-4xl font-black leading-none text-white">{hodStats.students}</p>
+                <p className="mt-2 text-xs text-cyan-100/65">Branch strength</p>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-[1.5rem] border border-white/12 bg-black/12 px-4 py-4">
+              <p className="text-xs text-cyan-100/75">Operational balance</p>
+              <p className="mt-1 text-base font-black text-white">Keep faculty, content, and student flow aligned.</p>
+            </div>
+          </div>
+
+          <div className="rounded-[1.9rem] border border-white/15 bg-[linear-gradient(135deg,#1f2937_0%,#0f172a_45%,#1e3a8a_100%)] p-5 text-white shadow-[0_22px_55px_rgba(4,28,50,0.24)] backdrop-blur-xl">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-emerald-100/80">Branch Pulse</p>
+                <p className="mt-2 text-xl font-black">Operational focus</p>
+                <p className="mt-1 text-sm text-emerald-50/75">Core branch indicators that need your attention.</p>
+              </div>
+              <div className="rounded-2xl border border-white/12 bg-white/10 px-4 py-3 text-left sm:text-right">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-white/60">Unread Alerts</p>
+                <p className="mt-1 text-3xl font-black leading-none text-white">{unreadCount}</p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {hodPulseMetrics.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-[1.35rem] border border-white/12 bg-black/10 p-4"
+                >
+                  <div className={`h-1.5 w-16 rounded-full bg-gradient-to-r ${item.surface}`} />
+                  <p className="mt-3 text-[11px] uppercase tracking-[0.2em] text-white/65">{item.label}</p>
+                  <p className="mt-2 text-3xl font-black leading-none text-white">{item.value}</p>
+                  <p className="mt-2 text-xs text-white/65">{item.caption}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -930,61 +930,61 @@ const RoleDashboard = () => {
           </div>
         </section>
 
-        <div className="hidden md:grid grid-cols-1 gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-          <section className="relative overflow-hidden rounded-[2rem] border border-[#d9f99d] bg-[linear-gradient(180deg,#f7fee7_0%,#ecfccb_100%)] p-5 shadow-[0_24px_60px_rgba(101,163,13,0.14)] md:p-6">
+        <div className="grid grid-cols-1 gap-4 md:gap-5 md:grid-cols-[1.05fr_0.95fr]">
+          <section className="relative overflow-hidden rounded-[1.4rem] border border-[#d9f99d] bg-[linear-gradient(180deg,#f7fee7_0%,#ecfccb_100%)] p-3.5 shadow-[0_16px_40px_rgba(101,163,13,0.14)] md:rounded-[2rem] md:p-6 md:shadow-[0_24px_60px_rgba(101,163,13,0.14)] md:order-2">
             <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-white/40 blur-3xl" />
             <div className="relative">
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start justify-between gap-2.5 md:gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#3f6212]">Operational Snapshot</p>
-                  <h3 className="mt-2 text-2xl font-black text-[#1f2937]">Branch pulse and quick access</h3>
-                  <p className="mt-1 text-sm text-[#4b5563]">Live workflow signals{syncStamp ? ` • synced at ${syncStamp}` : ''}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#3f6212] md:text-xs md:tracking-[0.3em]">Operational Snapshot</p>
+                  <h3 className="mt-1.5 text-base font-black text-[#1f2937] leading-tight md:mt-2 md:text-2xl">Branch pulse and quick access</h3>
+                  <p className="mt-1 text-[11px] text-[#4b5563] md:text-sm">Live workflow signals{syncStamp ? ` • synced at ${syncStamp}` : ''}</p>
                 </div>
-                <div className="rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-right shadow-sm backdrop-blur-sm">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-[#6b7280]">Unread</p>
-                  <p className="mt-1 text-3xl font-black text-[#0f172a]">{unreadCount}</p>
+                <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-2 text-right shadow-sm backdrop-blur-sm md:rounded-2xl md:px-4 md:py-3">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-[#6b7280] md:text-[11px] md:tracking-[0.22em]">Unread</p>
+                  <p className="mt-1 text-xl font-black text-[#0f172a] md:text-3xl">{unreadCount}</p>
                 </div>
               </div>
 
-              <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:mt-6 md:gap-3">
                 {dashboardInsights.map((item, index) => (
                   <div
                     key={item.label}
-                    className="rounded-[1.4rem] border border-white/70 bg-white/80 p-4 shadow-[0_14px_30px_rgba(15,23,42,0.07)] backdrop-blur-sm"
-                    style={{ transform: `rotateY(${index === 1 ? '0deg' : index === 0 ? '-3deg' : '3deg'})` }}
+                    className={`rounded-xl border border-white/70 bg-white/80 p-3 shadow-[0_10px_20px_rgba(15,23,42,0.07)] backdrop-blur-sm md:rounded-[1.4rem] md:p-4 md:shadow-[0_14px_30px_rgba(15,23,42,0.07)] ${index === 2 ? 'col-span-2 sm:col-span-1' : ''}`}
                   >
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-[#64748b]">{item.label}</p>
-                    <p className={`mt-2 text-3xl font-black ${item.tone}`}>{item.value}</p>
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-[#64748b] md:text-[11px] md:tracking-[0.2em]">{item.label}</p>
+                    <p className={`mt-1.5 text-2xl font-black md:mt-2 md:text-3xl ${item.tone}`}>{item.value}</p>
                   </div>
                 ))}
               </div>
 
-              <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-2 xl:grid-cols-3 md:mt-6 md:gap-3">
                 {hodActions.slice(0, 6).map((item) => (
                   <button
                     key={`quick-${item.title}`}
                     onClick={item.action}
-                    className="rounded-[1.3rem] border border-white/70 bg-white/80 px-4 py-3 text-left shadow-[0_12px_28px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5"
+                    className="rounded-xl border border-white/70 bg-white/80 px-3 py-2.5 text-left shadow-[0_8px_18px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 md:rounded-[1.3rem] md:px-4 md:py-3 md:shadow-[0_12px_28px_rgba(15,23,42,0.06)]"
                   >
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-[#64748b]">{item.eyebrow}</p>
-                    <p className="mt-1 text-sm font-black text-[#0f172a]">{item.title}</p>
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-[#64748b] md:text-[11px] md:tracking-[0.2em]">{item.eyebrow}</p>
+                    <p className="mt-1 text-xs font-black text-[#0f172a] md:text-sm">{item.title}</p>
                   </button>
                 ))}
               </div>
             </div>
           </section>
 
-          <section className="relative overflow-hidden rounded-[2rem] border border-[#e9d5ff] bg-[linear-gradient(180deg,#ffffff_0%,#faf5ff_100%)] shadow-[0_24px_60px_rgba(124,58,237,0.12)]">
+          <section className="relative overflow-hidden rounded-[2rem] border border-[#e9d5ff] bg-[linear-gradient(180deg,#ffffff_0%,#faf5ff_100%)] shadow-[0_24px_60px_rgba(124,58,237,0.12)] md:order-1">
+
             <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-[#e9d5ff]/60 blur-3xl" />
             <div className="relative border-b border-[#f3e8ff] px-5 py-4 md:px-6">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-2 md:gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#7c3aed]">Recent Activity</p>
-                  <h3 className="mt-2 text-2xl font-black text-[#111827]">Branch update stream</h3>
+                  <p className="hidden md:block text-xs font-bold uppercase tracking-[0.28em] text-[#7c3aed]">Recent Activity</p>
+                  <h3 className="text-sm font-black text-[#111827] whitespace-nowrap md:mt-2 md:text-2xl">Branch update stream</h3>
                 </div>
                 <button
                   onClick={() => navigate('/hod/notices')}
-                  className="rounded-full border border-[#ddd6fe] bg-white px-4 py-2 text-xs font-bold text-[#6d28d9] shadow-sm"
+                  className="shrink-0 whitespace-nowrap rounded-full border border-[#ddd6fe] bg-white px-3 py-1.5 text-[11px] font-bold text-[#6d28d9] shadow-sm md:px-4 md:py-2 md:text-xs"
                 >
                   Open Notice Board
                 </button>
@@ -1003,7 +1003,6 @@ const RoleDashboard = () => {
                       key={item._id}
                       onClick={() => navigate(item.actionUrl || item.link || '/hod/notices')}
                       className="group w-full rounded-[1.4rem] border border-[#ede9fe] bg-white/85 px-4 py-4 text-left shadow-[0_14px_30px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-0.5"
-                      style={{ transform: `rotateY(${index % 2 === 0 ? '-2deg' : '2deg'})` }}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
