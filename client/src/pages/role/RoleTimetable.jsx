@@ -103,12 +103,23 @@ const RoleTimetable = () => {
   const [activeHodBranchId, setActiveHodBranchId] = useState('');
   const [lastUpdatedAt, setLastUpdatedAt] = useState(new Date());
   const [authFailed, setAuthFailed] = useState(false);
+  const [mobileWeekDay, setMobileWeekDay] = useState('Monday');
 
   const token = localStorage.getItem('token');
   const canCreateTimetable = isAdmin || isHod;
   const canReviewRequests = isAdmin || isHod;
   const panelLabel = isAdmin ? 'Admin Panel' : isHod ? 'HOD Panel' : 'Teacher Panel';
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const mobileDays = useMemo(() => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], []);
+  const realTodayName = useMemo(() => new Date().toLocaleDateString('en-US', { weekday: 'long' }), []);
+  const todayWeekDay = useMemo(() => {
+    return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].includes(realTodayName) ? realTodayName : 'Monday';
+  }, [realTodayName]);
+  const todayAutoLabel = useMemo(() => {
+    return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].includes(realTodayName)
+      ? realTodayName
+      : `${realTodayName} (Holiday)`;
+  }, [realTodayName]);
   const toMinutes = useCallback((timeValue) => {
     const value = String(timeValue || '');
     const match = value.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
@@ -153,7 +164,7 @@ const RoleTimetable = () => {
       list.push({
         value: slot,
         isBreak,
-        label: `Slot ${slot} (${minutesToDisplayTime(start)} - ${minutesToDisplayTime(end)})${isBreak ? ' [Break]' : ''}`
+        label: `Slot ${slot} (${minutesToDisplayTime(start)} - ${minutesToDisplayTime(end)})`
       });
     }
 
@@ -655,6 +666,16 @@ const RoleTimetable = () => {
     return () => clearInterval(intervalId);
   }, [authFailed, fetchTimetables, token]);
 
+  useEffect(() => {
+    setMobileWeekDay(mobileDays.includes(realTodayName) ? realTodayName : todayWeekDay);
+  }, [mobileDays, realTodayName, todayWeekDay]);
+
+  useEffect(() => {
+    if (filters.dayOfWeek && ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].includes(filters.dayOfWeek)) {
+      setMobileWeekDay(filters.dayOfWeek);
+    }
+  }, [filters.dayOfWeek]);
+
   const filteredTimetables = useMemo(() => {
     return timetables.filter((entry) => {
       const semMatch = !filters.semesterId || getId(entry.semesterId) === filters.semesterId;
@@ -669,6 +690,18 @@ const RoleTimetable = () => {
   }, [activeHodBranchId, filters.branchId, filters.dayOfWeek, filters.semesterId, filters.status, getId, isHod, timetables]);
 
   const timeSlots = useMemo(() => SLOT_OPTIONS.map((item) => item.value), [SLOT_OPTIONS]);
+
+  const breakSlotOrder = useMemo(() => {
+    const map = {};
+    let order = 0;
+    SLOT_OPTIONS.forEach((item) => {
+      if (item.isBreak) {
+        order += 1;
+        map[item.value] = order;
+      }
+    });
+    return map;
+  }, [SLOT_OPTIONS]);
 
   const slotMap = useMemo(() => {
     const map = {};
@@ -697,78 +730,7 @@ const RoleTimetable = () => {
   };
 
   const handleDownloadPdf = () => {
-    const titleParts = [
-      'Weekly Timetable',
-      filters.semesterId ? `Semester: ${getLabel(semesters.find((s) => s._id === filters.semesterId))}` : 'All Semesters',
-      filters.branchId ? `Branch: ${getLabel(branches.find((b) => b._id === filters.branchId))}` : 'All Branches'
-    ];
-
-    const gridRows = timeSlots.map((slot) => {
-      const slotMeta = SLOT_OPTIONS.find((item) => item.value === slot);
-      const cells = days.map((day) => {
-        const entries = slotMap[`${day}|${slot}`] || [];
-        if (!entries.length) return '<td style="padding:10px;border:1px solid #d1d5db;color:#9ca3af">-</td>';
-
-        const rendered = entries.map((entry) => {
-          const isLab = ['lab', 'practical'].includes((entry.lectureType || '').toLowerCase());
-          const bg = isLab ? '#dbeafe' : '#ffffff';
-          return `
-            <div style="background:${bg};border:1px solid #cbd5e1;border-radius:8px;padding:8px;margin-bottom:6px;">
-              <div style="font-weight:700;color:#111827;">${entry.subjectId?.name || 'Subject'}</div>
-              <div style="font-size:12px;color:#374151;">Code: ${entry.subjectId?.code || '-'}</div>
-              <div style="font-size:12px;color:#374151;">Teacher: ${entry.teacherId?.name || '-'}</div>
-              <div style="font-size:12px;color:#374151;">Room: ${getRoomLabel(entry)}</div>
-            </div>
-          `;
-        }).join('');
-
-        return `<td style="vertical-align:top;padding:8px;border:1px solid #d1d5db;min-width:180px;">${rendered}</td>`;
-      }).join('');
-
-      return `
-        <tr>
-          <td style="padding:10px;border:1px solid #d1d5db;background:#f8fafc;font-weight:600;white-space:nowrap;">${slotMeta ? slotMeta.label.replace(`Slot ${slot} `, '') : `Slot ${slot}`}</td>
-          ${cells}
-        </tr>
-      `;
-    }).join('');
-
-    const html = `
-      <html>
-      <head>
-        <title>Timetable PDF</title>
-      </head>
-      <body style="font-family:Arial,sans-serif;padding:20px;color:#111827;">
-        <h2 style="margin:0 0 8px;">Weekly Timetable</h2>
-        <p style="margin:0 0 6px;color:#374151;">${titleParts.join(' | ')}</p>
-        <p style="margin:0 0 14px;color:#dc2626;font-weight:700;">Sunday: Holiday</p>
-        <table style="border-collapse:collapse;width:100%;font-size:12px;">
-          <thead>
-            <tr>
-              <th style="padding:10px;border:1px solid #d1d5db;background:#111827;color:#fff;">Time</th>
-              ${days.map((day) => `<th style="padding:10px;border:1px solid #d1d5db;background:#111827;color:#fff;">${day}</th>`).join('')}
-            </tr>
-          </thead>
-          <tbody>
-            ${gridRows || '<tr><td colspan="7" style="padding:12px;border:1px solid #d1d5db;">No timetable data</td></tr>'}
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `;
-
-    const printWindow = window.open('', '_blank', 'width=1200,height=800');
-    if (!printWindow) {
-      alert('Pop-up blocked. Please allow pop-ups to download PDF.');
-      return;
-    }
-
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 300);
+    alert('Download PDF feature will be available in a future update.');
   };
 
   const resetCreateForm = useCallback((overrides = {}) => {
@@ -1354,11 +1316,11 @@ const RoleTimetable = () => {
       profileLinks={isAdmin ? [] : [{ label: 'Profile', to: `/${role}/profile` }]}
     >
       <div className="space-y-6">
-        <section className="rounded-3xl bg-gradient-to-r from-[#1f2937] via-[#1e40af] to-[#0f766e] text-white p-6 md:p-8">
+        <section className="rounded-3xl bg-gradient-to-r from-[#1f2937] via-[#1e40af] to-[#0f766e] text-white p-4 sm:p-6 md:p-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
               <p className="text-xs uppercase tracking-[0.22em] text-sky-100">Schedule Control</p>
-              <h1 className="text-3xl md:text-4xl font-black mt-2">Timetable Management</h1>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black mt-2">Timetable Management</h1>
               <p className="text-sky-100 mt-2 text-sm md:text-base">
                 Plan classes, assign faculty, and keep weekly schedule execution consistent.
               </p>
@@ -1377,11 +1339,11 @@ const RoleTimetable = () => {
                 <span className="px-3 py-1 rounded-full bg-white/15">Today: {timetableStats.todayCount}</span>
               </div>
             </div>
-            <div className="flex flex-col items-start lg:items-end gap-1">
+            <div className="flex flex-col items-stretch sm:items-start lg:items-end gap-2">
               {isAdmin && (
                 <Button
                   onClick={() => navigate('/admin/rooms')}
-                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  className="bg-purple-600 hover:bg-purple-700 text-white w-full sm:w-auto"
                 >
                   Manage Rooms
                 </Button>
@@ -1398,7 +1360,7 @@ const RoleTimetable = () => {
                 }}
                 disabled={!canCreateTimetable}
                 variant="secondary"
-                className="!bg-white [background-image:none] !text-[#0f172a] border border-white/70 hover:!bg-[#F1F5F9] disabled:!bg-white/60 disabled:!text-[#475569]"
+                className="!bg-white [background-image:none] !text-[#0f172a] border border-white/70 hover:!bg-[#F1F5F9] disabled:!bg-white/60 disabled:!text-[#475569] w-full sm:w-auto"
               >
                 + Create Timetable Entry
               </Button>
@@ -1409,58 +1371,48 @@ const RoleTimetable = () => {
           </div>
         </section>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
-            <p className="text-xs text-[#6B7280]">Total Entries</p>
-            <p className="text-2xl font-black text-[#111827] mt-1">{timetableStats.total}</p>
-          </div>
-          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
-            <p className="text-xs text-[#6B7280]">Today</p>
-            <p className="text-2xl font-black text-blue-600 mt-1">{timetableStats.todayCount}</p>
-          </div>
-          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
-            <p className="text-xs text-[#6B7280]">Theory</p>
-            <p className="text-2xl font-black text-emerald-600 mt-1">{timetableStats.theory}</p>
-          </div>
-          <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
-            <p className="text-xs text-[#6B7280]">Practical/Lab</p>
-            <p className="text-2xl font-black text-purple-600 mt-1">{timetableStats.practical}</p>
-          </div>
-        </div>
-
         {/* Branch switcher — only show for multi-branch HODs */}
         {isHod && scopedBranches.length > 1 && (
-          <div className="flex items-center gap-3 flex-wrap px-1">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Branch:</span>
-            {scopedBranches.map((branch) => {
-              const bId = getId(branch);
-              const isActive = bId === activeHodBranchId;
-              return (
-                <button
-                  key={bId}
-                  onClick={() => setActiveHodBranchId(bId)}
-                  className={`px-5 py-2 text-sm font-bold rounded-full border-2 transition-all ${
-                    isActive
-                      ? 'bg-[#111827] text-white border-[#111827] shadow-sm'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-[#111827] hover:text-gray-900'
-                  }`}
-                >
-                  {branch.name || branch.code || bId}
-                </button>
-              );
-            })}
+          <div className="px-1">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-2">Branch:</span>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {scopedBranches.map((branch) => {
+                const bId = getId(branch);
+                const isActive = bId === activeHodBranchId;
+                return (
+                  <button
+                    key={bId}
+                    onClick={() => setActiveHodBranchId(bId)}
+                    className={`px-4 py-2 text-sm font-bold rounded-full border-2 transition-all whitespace-nowrap ${
+                      isActive
+                        ? 'bg-[#111827] text-white border-[#111827] shadow-sm'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-[#111827] hover:text-gray-900'
+                    }`}
+                  >
+                    {branch.name || branch.code || bId}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
-        <Card className="bg-white dark:bg-gray-800 p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
+        <Card className="bg-white dark:bg-gray-800 p-4 sm:p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4 mb-4">
             <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Smart Filters</h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Branch and semester wise proper timetable filtering</p>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Weekly Table View</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Simple filters for branch, semester, day, and status.</p>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Live updated: {lastUpdatedAt.toLocaleTimeString()}</span>
-              <Button onClick={handleDownloadPdf} className="bg-[#111827] hover:bg-[#1f2937] text-white">Download PDF</Button>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <span className="text-xs text-gray-500">Updated at: {lastUpdatedAt.toLocaleTimeString()}</span>
+              <Button
+                type="button"
+                onClick={handleDownloadPdf}
+                title="Download PDF will be enabled in upcoming update"
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 w-full sm:w-auto"
+              >
+                Download PDF (Coming Soon)
+              </Button>
             </div>
           </div>
 
@@ -1518,12 +1470,13 @@ const RoleTimetable = () => {
             )}
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="mt-5">
+            <div className="flex gap-2 overflow-x-auto pb-2 snap-x snap-mandatory scroll-px-1">
             {days.map((day) => (
               <button
                 key={day}
                 onClick={() => setFilters((prev) => ({ ...prev, dayOfWeek: prev.dayOfWeek === day ? '' : day }))}
-                className={`px-3 py-1.5 text-xs rounded-full border transition ${
+                className={`shrink-0 snap-start px-3 py-1.5 text-xs rounded-full border transition ${
                   filters.dayOfWeek === day
                     ? 'bg-[#111827] text-white border-[#111827]'
                     : 'bg-white text-gray-700 border-gray-300 hover:border-[#111827]'
@@ -1532,18 +1485,16 @@ const RoleTimetable = () => {
                 {day}
               </button>
             ))}
-            <span className="px-3 py-1.5 text-xs rounded-full border border-red-200 bg-red-50 text-red-700 font-semibold">
-              Sunday Holiday
-            </span>
-            <span className="px-3 py-1.5 text-xs rounded-full border border-blue-200 bg-blue-50 text-blue-700 font-semibold">
-              Working Time: {minutesToDisplayTime(toMinutes(settingsData.dayStartTime) ?? 0)} to {minutesToDisplayTime(toMinutes(settingsData.dayEndTime) ?? 0)}
-            </span>
+            </div>
+            <div className="mt-2 text-xs text-gray-600">
+              Working hours: {minutesToDisplayTime(toMinutes(settingsData.dayStartTime) ?? 0)} to {minutesToDisplayTime(toMinutes(settingsData.dayEndTime) ?? 0)} | Sunday: Holiday
+            </div>
           </div>
         </Card>
 
         {(isAdmin || isHod) && (
-          <Card className="bg-white dark:bg-gray-800 p-6">
-            <div className="flex items-center justify-between mb-4">
+          <Card className="bg-white dark:bg-gray-800 p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">Timetable Settings</h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -1553,23 +1504,26 @@ const RoleTimetable = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Day Starts At</label>
-                <input
-                  type="time"
-                  value={settingsForm.dayStartTime}
-                  onChange={(e) => setSettingsForm((prev) => ({ ...prev, dayStartTime: e.target.value }))}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Day Ends At</label>
-                <input
-                  type="time"
-                  value={settingsForm.dayEndTime}
-                  onChange={(e) => setSettingsForm((prev) => ({ ...prev, dayEndTime: e.target.value }))}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Working Hours</label>
+                <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+                  <input
+                    type="time"
+                    value={settingsForm.dayStartTime}
+                    onChange={(e) => setSettingsForm((prev) => ({ ...prev, dayStartTime: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">to</span>
+                  <input
+                    type="time"
+                    value={settingsForm.dayEndTime}
+                    onChange={(e) => setSettingsForm((prev) => ({ ...prev, dayEndTime: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  {minutesToDisplayTime(toMinutes(settingsForm.dayStartTime) ?? 0)} to {minutesToDisplayTime(toMinutes(settingsForm.dayEndTime) ?? 0)}
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Teacher Max Hours / Day</label>
@@ -1583,7 +1537,7 @@ const RoleTimetable = () => {
                 />
               </div>
               <div className="md:col-span-3">
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-1.5">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Break Windows</label>
                   <button
                     type="button"
@@ -1591,14 +1545,14 @@ const RoleTimetable = () => {
                       ...prev,
                       breakWindows: [...(prev.breakWindows || []), { id: `break-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, startTime: '', endTime: '' }]
                     }))}
-                    className="px-3 py-1.5 rounded-md text-xs font-semibold border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 w-full sm:w-auto"
                   >
                     + Add Break
                   </button>
                 </div>
                 <div className="space-y-2">
                   {(settingsForm.breakWindows || []).map((window, index) => (
-                    <div key={window.id || `break-${index}`} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                    <div key={window.id || `break-${index}`} className="grid grid-cols-[1fr_auto_1fr_auto] gap-2 items-center">
                       <input
                         type="time"
                         value={window.startTime || ''}
@@ -1608,8 +1562,9 @@ const RoleTimetable = () => {
                             itemIndex === index ? { ...item, startTime: e.target.value } : item
                           ))
                         }))}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       />
+                      <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">to</span>
                       <input
                         type="time"
                         value={window.endTime || ''}
@@ -1619,7 +1574,7 @@ const RoleTimetable = () => {
                             itemIndex === index ? { ...item, endTime: e.target.value } : item
                           ))
                         }))}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       />
                       <button
                         type="button"
@@ -1627,9 +1582,11 @@ const RoleTimetable = () => {
                           ...prev,
                           breakWindows: (prev.breakWindows || []).filter((_, itemIndex) => itemIndex !== index)
                         }))}
-                        className="px-3 py-2 rounded-md text-xs font-semibold border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                        aria-label={`Remove break window ${index + 1}`}
+                        title="Remove break"
+                        className="h-9 w-9 inline-flex items-center justify-center rounded-md text-sm font-bold border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 shrink-0"
                       >
-                        Remove
+                        x
                       </button>
                     </div>
                   ))}
@@ -1637,19 +1594,19 @@ const RoleTimetable = () => {
               </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 Fixed slot size: 60 min | Max slots/day: {settingsData.maxSlot} | Teacher limit: {settingsData.teacherMaxHoursPerDay || 6}h/day
               </p>
-              <Button onClick={handleSaveSettings} disabled={saving} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={handleSaveSettings} disabled={saving} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
                 {saving ? 'Saving...' : 'Save Settings'}
               </Button>
             </div>
           </Card>
         )}
 
-        <Card className="bg-white dark:bg-gray-800 p-6">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="bg-white dark:bg-gray-800 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <div>
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                 {canReviewRequests ? 'Pending Change Requests' : 'My Change Requests'}
@@ -1663,6 +1620,7 @@ const RoleTimetable = () => {
             <Button
               onClick={() => fetchChangeRequests(canReviewRequests ? 'pending' : 'all')}
               variant="secondary"
+              className="w-full sm:w-auto"
             >
               Refresh
             </Button>
@@ -1726,8 +1684,8 @@ const RoleTimetable = () => {
           )}
         </Card>
 
-        <Card className="bg-white dark:bg-gray-800 p-6">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="bg-white dark:bg-gray-800 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <div>
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">Weekly Table View</h3>
               <p className="text-xs text-gray-500 dark:text-gray-400">Left side time slots, top side days Monday to Saturday</p>
@@ -1744,13 +1702,190 @@ const RoleTimetable = () => {
               No timetable entries found
             </p>
           ) : (
-            <div className="w-full overflow-x-hidden">
-              <table className="w-full table-fixed border-separate border-spacing-1.5">
+            <>
+              <div className="md:hidden space-y-3">
+                <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Choose Day (Auto: {todayAutoLabel})</p>
+                    <button
+                      type="button"
+                      onClick={() => setMobileWeekDay(realTodayName)}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold border border-slate-300 bg-white text-slate-700"
+                    >
+                      Today
+                    </button>
+                  </div>
+                  <div className="mt-2 flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scroll-px-1">
+                    {mobileDays.map((day) => {
+                      const dayCount = filteredTimetables.filter((entry) => entry.dayOfWeek === day).length;
+                      const active = mobileWeekDay === day;
+                      return (
+                        <button
+                          key={`mobile-tab-${day}`}
+                          onClick={() => setMobileWeekDay(day)}
+                          className={`shrink-0 snap-start px-3 py-2 rounded-xl border text-xs font-bold transition ${
+                            active
+                              ? 'bg-[#0f172a] text-white border-[#0f172a] shadow-sm'
+                              : 'bg-white text-slate-700 border-slate-300 hover:border-slate-400'
+                          }`}
+                        >
+                          {day} ({dayCount})
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {(() => {
+                  const isSundayHoliday = mobileWeekDay === 'Sunday';
+                  const dayEntries = filteredTimetables
+                    .filter((entry) => entry.dayOfWeek === mobileWeekDay)
+                    .sort((a, b) => getSlotValue(a?.slot) - getSlotValue(b?.slot));
+                  const firstSlot = dayEntries.length ? getSlotValue(dayEntries[0]?.slot) : null;
+                  const lastSlot = dayEntries.length ? getSlotValue(dayEntries[dayEntries.length - 1]?.slot) : null;
+
+                  return (
+                    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <h4 className="text-sm font-extrabold text-slate-900">{mobileWeekDay}</h4>
+                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
+                          {dayEntries.length} class{dayEntries.length === 1 ? '' : 'es'}
+                        </span>
+                      </div>
+                      {!!dayEntries.length && (
+                        <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[11px] font-semibold text-slate-600">
+                              Slot flow: {firstSlot} to {lastSlot}
+                            </p>
+                            {dayEntries.length >= 6 && (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                Busy Day
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
+                            {dayEntries.map((entry, index) => {
+                              const slotValue = getSlotValue(entry?.slot);
+                              const jumpId = `mobile-day-card-${mobileWeekDay}-${slotValue}-${index}`;
+                              return (
+                                <button
+                                  key={`jump-${jumpId}`}
+                                  type="button"
+                                  onClick={() => {
+                                    const target = document.getElementById(jumpId);
+                                    if (target) {
+                                      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    }
+                                  }}
+                                  className="shrink-0 px-2 py-1 rounded-lg border border-slate-300 bg-white text-[10px] font-bold text-slate-700"
+                                >
+                                  S{slotValue}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {isSundayHoliday ? (
+                        <div className="rounded-xl border border-dashed border-red-300 bg-red-50 text-center py-5 text-xs text-red-700 font-semibold">
+                          Today is Holiday (Sunday)
+                        </div>
+                      ) : dayEntries.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 text-center py-5 text-xs text-slate-500">
+                          No classes scheduled.
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-[66vh] overflow-y-auto pr-0.5">
+                          {dayEntries.map((entry, index) => {
+                            const slotValue = getSlotValue(entry?.slot);
+                            const jumpId = `mobile-day-card-${mobileWeekDay}-${slotValue}-${index}`;
+                            const entryKey = getId(entry) || `${slotValue}-${index}`;
+                            const slotMeta = SLOT_OPTIONS.find((item) => item.value === slotValue);
+                            return (
+                            <div id={jumpId} key={`mobile-entry-${entryKey}`} className={`rounded-xl border p-2.5 shadow-sm ${getLectureTone(entry)}`}>
+                              <div className="flex items-center justify-between gap-2 mb-1.5">
+                                <div className="min-w-0">
+                                  <p className="text-[11px] font-black text-slate-900">{getSlotRange(entry)}</p>
+                                  <p className="text-[10px] text-slate-600 font-semibold">
+                                    Slot {slotValue}{slotMeta?.isBreak ? ' • Break overlap' : ''}
+                                  </p>
+                                </div>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${
+                                  getEntryStatus(entry) === 'active'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : 'bg-rose-50 text-rose-700 border-rose-200'
+                                }`}>
+                                  {getEntryStatus(entry) === 'active' ? 'ON' : 'OFF'}
+                                </span>
+                              </div>
+                              <div className="text-sm font-bold text-slate-900 leading-tight break-words">{entry.subjectId?.name || 'Subject'}</div>
+                              <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-slate-600 leading-tight">
+                                <p className="truncate">Code: {entry.subjectId?.code || '-'}</p>
+                                <p className="truncate">Section: {entry.division || 'General'}</p>
+                                <p className="col-span-2 truncate">Teacher: {entry.teacherId?.name || '-'}</p>
+                                <p className="col-span-2 truncate">Room: {getRoomLabel(entry)}</p>
+                              </div>
+
+                              <details className="mt-2">
+                                <summary className="cursor-pointer list-none text-[11px] font-bold text-slate-700 inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-300 bg-white">
+                                  Actions
+                                </summary>
+                                {canDirectlyControlEntry(entry) ? (
+                                  <div className="grid grid-cols-2 gap-2 mt-2.5">
+                                    <button
+                                      onClick={() => handleToggleStatus(entry)}
+                                      className="text-[11px] font-bold px-2.5 py-1.5 rounded-md border border-slate-300 bg-white text-slate-700"
+                                    >
+                                      {getEntryStatus(entry) === 'active' ? 'Turn OFF' : 'Turn ON'}
+                                    </button>
+                                    <button
+                                      onClick={() => openEditModal(entry)}
+                                      className="text-[11px] font-bold px-2.5 py-1.5 rounded-md border border-blue-200 bg-blue-50 text-blue-700"
+                                    >
+                                      Modify
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteTimetable(getId(entry))}
+                                      className="col-span-2 text-[11px] font-bold px-2.5 py-1.5 rounded-md border border-red-200 bg-red-50 text-red-700"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="grid grid-cols-2 gap-2 mt-2.5">
+                                    <button
+                                      onClick={() => openRequestModal(entry, 'modify')}
+                                      className="text-[11px] font-bold px-2.5 py-1.5 rounded-md border border-blue-200 bg-blue-50 text-blue-700"
+                                    >
+                                      Request Change
+                                    </button>
+                                    <button
+                                      onClick={() => openRequestModal(entry, 'delete')}
+                                      className="text-[11px] font-bold px-2.5 py-1.5 rounded-md border border-red-200 bg-red-50 text-red-700"
+                                    >
+                                      Request Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </details>
+                            </div>
+                          );})}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="hidden md:block w-full overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+              <table className="w-full min-w-[1240px] table-auto border-separate border-spacing-2">
                 <thead>
                   <tr>
-                    <th className="w-[14%] px-2 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-gray-700 bg-gray-100 rounded-xl">Time</th>
+                    <th className="sticky left-0 z-30 min-w-[170px] px-3 py-3 text-center text-xs font-bold uppercase tracking-wide text-gray-700 bg-gray-100 rounded-xl">Time</th>
                     {days.map((day) => (
-                      <th key={day} className="w-[14.3%] px-2 py-3 text-center text-[11px] font-bold uppercase tracking-wide text-gray-700 bg-gray-100 rounded-xl">
+                      <th key={day} className="min-w-[175px] px-3 py-3 text-center text-xs font-bold uppercase tracking-wide text-gray-700 bg-gray-100 rounded-xl">
                         {day}
                       </th>
                     ))}
@@ -1760,14 +1895,15 @@ const RoleTimetable = () => {
                   {timeSlots.map((slot) => {
                     const slotMeta = SLOT_OPTIONS.find((item) => item.value === slot);
                     if (slotMeta?.isBreak) {
+                      const breakNumber = breakSlotOrder[slot] || 1;
                       return (
                         <tr key={slot}>
-                          <td className="align-middle px-2 py-3 text-xs font-bold text-amber-800 bg-amber-100 rounded-xl whitespace-nowrap text-center">
+                          <td className="sticky left-0 z-20 align-middle px-3 py-3 text-xs font-bold text-amber-800 bg-amber-100 rounded-xl whitespace-nowrap text-center">
                             {slotMeta.label.replace(`Slot ${slot} `, '')}
                           </td>
-                          <td colSpan={days.length} className="align-middle px-2 py-3">
+                          <td colSpan={days.length} className="align-middle px-3 py-3">
                             <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-center text-xs font-semibold py-3">
-                              Fixed Break Slot
+                              Break {breakNumber}
                             </div>
                           </td>
                         </tr>
@@ -1775,22 +1911,22 @@ const RoleTimetable = () => {
                     }
                     return (
                       <tr key={slot}>
-                        <td className="align-middle px-2 py-3 text-xs font-bold text-gray-800 bg-gray-50 rounded-xl whitespace-nowrap text-center">
+                        <td className="sticky left-0 z-20 align-middle px-3 py-3 text-xs font-bold text-gray-800 bg-gray-50 rounded-xl whitespace-nowrap text-center">
                           {slotMeta ? slotMeta.label.replace(`Slot ${slot} `, '') : `Slot ${slot}`}
                         </td>
                         {days.map((day) => {
                           const key = `${day}|${slot}`;
                           const entries = slotMap[key] || [];
                           return (
-                            <td key={key} className="align-top px-0.5">
+                            <td key={key} className="align-top px-1 min-w-[175px]">
                               {entries.length === 0 ? (
-                                <div className="min-h-[92px] rounded-xl border border-dashed border-gray-200 bg-gray-50/40" />
+                                <div className="min-h-[110px] rounded-xl border border-dashed border-gray-200 bg-gray-50/40" />
                               ) : (
                                 <div className="space-y-2">
                                   {entries.map((entry) => (
                                     <div
                                       key={entry._id}
-                                      className={`rounded-xl border p-2 shadow-sm ${getLectureTone(entry)}`}
+                                      className={`rounded-xl border p-2.5 shadow-sm ${getLectureTone(entry)}`}
                                     >
                                       <div className="flex items-center justify-between gap-2 mb-1">
                                         <span
@@ -1803,11 +1939,11 @@ const RoleTimetable = () => {
                                           {getEntryStatus(entry) === 'active' ? 'ON' : 'OFF'}
                                         </span>
                                       </div>
-                                      <div className="text-xs font-bold text-gray-900 leading-tight break-words">{entry.subjectId?.name || 'Subject'}</div>
-                                      <div className="text-[10px] text-gray-600 mt-1 leading-tight break-words">Code: {entry.subjectId?.code || '-'}</div>
-                                      <div className="text-[10px] text-gray-600 leading-tight break-words">Section: {entry.division || 'General'}</div>
-                                      <div className="text-[10px] text-gray-600 leading-tight break-words">Teacher: {entry.teacherId?.name || '-'}</div>
-                                      <div className="text-[10px] text-gray-600 leading-tight break-words">Room: {getRoomLabel(entry)}</div>
+                                      <div className="text-sm font-bold text-gray-900 leading-tight break-words">{entry.subjectId?.name || 'Subject'}</div>
+                                      <div className="text-[11px] text-gray-600 mt-1 leading-tight break-words">Code: {entry.subjectId?.code || '-'}</div>
+                                      <div className="text-[11px] text-gray-600 leading-tight break-words">Section: {entry.division || 'General'}</div>
+                                      <div className="text-[11px] text-gray-600 leading-tight break-words">Teacher: {entry.teacherId?.name || '-'}</div>
+                                      <div className="text-[11px] text-gray-600 leading-tight break-words">Room: {getRoomLabel(entry)}</div>
                                       {canDirectlyControlEntry(entry) ? (
                                         <div className="flex flex-wrap gap-2 mt-2">
                                           <button
@@ -1881,7 +2017,8 @@ const RoleTimetable = () => {
                   })}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
 
           {selectedTimetable && selectedTimetable.canBeModifiedBy?.length > 0 && isAdmin && (
@@ -1914,7 +2051,7 @@ const RoleTimetable = () => {
 
       {showCreateModal && (isAdmin || isHod) && (
         <Modal onClose={() => setShowCreateModal(false)} isOpen={true}>
-          <div className="w-full max-w-6xl bg-white dark:bg-[#1a0f0b] rounded-2xl shadow-xl border border-[#e6dedb] dark:border-[#3a2a24] p-4 sm:p-6">
+          <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto bg-white dark:bg-[#1a0f0b] rounded-2xl shadow-xl border border-[#e6dedb] dark:border-[#3a2a24] p-4 sm:p-6">
             <div className="flex items-start justify-between gap-4 mb-6">
               <div>
                 <h2 className="text-xl sm:text-2xl font-bold text-[#181311] dark:text-white">Create Timetable Entry</h2>
@@ -2261,7 +2398,7 @@ const RoleTimetable = () => {
           setShowEditModal(false);
           setSelectedTimetable(null);
         }}>
-          <div className="w-full max-w-2xl">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto p-1">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
               Edit Timetable Entry
             </h2>
@@ -2274,7 +2411,7 @@ const RoleTimetable = () => {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Room Number *</label>
                   <select
@@ -2316,7 +2453,7 @@ const RoleTimetable = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Start Time *</label>
                   <input
@@ -2363,7 +2500,7 @@ const RoleTimetable = () => {
               </div>
             </div>
 
-            <div className="mt-6 flex gap-3 justify-end">
+            <div className="mt-6 flex flex-col-reverse sm:flex-row gap-3 justify-end">
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -2371,13 +2508,14 @@ const RoleTimetable = () => {
                   setSelectedTimetable(null);
                 }}
                 disabled={saving}
+                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleUpdateTimetable}
                 disabled={saving}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </Button>
@@ -2391,7 +2529,7 @@ const RoleTimetable = () => {
           setShowRequestModal(false);
           setSelectedRequestEntry(null);
         }}>
-          <div className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl p-5">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 rounded-2xl p-5">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Request Timetable Change</h2>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
               This request will be sent to Admin/HOD for approval.
@@ -2508,7 +2646,7 @@ const RoleTimetable = () => {
               </div>
             </div>
 
-            <div className="mt-5 flex gap-3 justify-end">
+            <div className="mt-5 flex flex-col-reverse sm:flex-row gap-3 justify-end">
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -2516,10 +2654,11 @@ const RoleTimetable = () => {
                   setSelectedRequestEntry(null);
                 }}
                 disabled={saving}
+                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>
-              <Button onClick={handleSubmitChangeRequest} disabled={saving} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={handleSubmitChangeRequest} disabled={saving} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
                 {saving ? 'Sending...' : 'Send Request'}
               </Button>
             </div>
@@ -2529,7 +2668,7 @@ const RoleTimetable = () => {
 
       {showGrantModal && selectedTimetable && isAdmin && (
         <Modal onClose={() => setShowGrantModal(false)}>
-          <div className="w-full max-w-lg">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto p-1">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Grant Timetable Access</h2>
             <div className="space-y-4">
               <div>
@@ -2558,11 +2697,11 @@ const RoleTimetable = () => {
                 </select>
               </div>
 
-              <div className="flex justify-end gap-3">
-                <Button variant="secondary" onClick={() => setShowGrantModal(false)} disabled={saving}>
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
+                <Button variant="secondary" onClick={() => setShowGrantModal(false)} disabled={saving} className="w-full sm:w-auto">
                   Cancel
                 </Button>
-                <Button onClick={handleGrantPermission} disabled={saving}>
+                <Button onClick={handleGrantPermission} disabled={saving} className="w-full sm:w-auto">
                   {saving ? 'Granting...' : 'Grant Access'}
                 </Button>
               </div>
