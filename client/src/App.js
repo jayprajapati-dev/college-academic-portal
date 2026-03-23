@@ -62,6 +62,7 @@ import StudentTaskDetail from './pages/student/TaskDetail';
 import StudentLibrary from './pages/student/StudentLibrary';
 import StudentExams from './pages/student/StudentExams';
 import TaskSubmissions from './pages/teacher/TaskSubmissions';
+import TeacherTimetableView from './pages/teacher/TeacherTimetableView';
 import RoleExamsViewOnly from './pages/role/RoleExamsViewOnly';
 
 function App() {
@@ -163,7 +164,7 @@ function App() {
         <Route path="/teacher/subjects" element={<RoleSubjects />} />
         <Route path="/hod/academic-structure" element={<RoleAcademicStructure />} />
         <Route path="/teacher/academic-structure" element={<RoleAcademicStructure />} />
-        <Route path="/teacher/timetable" element={<RoleTimetable />} />
+        <Route path="/teacher/timetable" element={<TeacherTimetableView />} />
         
         {/* Catch All */}
         <Route path="*" element={<Navigate to="/" replace />} />

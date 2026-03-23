@@ -123,14 +123,19 @@ const RoleDashboard = () => {
       const branchCount = Array.isArray(branchesRes.data) ? branchesRes.data.length : 0;
       const subjectCount = Array.isArray(subjectsRes.data) ? subjectsRes.data.length : 0;
 
-      if (usersData.success && Array.isArray(usersData.data)) {
-        const allUsers = usersData.data;
+      const allUsers = Array.isArray(usersData?.data)
+        ? usersData.data
+        : Array.isArray(usersData?.users)
+          ? usersData.users
+          : [];
+
+      if (usersData?.success && allUsers.length >= 0) {
         const students = allUsers.filter(u => u.role === 'student').length;
         const teachers = allUsers.filter(u => u.role === 'teacher').length;
         const hods = allUsers.filter(u => u.role === 'hod').length;
 
         setAdminStats({
-          totalUsers: usersData.total || allUsers.length,
+          totalUsers: Number(usersData?.total) || allUsers.length,
           students,
           teachers,
           hods,
@@ -205,21 +210,21 @@ const RoleDashboard = () => {
   useEffect(() => {
     if (!user?.role) return;
 
-    if (user.role === 'admin') {
+    if (dashboardMode === 'admin' || user?.adminAccess === true) {
       fetchAdminStats();
     }
 
-    if (user.role === 'hod') {
+    if (dashboardMode === 'hod') {
       fetchHodStats(activeBranchId);
     }
 
-    if (user.role === 'teacher') {
+    if (dashboardMode === 'teacher') {
       fetchTeacherMeta();
     }
 
     fetchNotifications();
     setSyncStamp(new Date().toLocaleTimeString());
-  }, [user, activeBranchId, fetchAdminStats, fetchHodStats, fetchTeacherMeta, fetchNotifications]);
+  }, [user, dashboardMode, activeBranchId, fetchAdminStats, fetchHodStats, fetchTeacherMeta, fetchNotifications]);
 
   useEffect(() => {
     if (!user?.assignedSubjects?.length) return;

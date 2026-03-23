@@ -17,6 +17,7 @@ const SubjectHub = () => {
   const [books, setBooks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [subjectAccessDenied, setSubjectAccessDenied] = useState(false);
+  const [timetableEntries, setTimetableEntries] = useState([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -34,6 +35,20 @@ const SubjectHub = () => {
 
         if (!isMounted) return;
         setSubject(subjectData.subject);
+
+        // Fetch timetable entries for this subject
+        try {
+          const timetableRes = await fetch(`/api/timetable/subject/${id}`);
+          if (timetableRes.ok) {
+            const timetableData = await timetableRes.json();
+            if (isMounted && Array.isArray(timetableData?.data)) {
+              const activeEntries = timetableData.data.filter(e => e.status === 'active');
+              setTimetableEntries(activeEntries);
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching timetable:', err);
+        }
 
         const token = localStorage.getItem('token');
         if (!token && isMounted) {
@@ -347,6 +362,96 @@ const SubjectHub = () => {
                         )}
                       </div>
                       <p className="text-[11px] sm:text-xs text-gray-600 dark:text-gray-400">{item.description || item.type || 'Academic resource'}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Teachers & Class Information Section */}
+            <section id="teachers" className="bg-white dark:bg-white/5 border border-[#dcdee5] dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-sm">
+              <div className="mb-4">
+                <h2 className="text-lg sm:text-2xl font-bold">Faculty & Class Schedule</h2>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">Teachers assigned to this subject with their class timing and rooms.</p>
+              </div>
+
+              {timetableEntries.length === 0 ? (
+                <div className="p-4 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 text-center">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">No class schedule available for this subject yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Group timetable entries by teacher */}
+                  {(() => {
+                    const teacherMap = {};
+                    timetableEntries.forEach(entry => {
+                      const teacherId = entry?.teacherId?._id || entry?.teacherId;
+                      if (!teacherId) return;
+                      if (!teacherMap[teacherId]) {
+                        teacherMap[teacherId] = {
+                          teacher: entry?.teacherId,
+                          classes: []
+                        };
+                      }
+                      teacherMap[teacherId].classes.push(entry);
+                    });
+                    return Object.values(teacherMap);
+                  })().map((group, groupIdx) => (
+                    <div key={`teacher-${groupIdx}`} className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                      {/* Teacher Header */}
+                      <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-900/20 border-b border-slate-200 dark:border-slate-700 p-3 sm:p-4">
+                        <p className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">
+                          {typeof group.teacher === 'object' ? group.teacher?.name : group.teacher}
+                        </p>
+                        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
+                          {typeof group.teacher === 'object' ? group.teacher?.email : ''}
+                        </p>
+                      </div>
+
+                      {/* Classes for this teacher */}
+                      <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                        {group.classes.sort((a, b) => {
+                          const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                          const dayDiff = dayOrder.indexOf(a.dayOfWeek) - dayOrder.indexOf(b.dayOfWeek);
+                          if (dayDiff !== 0) return dayDiff;
+                          return (a.slot || 0) - (b.slot || 0);
+                        }).map((entry, classIdx) => (
+                          <div key={`class-${groupIdx}-${classIdx}`} className="p-3 sm:p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                              {/* Day & Slot */}
+                              <div>
+                                <p className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">When</p>
+                                <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-1">{entry.dayOfWeek}</p>
+                                <p className="text-xs text-slate-600 dark:text-slate-400">Slot {entry.slot}</p>
+                              </div>
+
+                              {/* Room */}
+                              <div>
+                                <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Room</p>
+                                <p className="text-sm font-black text-emerald-700 dark:text-emerald-300 mt-1">
+                                  {typeof entry.roomId === 'object' ? entry.roomId?.roomNo : entry.roomId}
+                                </p>
+                              </div>
+
+                              {/* Division */}
+                              <div>
+                                <p className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wide">Division</p>
+                                <p className="text-sm font-bold text-purple-700 dark:text-purple-300 mt-1">
+                                  {entry.division && entry.division !== 'General' ? entry.division : 'General'}
+                                </p>
+                              </div>
+
+                              {/* Type */}
+                              <div>
+                                <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wide">Type</p>
+                                <p className="text-sm font-bold text-amber-700 dark:text-amber-300 mt-1">
+                                  {entry.lectureType === 'Lab' ? `Lab (${entry.slotSpan || 1} slots)` : 'Theory'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>

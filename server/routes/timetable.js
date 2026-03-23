@@ -64,16 +64,83 @@ const normalizeBreakWindows = (items, dayStartTime, dayEndTime) => {
   });
 };
 
-const getSlotTimeRange = ({ slot, slotSpan, dayStartTime, slotMinutes }) => {
+const buildSlotTimeline = ({ dayStartTime, slotMinutes, maxSlot, breakWindows }) => {
+  const dayStart = toMinutes(dayStartTime);
+  const perSlot = Number(slotMinutes);
+  const totalSlots = Number(maxSlot);
+  if (dayStart === null || !Number.isInteger(perSlot) || perSlot <= 0 || !Number.isInteger(totalSlots) || totalSlots < 1) {
+    return [];
+  }
+
+  const windows = (Array.isArray(breakWindows) ? breakWindows : [])
+    .map((item) => ({ start: toMinutes(item?.startTime), end: toMinutes(item?.endTime) }))
+    .filter((item) => item.start !== null && item.end !== null && item.end > item.start)
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+
+  const timeline = [];
+  let pointer = dayStart;
+
+  const moveToTeachingTime = (timePoint) => {
+    let cursor = timePoint;
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const win of windows) {
+        if (cursor >= win.start && cursor < win.end) {
+          cursor = win.end;
+          changed = true;
+          break;
+        }
+      }
+    }
+    return cursor;
+  };
+
+  for (let slot = 1; slot <= totalSlots; slot += 1) {
+    let start = moveToTeachingTime(pointer);
+    let shifted = true;
+
+    while (shifted) {
+      shifted = false;
+      for (const win of windows) {
+        if (win.start < start + perSlot && win.end > start) {
+          start = moveToTeachingTime(win.end);
+          shifted = true;
+          break;
+        }
+      }
+    }
+
+    const end = start + perSlot;
+    timeline.push({ slot, start, end });
+    pointer = end;
+  }
+
+  return timeline;
+};
+
+const getSlotTimeRange = ({ slot, slotSpan, dayStartTime, slotMinutes, maxSlot, breakWindows }) => {
   const startSlot = Number(slot);
   const span = Number(slotSpan);
-  const dayStart = toMinutes(dayStartTime);
-  const duration = Number(slotMinutes);
-  if (!Number.isInteger(startSlot) || !Number.isInteger(span) || dayStart === null || !Number.isInteger(duration)) {
+  if (!Number.isInteger(startSlot) || !Number.isInteger(span) || startSlot < 1 || span < 1) {
     return null;
   }
-  const start = dayStart + ((startSlot - 1) * duration);
-  const end = start + (span * duration);
+
+  const totalSlots = Number(maxSlot);
+  const timeline = buildSlotTimeline({
+    dayStartTime,
+    slotMinutes,
+    maxSlot: Number.isInteger(totalSlots) && totalSlots > 0 ? totalSlots : startSlot + span - 1,
+    breakWindows
+  });
+  if (!timeline.length) return null;
+
+  const startMeta = timeline.find((item) => item.slot === startSlot);
+  const endMeta = timeline.find((item) => item.slot === (startSlot + span - 1));
+  if (!startMeta || !endMeta) return null;
+
+  const start = startMeta.start;
+  const end = endMeta.end;
   return { start, end };
 };
 
@@ -220,7 +287,9 @@ const validateSlotRangeAgainstSettings = ({ slot, slotSpan, maxSlot, breakSlots,
     slot: startSlot,
     slotSpan: span,
     dayStartTime,
-    slotMinutes
+    slotMinutes,
+    maxSlot,
+    breakWindows
   });
 
   if (slotRange && Array.isArray(breakWindows) && breakWindows.length > 0) {

@@ -117,6 +117,8 @@ const RoleTimetable = () => {
   const [createResult, setCreateResult] = useState(null);
   const [rowErrorMap, setRowErrorMap] = useState({});
   const [highlightCreateRowId, setHighlightCreateRowId] = useState('');
+  const [managementPage, setManagementPage] = useState(1);
+  const managementRowsPerPage = 10;
   const [shortNameEditor, setShortNameEditor] = useState({
     isOpen: false,
     type: 'subject',
@@ -168,34 +170,101 @@ const RoleTimetable = () => {
     const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
     return `${String(hour12)}:${String(minute).padStart(2, '0')} ${suffix}`;
   }, []);
+  const formatDisplayTime = useCallback((timeValue) => {
+    const mins = toMinutes(timeValue);
+    if (mins === null) return String(timeValue || '');
+    return minutesToDisplayTime(mins);
+  }, [minutesToDisplayTime, toMinutes]);
 
   const breaksOverlap = useCallback((startA, endA, startB, endB) => startA < endB && endA > startB, []);
+
+  const normalizedBreakWindows = useMemo(() => {
+    return (Array.isArray(settingsData.breakWindows) ? settingsData.breakWindows : [])
+      .map((item, index) => {
+        const start = toMinutes(item?.startTime);
+        const end = toMinutes(item?.endTime);
+        if (start === null || end === null || end <= start) return null;
+        return {
+          index,
+          start,
+          end,
+          startTime: String(item?.startTime || ''),
+          endTime: String(item?.endTime || '')
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.start - b.start || a.end - b.end);
+  }, [settingsData.breakWindows, toMinutes]);
 
   const SLOT_OPTIONS = useMemo(() => {
     const startMinutes = toMinutes(settingsData.dayStartTime) ?? (10 * 60 + 30);
     const slotMinutes = Number(settingsData.slotMinutes) || 60;
     const maxSlot = Number(settingsData.maxSlot) || 8;
-    const breakWindows = Array.isArray(settingsData.breakWindows) ? settingsData.breakWindows : [];
     const list = [];
 
+    const moveToTeachingTime = (value) => {
+      let cursor = value;
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const win of normalizedBreakWindows) {
+          if (cursor >= win.start && cursor < win.end) {
+            cursor = win.end;
+            changed = true;
+            break;
+          }
+        }
+      }
+      return cursor;
+    };
+
+    let pointer = startMinutes;
+
     for (let slot = 1; slot <= maxSlot; slot += 1) {
-      const start = startMinutes + ((slot - 1) * slotMinutes);
+      let start = moveToTeachingTime(pointer);
+      let shifted = true;
+
+      while (shifted) {
+        shifted = false;
+        for (const win of normalizedBreakWindows) {
+          if (win.start < start + slotMinutes && win.end > start) {
+            start = moveToTeachingTime(win.end);
+            shifted = true;
+            break;
+          }
+        }
+      }
+
       const end = start + slotMinutes;
-      const isBreak = breakWindows.some((window) => {
-        const breakStart = toMinutes(window?.startTime);
-        const breakEnd = toMinutes(window?.endTime);
-        if (breakStart === null || breakEnd === null || breakEnd <= breakStart) return false;
-        return breaksOverlap(start, end, breakStart, breakEnd);
-      });
+      pointer = end;
+
       list.push({
         value: slot,
-        isBreak,
-        label: `Slot ${slot} (${minutesToDisplayTime(start)} - ${minutesToDisplayTime(end)})`
+        start,
+        end,
+        label: `Slot ${slot} (${minutesToDisplayTime(start)} to ${minutesToDisplayTime(end)})`
       });
     }
 
     return list;
-  }, [breaksOverlap, minutesToDisplayTime, settingsData.breakWindows, settingsData.dayStartTime, settingsData.maxSlot, settingsData.slotMinutes, toMinutes]);
+  }, [minutesToDisplayTime, normalizedBreakWindows, settingsData.dayStartTime, settingsData.maxSlot, settingsData.slotMinutes, toMinutes]);
+
+  const SLOT_RANGE_OPTIONS = useMemo(() => {
+    const ranges = [];
+    for (let index = 0; index < SLOT_OPTIONS.length; index += 1) {
+      for (let span = 1; span <= 4; span += 1) {
+        const endIndex = index + span - 1;
+        if (endIndex >= SLOT_OPTIONS.length) break;
+        ranges.push({
+          slot: SLOT_OPTIONS[index].value,
+          slotSpan: span,
+          start: SLOT_OPTIONS[index].start,
+          end: SLOT_OPTIONS[endIndex].end
+        });
+      }
+    }
+    return ranges;
+  }, [SLOT_OPTIONS]);
   const DIVISION_OPTIONS = useMemo(() => {
     const splitCount = Math.min(6, Math.max(1, Number(createMeta.splitCount) || 1));
     const toId = (value) => {
@@ -216,22 +285,72 @@ const RoleTimetable = () => {
     return options;
   }, [branches, createMeta.branchId, createMeta.splitCount]);
 
+  const alignRangeToNearestSlot = useCallback((start, end) => {
+    if (
+      !Number.isFinite(start)
+      || !Number.isFinite(end)
+      || end <= start
+    ) {
+      return null;
+    }
+
+    if (!SLOT_RANGE_OPTIONS.length) return null;
+
+    const duration = end - start;
+    const exact = SLOT_RANGE_OPTIONS.find((range) => range.start === start && range.end === end);
+    if (exact) {
+      return {
+        ...exact,
+        adjusted: false
+      };
+    }
+
+    const durationMatched = SLOT_RANGE_OPTIONS.filter((range) => (range.end - range.start) === duration);
+    const source = durationMatched.length ? durationMatched : SLOT_RANGE_OPTIONS;
+
+    let bestRange = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (const candidate of source) {
+      const distance = Math.abs(candidate.start - start) + Math.abs(candidate.end - end);
+      if (
+        distance < bestDistance
+        || (distance === bestDistance && (bestRange === null || candidate.start > bestRange.start))
+      ) {
+        bestDistance = distance;
+        bestRange = candidate;
+      }
+    }
+
+    if (!bestRange) return null;
+
+    return {
+      ...bestRange,
+      adjusted: bestRange.start !== start || bestRange.end !== end
+    };
+  }, [SLOT_RANGE_OPTIONS]);
+
   const getRangeWarning = useCallback((startTime, endTime, lectureType = 'Theory') => {
-    const dayStart = toMinutes(settingsData.dayStartTime);
-    const dayEnd = toMinutes(settingsData.dayEndTime);
     const start = toMinutes(startTime);
     const end = toMinutes(endTime);
-    const slotMinutes = Number(settingsData.slotMinutes) || 60;
+    const firstSlotStart = SLOT_OPTIONS[0]?.start ?? null;
+    const lastSlotEnd = SLOT_OPTIONS[SLOT_OPTIONS.length - 1]?.end ?? null;
 
-    if (dayStart === null || dayEnd === null || start === null || end === null) {
+    if (start === null || end === null || firstSlotStart === null || lastSlotEnd === null) {
       return 'Invalid time format. Use HH:MM.';
     }
     if (end <= start) return 'End time must be after start time.';
-    if (start < dayStart || end > dayEnd) {
-      return `Time must stay inside working day (${settingsData.dayStartTime} to ${settingsData.dayEndTime}).`;
+    if (start < firstSlotStart || end > lastSlotEnd) {
+      const dayStartLabel = minutesToDisplayTime(firstSlotStart);
+      const dayEndLabel = minutesToDisplayTime(lastSlotEnd);
+      return `Time must stay inside working day: ${dayStartLabel} to ${dayEndLabel}.`;
     }
-    if ((start - dayStart) % slotMinutes !== 0 || (end - dayStart) % slotMinutes !== 0) {
-      return `Start/end must align to ${slotMinutes}-minute boundaries from ${settingsData.dayStartTime}.`;
+    if (!SLOT_RANGE_OPTIONS.some((range) => range.start === start && range.end === end)) {
+      const aligned = alignRangeToNearestSlot(start, end);
+      if (!aligned) {
+        return 'Start/end must align to configured timetable boundaries.';
+      }
+
+      return `Time must align to timetable boundaries. Try: ${minutesToDisplayTime(aligned.start)} to ${minutesToDisplayTime(aligned.end)}.`;
     }
 
     const duration = end - start;
@@ -267,25 +386,35 @@ const RoleTimetable = () => {
     }
 
     return '';
-  }, [breaksOverlap, settingsData.breakWindows, settingsData.dayEndTime, settingsData.dayStartTime, settingsData.slotMinutes, toMinutes]);
+  }, [SLOT_OPTIONS, SLOT_RANGE_OPTIONS, alignRangeToNearestSlot, breaksOverlap, minutesToDisplayTime, settingsData.breakWindows, toMinutes]);
 
   const mapTimeRangeToSlot = useCallback((startTime, endTime, lectureType = 'Theory') => {
-    const warning = getRangeWarning(startTime, endTime, lectureType);
-    if (warning) return { error: warning };
-
-    const dayStart = toMinutes(settingsData.dayStartTime);
     const start = toMinutes(startTime);
     const end = toMinutes(endTime);
-    const slotMinutes = Number(settingsData.slotMinutes) || 60;
 
-    if (dayStart === null || start === null || end === null) {
+    if (start === null || end === null) {
       return { error: 'Invalid time range.' };
     }
 
-    const slot = Math.floor((start - dayStart) / slotMinutes) + 1;
-    const slotSpan = Math.floor((end - start) / slotMinutes);
-    return { slot, slotSpan };
-  }, [getRangeWarning, settingsData.dayStartTime, settingsData.slotMinutes, toMinutes]);
+    const alignedRange = alignRangeToNearestSlot(start, end);
+    if (!alignedRange) {
+      return { error: 'Invalid time range.' };
+    }
+
+    const alignedStartTime = minutesToHHMM(alignedRange.start);
+    const alignedEndTime = minutesToHHMM(alignedRange.end);
+
+    const warning = getRangeWarning(alignedStartTime, alignedEndTime, lectureType);
+    if (warning) return { error: warning };
+
+    return {
+      slot: alignedRange.slot,
+      slotSpan: alignedRange.slotSpan,
+      normalizedStartTime: alignedStartTime,
+      normalizedEndTime: alignedEndTime,
+      adjusted: alignedRange.adjusted
+    };
+  }, [alignRangeToNearestSlot, getRangeWarning, minutesToHHMM, toMinutes]);
 
   useEffect(() => {
     if (!DIVISION_OPTIONS.length) return;
@@ -486,13 +615,10 @@ const RoleTimetable = () => {
     const slot = getSlotValue(entry?.slot);
     const span = Number(entry?.slotSpan) > 1 ? Number(entry.slotSpan) : 1;
     const slotMeta = SLOT_OPTIONS.find((item) => item.value === slot);
+    const endMeta = SLOT_OPTIONS.find((item) => item.value === (slot + span - 1));
 
-    if (slotMeta) {
-      const rangeText = slotMeta.label.replace(`Slot ${slot} `, '');
-      if (span === 2) {
-        return rangeText.replace(')', ' + next slot)');
-      }
-      return rangeText;
+    if (slotMeta && endMeta) {
+      return `(${minutesToDisplayTime(slotMeta.start)} to ${minutesToDisplayTime(endMeta.end)})`;
     }
 
     const fallbackStart = formatTime(entry?.startTime || '08:00');
@@ -852,19 +978,40 @@ const RoleTimetable = () => {
     return { total, theory, practical, todayCount };
   }, [filteredTimetables]);
 
-  const timeSlots = useMemo(() => SLOT_OPTIONS.map((item) => item.value), [SLOT_OPTIONS]);
+  const WEEKLY_TABLE_ROWS = useMemo(() => {
+    if (!SLOT_OPTIONS.length) return [];
 
-  const breakSlotOrder = useMemo(() => {
-    const map = {};
-    let order = 0;
-    SLOT_OPTIONS.forEach((item) => {
-      if (item.isBreak) {
-        order += 1;
-        map[item.value] = order;
-      }
+    const rows = [];
+    SLOT_OPTIONS.forEach((slotMeta, index) => {
+      rows.push({
+        type: 'slot',
+        slot: slotMeta.value,
+        start: slotMeta.start,
+        end: slotMeta.end,
+        label: slotMeta.label.replace(`Slot ${slotMeta.value} `, '')
+      });
+
+      const nextSlotStart = SLOT_OPTIONS[index + 1]?.start ?? null;
+      const betweenBreaks = normalizedBreakWindows.filter((win) => {
+        const startsAfterCurrent = win.start >= slotMeta.end;
+        const endsBeforeNext = nextSlotStart === null || win.end <= nextSlotStart;
+        return startsAfterCurrent && endsBeforeNext;
+      });
+
+      betweenBreaks.forEach((win) => {
+        rows.push({
+          type: 'break',
+          key: `break-${win.index}-${win.start}-${win.end}`,
+          start: win.start,
+          end: win.end,
+          label: `(${minutesToDisplayTime(win.start)} to ${minutesToDisplayTime(win.end)})`,
+          title: `Break ${win.index + 1}`
+        });
+      });
     });
-    return map;
-  }, [SLOT_OPTIONS]);
+
+    return rows;
+  }, [SLOT_OPTIONS, minutesToDisplayTime, normalizedBreakWindows]);
 
   const dayOrderMap = useMemo(() => {
     const map = {};
@@ -881,16 +1028,31 @@ const RoleTimetable = () => {
       return getSlotValue(a?.slot) - getSlotValue(b?.slot);
     });
   }, [dayOrderMap, managementFilteredTimetables]);
+
+  const managementTotalPages = useMemo(() => {
+    const total = Math.ceil(managementRows.length / Math.max(1, managementRowsPerPage));
+    return Math.max(1, total);
+  }, [managementRows.length, managementRowsPerPage]);
+
+  const pagedManagementRows = useMemo(() => {
+    const startIndex = (managementPage - 1) * managementRowsPerPage;
+    return managementRows.slice(startIndex, startIndex + managementRowsPerPage);
+  }, [managementPage, managementRows, managementRowsPerPage]);
+
+  useEffect(() => {
+    setManagementPage((prev) => {
+      if (prev < 1) return 1;
+      if (prev > managementTotalPages) return managementTotalPages;
+      return prev;
+    });
+  }, [managementTotalPages]);
   const slotMap = useMemo(() => {
     const map = {};
     filteredTimetables.forEach((entry) => {
       const baseSlot = getSlotValue(entry?.slot);
-      const slotSpan = Number(entry?.slotSpan) > 1 ? Number(entry.slotSpan) : 1;
-      for (let offset = 0; offset < slotSpan; offset += 1) {
-        const key = `${entry.dayOfWeek}|${baseSlot + offset}`;
-        if (!map[key]) map[key] = [];
-        map[key].push(entry);
-      }
+      const key = `${entry.dayOfWeek}|${baseSlot}`;
+      if (!map[key]) map[key] = [];
+      map[key].push(entry);
     });
     return map;
   }, [filteredTimetables]);
@@ -927,7 +1089,7 @@ const RoleTimetable = () => {
   const getLectureTone = (entry) => {
     const type = (entry.lectureType || '').toLowerCase();
     if (type === 'lab' || type === 'practical') {
-      return 'bg-[#dbeafe] border-[#93c5fd]';
+      return 'bg-[#e0f2fe] border-[#38bdf8]';
     }
     return 'bg-white border-[#e5e7eb]';
   };
@@ -993,6 +1155,24 @@ const RoleTimetable = () => {
       return;
     }
 
+    // Count unique divisions per subject per semester for display optimization
+    const divisionCountMap = {};
+    pdfTimetables.forEach((entry) => {
+      const key = `${getId(entry?.semesterId)}-${getId(entry?.branchId)}-${getId(entry?.subjectId)}`;
+      if (!divisionCountMap[key]) {
+        divisionCountMap[key] = new Set();
+      }
+      const div = entry?.division && String(entry.division).toLowerCase() !== 'general' ? entry.division : null;
+      if (div) {
+        divisionCountMap[key].add(div);
+      }
+    });
+
+    // Convert sets to counts
+    Object.keys(divisionCountMap).forEach(key => {
+      divisionCountMap[key] = divisionCountMap[key].size;
+    });
+
     const termText = semesterGroups
       .map((group) => {
         const start = formatDate(group.startDate);
@@ -1005,24 +1185,113 @@ const RoleTimetable = () => {
 
     const dayHead = days.map((day) => `<th>${safe(day)}</th>`).join('');
 
+    const slotMetaMap = {};
+    SLOT_OPTIONS.forEach((item) => {
+      slotMetaMap[item.value] = item;
+    });
+
+    const timelineRows = WEEKLY_TABLE_ROWS
+      .map((row) => {
+        if (!Number.isFinite(row.start) || !Number.isFinite(row.end) || row.end <= row.start) return null;
+        return {
+          slot: row.type === 'slot' ? row.slot : null,
+          start: row.start,
+          end: row.end,
+          isBreak: row.type === 'break',
+          breakNumber: row.type === 'break' ? Number(String(row.title || '').replace('Break ', '')) || null : null
+        };
+      })
+      .filter(Boolean);
+
+    const getEntryRange = (entry) => {
+      const slot = getSlotValue(entry?.slot);
+      const span = Number(entry?.slotSpan) > 1 ? Number(entry.slotSpan) : 1;
+      const startMeta = slotMetaMap[slot];
+      const endMeta = slotMetaMap[slot + span - 1];
+      if (!startMeta || !endMeta) return { start: null, end: null };
+      const start = startMeta.start;
+      const end = endMeta.end;
+      return { start, end };
+    };
+
+    const getEntryTypeClass = (entry) => {
+      const kind = String(entry?.lectureType || '').toLowerCase();
+      return (kind === 'lab' || kind === 'practical') ? 'entry-pill lab-pill' : 'entry-pill theory-pill';
+    };
+
     const semesterTablesHtml = semesterGroups.map((group) => {
-      const bodyRows = timeSlots.map((slot) => {
-        const slotMeta = SLOT_OPTIONS.find((item) => item.value === slot);
-        const timeLabel = slotMeta ? slotMeta.label.replace(`Slot ${slot} `, '') : `Slot ${slot}`;
+      const startEntriesByDayRow = {};
+      const skipDayRow = {};
+      days.forEach((day) => {
+        startEntriesByDayRow[day] = {};
+        skipDayRow[day] = new Set();
+      });
+
+      const buildEntryContent = (entry) => {
+        const subjectShort = getSubjectShortLabel(entry?.subjectId);
+        const teacherShort = getTeacherShortLabel(entry?.teacherId);
+        const roomShort = getRoomLabel(entry);
+        const entryRange = getEntryRange(entry);
+        const rangeText = entryRange.start !== null && entryRange.end !== null
+          ? `(${minutesToDisplayTime(entryRange.start)} to ${minutesToDisplayTime(entryRange.end)})`
+          : '';
+
+        const divKey = `${getId(entry?.semesterId)}-${getId(entry?.branchId)}-${getId(entry?.subjectId)}`;
+        const divisionCount = divisionCountMap[divKey] || 0;
+        const hasPart = divisionCount > 1 && entry?.division && String(entry.division).toLowerCase() !== 'general';
+        const part = hasPart ? ` - ${safe(entry.division)}` : '';
+
+        return `<div class="${getEntryTypeClass(entry)}"><div class="entry-time">${safe(rangeText)}</div>${safe(subjectShort)}${part}<br/>${safe(teacherShort)}<br/>${safe(roomShort)}</div>`;
+      };
+
+      group.entries.forEach((entry) => {
+        const day = entry?.dayOfWeek;
+        if (!days.includes(day)) return;
+
+        const slot = getSlotValue(entry?.slot);
+        const span = Number(entry?.slotSpan) > 1 ? Number(entry.slotSpan) : 1;
+        const startRowIndex = timelineRows.findIndex((row) => !row.isBreak && row.slot === slot);
+        const endRowIndex = timelineRows.findIndex((row) => !row.isBreak && row.slot === (slot + span - 1));
+        if (startRowIndex < 0 || endRowIndex < startRowIndex) return;
+
+        const rowSpan = endRowIndex - startRowIndex + 1;
+        const crossesBreak = timelineRows.slice(startRowIndex, endRowIndex + 1).some((row) => row.isBreak);
+        const canMergeRows = span > 1 && rowSpan > 1 && !crossesBreak;
+
+        if (!startEntriesByDayRow[day][startRowIndex]) {
+          startEntriesByDayRow[day][startRowIndex] = [];
+        }
+
+        startEntriesByDayRow[day][startRowIndex].push({
+          html: buildEntryContent(entry),
+          rowSpan: canMergeRows ? rowSpan : 1
+        });
+
+        if (canMergeRows) {
+          for (let i = startRowIndex + 1; i <= endRowIndex; i += 1) {
+            skipDayRow[day].add(i);
+          }
+        }
+      });
+
+      const bodyRows = timelineRows.map((row, rowIndex) => {
+        const timeLabel = `(${minutesToDisplayTime(row.start)} to ${minutesToDisplayTime(row.end)})`;
+
+        if (row.isBreak) {
+          return `<tr><td class="time-cell break-time">${safe(timeLabel)}</td><td class="break-cell" colspan="${days.length}">Break ${safe(row.breakNumber || 1)}</td></tr>`;
+        }
 
         const dayCells = days.map((day) => {
-          const slotEntries = group.entries.filter((entry) => entry.dayOfWeek === day && getSlotValue(entry?.slot) === slot);
-          if (!slotEntries.length) return '<td class="entry-cell">-</td>';
+          if (skipDayRow[day].has(rowIndex)) return '';
+          const entries = startEntriesByDayRow[day][rowIndex] || [];
+          if (!entries.length) return '<td class="entry-cell">-</td>';
 
-          const text = slotEntries.map((entry) => {
-            const subjectShort = getSubjectShortLabel(entry?.subjectId);
-            const teacherShort = getTeacherShortLabel(entry?.teacherId);
-            const hasPart = !!entry?.division && String(entry.division).toLowerCase() !== 'general';
-            const part = hasPart ? ` Part-${safe(entry.division)}` : '';
-            return `${safe(subjectShort)}${part}<br/>${safe(teacherShort)}`;
-          }).join('<hr style="border:0;border-top:1px dotted #ddd;margin:2px 0;"/>');
-
-          return `<td class="entry-cell">${text}</td>`;
+          const mergedEntry = entries.length === 1 ? entries[0] : null;
+          const rowSpanAttr = mergedEntry && mergedEntry.rowSpan > 1
+            ? ` rowspan="${mergedEntry.rowSpan}"`
+            : '';
+          const text = entries.map((item) => item.html).join('');
+          return `<td class="entry-cell"${rowSpanAttr}>${text}</td>`;
         }).join('');
 
         return `<tr><td class="time-cell">${safe(timeLabel)}</td>${dayCells}</tr>`;
@@ -1045,11 +1314,6 @@ const RoleTimetable = () => {
         </section>
       `;
     }).join('');
-    const generatedAt = new Date().toLocaleString();
-    const subjectLabel = filters.subjectId
-      ? getLabel(subjects.find((s) => getId(s) === filters.subjectId))
-      : 'All Subjects';
-    const statusLabel = 'Active Only';
 
     const html = `
       <!doctype html>
@@ -1058,13 +1322,18 @@ const RoleTimetable = () => {
         <meta charset="utf-8" />
         <title>Weekly Timetable</title>
         <style>
-          @page { size: A4 portrait; margin: 8mm; }
+          @page { size: A4 portrait; margin: 10mm; }
           * { box-sizing: border-box; }
           body {
             margin: 0;
             color: #111111;
             font-family: Arial, Helvetica, sans-serif;
             background: #ffffff;
+          }
+          .page {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 20px 12px;
           }
           .top {
             text-align: center;
@@ -1073,10 +1342,10 @@ const RoleTimetable = () => {
           .college { font-size: 15px; font-weight: 700; margin: 0; }
           .dept { font-size: 13px; font-weight: 700; margin: 2px 0 0; }
           .term { font-size: 10px; font-weight: 700; margin: 4px 0 0; }
-          .meta { font-size: 9px; margin-top: 3px; }
 
           table {
-            width: 100%;
+            width: 94%;
+            margin: 0 auto;
             border-collapse: collapse;
             table-layout: fixed;
           }
@@ -1097,7 +1366,8 @@ const RoleTimetable = () => {
             font-size: 10px;
             font-weight: 700;
             text-transform: uppercase;
-            margin: 0 0 4px;
+            width: 94%;
+            margin: 0 auto 4px;
             padding: 3px 4px;
             border: 1px solid #222;
             background: #f8fafc;
@@ -1115,18 +1385,57 @@ const RoleTimetable = () => {
             font-size: 9px;
             line-height: 1.18;
             height: 22px;
+            background: #ffffff;
+          }
+          .entry-pill {
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 2px 3px;
+            margin: 1px 0;
+            font-weight: 700;
+          }
+          .entry-time {
+            font-size: 7px;
+            font-weight: 700;
+            margin-bottom: 2px;
+            opacity: 0.9;
+            display: block;
+            line-height: 1.2;
+          }
+          .theory-pill {
+            background: #f8fafc;
+            border-color: #dbe0e8;
+            color: #111827;
+          }
+          .lab-pill {
+            background: #e0f2fe;
+            border-color: #38bdf8;
+            color: #0c4a6e;
+          }
+          .break-time {
+            background: #fef3c7;
+            color: #92400e;
+          }
+          .break-cell {
+            text-align: center;
+            font-size: 9px;
+            font-weight: 700;
+            background: #fffbeb;
+            color: #92400e;
+            letter-spacing: 0.2px;
           }
         </style>
       </head>
       <body>
-        <div class="top">
-          <p class="college">${safe(instituteName)}</p>
-          <p class="dept">${safe(departmentName)}</p>
-          <p class="term">TIME TABLE TERM DATES - ${safe(termText)}</p>
-          <p class="meta">Generated: ${safe(generatedAt)} | Subject Filter: ${safe(subjectLabel)} | Status: ${safe(statusLabel)}</p>
-        </div>
+        <div class="page">
+          <div class="top">
+            <p class="college">${safe(instituteName)}</p>
+            <p class="dept">${safe(departmentName)}</p>
+            <p class="term">TIME TABLE TERM DATES - ${safe(termText)}</p>
+          </div>
 
-        ${semesterTablesHtml}
+          ${semesterTablesHtml}
+        </div>
       </body>
       </html>
     `;
@@ -1342,10 +1651,11 @@ const RoleTimetable = () => {
 
       const createdCount = Math.max(0, createdIds.length - restoredCount);
       const summary = `Requested: ${createRows.length} | Created: ${createdCount} | Failed: ${failedRows.length} | Updated: ${restoredCount}`;
+      const firstIssue = failedRows[0]?.message ? ` First issue: ${failedRows[0].message}` : '';
 
       notify(
         'warning',
-        `Create finished with issues. ${summary}`
+        `Create finished with issues. ${summary}${firstIssue}`
       );
       setCreateResult({
         type: 'warning',
@@ -1964,7 +2274,12 @@ const RoleTimetable = () => {
               <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">Manage Timetable Entries</h3>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                  {managementRows.length} rows
+                  {managementRows.length === 0
+                    ? '0 rows'
+                    : `Showing ${(managementPage - 1) * managementRowsPerPage + 1}-${Math.min(managementPage * managementRowsPerPage, managementRows.length)} of ${managementRows.length}`}
+                </span>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-md border border-gray-300 bg-white text-gray-700">
+                  10 / page
                 </span>
                 <button
                   onClick={() => handleBulkStatusChange('active')}
@@ -1986,6 +2301,7 @@ const RoleTimetable = () => {
             {managementRows.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">No entries for selected branch/semester.</p>
             ) : (
+              <>
               <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
                 <table className="w-full min-w-[980px] text-xs">
                   <thead className="bg-gray-50 dark:bg-gray-800/60">
@@ -1999,7 +2315,7 @@ const RoleTimetable = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {managementRows.map((entry, index) => {
+                    {pagedManagementRows.map((entry, index) => {
                       const entryId = getId(entry) || `m-row-${index}`;
                       const statusBusy = isStatusUpdating(entryId);
                       const canControl = canDirectlyControlEntry(entry);
@@ -2052,6 +2368,33 @@ const RoleTimetable = () => {
                   </tbody>
                 </table>
               </div>
+
+              {managementRows.length > 0 && (
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-gray-600">
+                    Page {managementPage} of {managementTotalPages}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setManagementPage((prev) => Math.max(1, prev - 1))}
+                      disabled={managementPage <= 1}
+                      className={`px-2.5 py-1 rounded-md border text-[11px] font-bold ${managementPage <= 1 ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setManagementPage((prev) => Math.min(managementTotalPages, prev + 1))}
+                      disabled={managementPage >= managementTotalPages}
+                      className={`px-2.5 py-1 rounded-md border text-[11px] font-bold ${managementPage >= managementTotalPages ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+              </>
             )}
           </div>
         </Card>
@@ -2174,15 +2517,12 @@ const RoleTimetable = () => {
                             const jumpId = `mobile-day-card-${mobileWeekDay}-${slotValue}-${index}`;
                             const entryKey = getId(entry) || `${slotValue}-${index}`;
                             const statusBusy = isStatusUpdating(entryKey);
-                            const slotMeta = SLOT_OPTIONS.find((item) => item.value === slotValue);
                             return (
                             <div id={jumpId} key={`mobile-entry-${entryKey}`} className={`rounded-xl border p-2.5 shadow-sm ${getLectureTone(entry)}`}>
                               <div className="flex items-center justify-between gap-2 mb-1.5">
                                 <div className="min-w-0">
                                   <p className="text-[11px] font-black text-slate-900">{getSlotRange(entry)}</p>
-                                  <p className="text-[10px] text-slate-600 font-semibold">
-                                    Slot {slotValue}{slotMeta?.isBreak ? ' • Break overlap' : ''}
-                                  </p>
+                                  <p className="text-[10px] text-slate-600 font-semibold">Slot {slotValue}</p>
                                 </div>
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${
                                   getEntryStatus(entry) === 'active'
@@ -2258,7 +2598,8 @@ const RoleTimetable = () => {
                 })()}
               </div>
 
-              <div className="hidden md:block w-full overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+              <div className="hidden md:block w-full max-w-[1380px] mx-auto px-2">
+              <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
               <table className="w-full min-w-[1240px] table-auto border-separate border-spacing-2">
                 <thead>
                   <tr>
@@ -2271,27 +2612,27 @@ const RoleTimetable = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {timeSlots.map((slot) => {
-                    const slotMeta = SLOT_OPTIONS.find((item) => item.value === slot);
-                    if (slotMeta?.isBreak) {
-                      const breakNumber = breakSlotOrder[slot] || 1;
+                  {WEEKLY_TABLE_ROWS.map((row) => {
+                    if (row.type === 'break') {
                       return (
-                        <tr key={slot}>
+                        <tr key={row.key}>
                           <td className="sticky left-0 z-20 align-middle px-3 py-3 text-xs font-bold text-amber-800 bg-amber-100 rounded-xl whitespace-nowrap text-center">
-                            {slotMeta.label.replace(`Slot ${slot} `, '')}
+                            {row.label}
                           </td>
                           <td colSpan={days.length} className="align-middle px-3 py-3">
                             <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-center text-xs font-semibold py-3">
-                              Break {breakNumber}
+                              {row.title}
                             </div>
                           </td>
                         </tr>
                       );
                     }
+                    const slot = row.slot;
+                    const slotMeta = SLOT_OPTIONS.find((item) => item.value === slot);
                     return (
                       <tr key={slot}>
                         <td className="sticky left-0 z-20 align-middle px-3 py-3 text-xs font-bold text-gray-800 bg-gray-50 rounded-xl whitespace-nowrap text-center">
-                          {slotMeta ? slotMeta.label.replace(`Slot ${slot} `, '') : `Slot ${slot}`}
+                          {row.label || (slotMeta ? slotMeta.label.replace(`Slot ${slot} `, '') : `Slot ${slot}`)}
                         </td>
                         {days.map((day) => {
                           const key = `${day}|${slot}`;
@@ -2390,6 +2731,7 @@ const RoleTimetable = () => {
                   })}
                 </tbody>
               </table>
+              </div>
               </div>
             </>
           )}
@@ -2555,6 +2897,9 @@ const RoleTimetable = () => {
                         className="w-full px-3 py-2 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-white dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                       />
                     </div>
+                    <p className="text-[11px] text-[#8a766f] mt-1">
+                      {formatDisplayTime(settingsForm.dayStartTime)} to {formatDisplayTime(settingsForm.dayEndTime)}
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-[#181311] dark:text-white mb-1.5">Teacher Max Hours / Day</label>
@@ -2619,6 +2964,9 @@ const RoleTimetable = () => {
                           >
                             x
                           </button>
+                          <p className="col-span-4 text-[10px] text-[#8a766f]">
+                            Break {index + 1}: {formatDisplayTime(window.startTime)} to {formatDisplayTime(window.endTime)}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -2677,7 +3025,7 @@ const RoleTimetable = () => {
                           <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
                             {dayRows.map((row) => (
                               <div key={`preview-row-${row.id}`} className="text-[11px] text-[#4a3f3a] dark:text-[#d5c3bb] border border-[#eee5e2] dark:border-[#3a2a24] rounded-md px-2 py-1 bg-[#fff7f3] dark:bg-[#261913]">
-                                {row.startTime} to {row.endTime} | {row.lectureType} | {getSubjectShortLabel(row.subjectId)} | {getTeacherShortLabel(row.teacherId)}
+                                {formatDisplayTime(row.startTime)} to {formatDisplayTime(row.endTime)} | {row.lectureType} | {getSubjectShortLabel(row.subjectId)} | {getTeacherShortLabel(row.teacherId)}
                               </div>
                             ))}
                           </div>
@@ -2818,6 +3166,9 @@ const RoleTimetable = () => {
                               onChange={(e) => setCreateRows((prev) => prev.map((item) => item.id === row.id ? { ...item, endTime: e.target.value } : item))}
                               className="w-full h-10 px-3 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-white dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                             />
+                            <p className="text-[10px] text-[#8a766f] mt-1">
+                              {formatDisplayTime(row.startTime)} to {formatDisplayTime(row.endTime)}
+                            </p>
                             {getRangeWarning(row.startTime, row.endTime, row.lectureType) && (
                               <p className="text-[10px] text-red-600 mt-1">{getRangeWarning(row.startTime, row.endTime, row.lectureType)}</p>
                             )}
@@ -2965,6 +3316,9 @@ const RoleTimetable = () => {
                             className="w-full h-10 px-3 border border-[#e6dedb] dark:border-[#3a2a24] rounded-lg bg-white dark:bg-[#2d1e18] text-[#181311] dark:text-white"
                           />
                         </div>
+                        <p className="text-[10px] text-[#8a766f] mt-1">
+                          Selected: {formatDisplayTime(row.startTime)} to {formatDisplayTime(row.endTime)}
+                        </p>
                         {getRangeWarning(row.startTime, row.endTime, row.lectureType) && (
                           <p className="text-[10px] text-red-600 mt-1">{getRangeWarning(row.startTime, row.endTime, row.lectureType)}</p>
                         )}
@@ -3101,6 +3455,9 @@ const RoleTimetable = () => {
                     disabled={isEditReadOnly}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {formatDisplayTime(formData.startTime)} to {formatDisplayTime(formData.endTime)}
+                  </p>
                   {getRangeWarning(formData.startTime, formData.endTime, formData.lectureType) && (
                     <p className="text-xs text-red-600 mt-1">{getRangeWarning(formData.startTime, formData.endTime, formData.lectureType)}</p>
                   )}
