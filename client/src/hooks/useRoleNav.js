@@ -40,6 +40,7 @@ const ROLE_NAV = {
   teacher: [
     { key: 'dashboard', label: 'Dashboard', to: '/teacher/dashboard', icon: 'space_dashboard' },
     { key: 'timetable', label: 'Timetable', to: '/teacher/timetable', icon: 'calendar_today' },
+    { key: 'subjects', label: 'Subjects', to: '/teacher/subjects', icon: 'menu_book' },
     { key: 'materials', label: 'Materials', to: '/teacher/materials', icon: 'menu_book' },
     { key: 'library', label: 'Library', to: '/teacher/library', icon: 'library_books' },
     { key: 'tasks', label: 'Tasks', to: '/teacher/tasks', icon: 'assignment' },
@@ -136,6 +137,10 @@ const useRoleNav = (role) => {
           const allowedSet = new Set(allowed);
           if (effectiveRole === 'teacher' || effectiveRole === 'hod' || effectiveRole === 'coordinator') {
             allowedSet.add('users');
+          }
+          if (effectiveRole === 'teacher') {
+            allowedSet.add('subjects');
+            allowedSet.add('timetable');
           }
           const hasTeachingSubjects = assignedSubjectsCount > 0;
           if (effectiveRole === 'hod' && hasTeachingSubjects) {

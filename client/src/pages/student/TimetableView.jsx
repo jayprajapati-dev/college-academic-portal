@@ -3,6 +3,13 @@ import axios from 'axios';
 import { useLocation } from 'react-router-dom';
 import { Card, LoadingSpinner, Modal, StudentLayout } from '../../components';
 
+const safeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
 const StudentTimetableView = () => {
   const location = useLocation();
   const preselectedSubjectId = useMemo(
@@ -93,6 +100,14 @@ const StudentTimetableView = () => {
   }, [settings.breakWindows]);
 
   const getSlotRange = useCallback((entry) => {
+    const explicitStart = toMinutes(entry?.startTime);
+    const explicitEnd = toMinutes(entry?.endTime);
+    if (explicitStart !== null && explicitEnd !== null && explicitEnd > explicitStart) {
+      const startLabel = minutesToHHMM(explicitStart);
+      const endLabel = minutesToHHMM(explicitEnd);
+      return `${startLabel} - ${endLabel}`;
+    }
+
     const slot = Number(entry?.slot) || 1;
     const span = Number(entry?.slotSpan) > 1 ? Number(entry.slotSpan) : 1;
     const slotMeta = slotOptions.find((item) => item.value === slot);
@@ -223,6 +238,75 @@ const StudentTimetableView = () => {
     }, {});
   }, [days, filteredTimetable]);
 
+  const handleDownloadPdf = useCallback(() => {
+    const filterSummary = [
+      `Day: ${filters.day}`,
+      `Subject: ${filters.subjectId || 'All'}`,
+      `Type: ${filters.lectureType}`,
+      `Division: ${filters.division}`
+    ].join(' | ');
+    const activeDays = days.filter((day) => (dailyList?.[day] || []).length > 0);
+    const daysToRender = activeDays.length ? activeDays : days;
+
+    const daySections = daysToRender.map((day) => {
+      const entries = (dailyList?.[day] || []);
+      const rows = entries.length
+        ? entries.map((entry) => {
+          const subjectName = entry?.subjectId?.name || 'Subject';
+          const code = entry?.subjectId?.code || '-';
+          const division = entry?.division || 'General';
+          const lectureType = entry?.lectureType || '-';
+          const room = entry?.roomId?.roomNo || '-';
+          const teacher = entry?.teacherId?.name || '-';
+          const range = getSlotRange(entry);
+          return `<tr><td class="time-col">${safeHtml(range)}</td><td>${safeHtml(subjectName)}</td><td>${safeHtml(code)}</td><td>${safeHtml(division)}</td><td>${safeHtml(lectureType)}</td><td>${safeHtml(room)}</td><td>${safeHtml(teacher)}</td></tr>`;
+        }).join('')
+        : '<tr><td colspan="7" style="text-align:center;color:#666;">No classes</td></tr>';
+
+      return `
+        <section class="day-section">
+          <h3>${safeHtml(day)}</h3>
+          <table>
+            <thead><tr><th>Time</th><th>Subject</th><th>Code</th><th>Division</th><th>Type</th><th>Room</th><th>Teacher</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </section>
+      `;
+    }).join('');
+
+    const html = `<!doctype html><html><head><meta charset="utf-8"/><title>Student Timetable</title><style>
+      @page { size: A4 landscape; margin: 8mm; }
+      body { font-family: Arial, sans-serif; color:#111; margin:0; }
+      .page { padding: 6px; }
+      h1 { margin: 0; font-size: 16px; }
+      .meta { margin-top: 3px; font-size: 10px; color:#374151; }
+      .day-section { margin-top: 10px; break-inside: avoid; }
+      .day-section h3 { margin: 0 0 5px; font-size: 12px; }
+      table { width:100%; border-collapse:collapse; table-layout: fixed; font-size: 10px; }
+      th, td { border:1px solid #cbd5e1; padding:4px; text-align:left; vertical-align: top; word-wrap: break-word; }
+      th { background:#eef2ff; }
+      .time-col { white-space: nowrap; width: 15%; }
+    </style></head><body><div class="page">
+      <h1>Student Timetable</h1>
+      <div class="meta">Generated: ${safeHtml(new Date().toLocaleString())}</div>
+      <div class="meta">Working Hours: ${safeHtml(settings.dayStartTime)} to ${safeHtml(settings.dayEndTime)} | Slot: ${safeHtml(settings.slotMinutes)} min</div>
+      <div class="meta">Filters: ${safeHtml(filterSummary)} | Total Classes: ${safeHtml(filteredTimetable.length)}</div>
+      ${daySections}
+    </div></body></html>`;
+
+    const printWindow = window.open('', '_blank', 'width=1280,height=900');
+    if (!printWindow) {
+      alert('Popup blocked. Please allow popups to download PDF.');
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 250);
+  }, [dailyList, days, filters, getSlotRange, settings.dayEndTime, settings.dayStartTime, settings.slotMinutes]);
+
   if (loading) {
     return (
       <StudentLayout title="My Timetable" onLogout={handleLogout} userName={user?.name || 'Student'}>
@@ -247,6 +331,13 @@ const StudentTimetableView = () => {
               <span className="px-3 py-1 rounded-full bg-white/15">Classes: {filteredTimetable.length}</span>
               <span className="px-3 py-1 rounded-full bg-white/15">Subjects: {subjects.length}</span>
               <span className="px-3 py-1 rounded-full bg-white/15">Divisions: {divisions.length || 1}</span>
+              <button
+                onClick={handleDownloadPdf}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-[#1e3a8a] font-bold"
+              >
+                <span className="material-symbols-outlined text-[16px]">download</span>
+                Download PDF
+              </button>
             </div>
           </div>
         </section>

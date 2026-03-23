@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Branch = require('../models/Branch');
 const Semester = require('../models/Semester');
+const Timetable = require('../models/Timetable');
 const { getCoordinatorStatus } = require('../utils/coordinatorScheduler');
 
 const getJwtSecret = () => process.env.JWT_SECRET || 'smartacademics-dev-jwt-secret';
@@ -72,6 +73,32 @@ const normalizeStudentAcademicRefs = async (user) => {
   }
 };
 
+const syncTeacherAssignedSubjectsFromTimetable = async (user) => {
+  if (!user || user.role !== 'teacher') return;
+
+  const timetableSubjectIds = await Timetable.distinct('subjectId', {
+    teacherId: user._id,
+    status: 'active'
+  });
+
+  const assigned = Array.isArray(user.assignedSubjects) ? user.assignedSubjects : [];
+  const mergedIds = Array.from(new Set(
+    [...assigned, ...timetableSubjectIds]
+      .filter(Boolean)
+      .map((id) => String(id))
+  ));
+
+  const hasChanged = mergedIds.length !== assigned.length
+    || assigned.some((id) => !mergedIds.includes(String(id)));
+
+  if (hasChanged) {
+    user.assignedSubjects = mergedIds
+      .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
+    await user.save();
+  }
+};
+
 // Protect routes - verify JWT token
 const protect = async (req, res, next) => {
   try {
@@ -113,6 +140,10 @@ const protect = async (req, res, next) => {
 
       if (req.user.role === 'student') {
         await normalizeStudentAcademicRefs(req.user);
+      }
+
+      if (req.user.role === 'teacher') {
+        await syncTeacherAssignedSubjectsFromTimetable(req.user);
       }
 
       if (req.user.role === 'coordinator' && req.user.coordinator) {

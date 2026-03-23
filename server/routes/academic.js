@@ -8,7 +8,16 @@ const Semester = require('../models/Semester');
 const Branch = require('../models/Branch');
 const Subject = require('../models/Subject');
 const User = require('../models/User');
+const Timetable = require('../models/Timetable');
 const { protect, authorize } = require('../middleware/auth');
+
+const MATERIAL_CATEGORIES = ['Syllabus', 'Book', 'Notes', 'Manuals', 'Test', 'Mid Exam Paper', 'GTU Exam Paper', 'Other'];
+
+const normalizeMaterialCategory = (category) => {
+  const normalized = String(category || '').trim();
+  if (!normalized) return 'Notes';
+  return MATERIAL_CATEGORIES.includes(normalized) ? normalized : 'Other';
+};
 
 const getHodBranchScope = (user) => ([
   ...(Array.isArray(user.branches) ? user.branches : []),
@@ -2270,9 +2279,14 @@ router.get('/subjects/:id/materials', protect, async (req, res) => {
       });
     }
 
+    const normalizedMaterials = (subject.materials || []).map((material) => ({
+      ...material.toObject(),
+      category: normalizeMaterialCategory(material.category)
+    }));
+
     res.json({
       success: true,
-      materials: subject.materials || []
+      materials: normalizedMaterials
     });
   } catch (error) {
     res.status(500).json({
@@ -2404,7 +2418,7 @@ router.post('/subjects/:id/materials/link', protect, authorize('teacher', 'hod',
 
     const material = {
       title: title.trim(),
-      category: category || 'Notes',
+      category: normalizeMaterialCategory(category),
       description: description || '',
       link: link.trim(),
       addedBy: req.user._id,
@@ -2431,7 +2445,7 @@ router.post('/subjects/:id/materials/link', protect, authorize('teacher', 'hod',
 // @access  Public
 router.get('/subjects/:id/materials/categories', async (req, res) => {
   try {
-    const categories = ['All', 'Syllabus', 'Book', 'Notes', 'Manuals', 'Test', 'Mid Exam Paper', 'GTU Exam Paper', 'Other'];
+    const categories = ['All', ...MATERIAL_CATEGORIES];
     res.json({
       success: true,
       categories
@@ -2465,7 +2479,7 @@ router.put('/subjects/:id/materials/:matId/link', protect, authorize('teacher', 
     }
 
     if (title) material.title = title;
-    if (category) material.category = category;
+    if (category !== undefined) material.category = normalizeMaterialCategory(category);
     if (description !== undefined) material.description = description;
     if (link) material.link = link;
 
@@ -2529,21 +2543,34 @@ router.get('/teacher/:teacherId/subjects', protect, async (req, res) => {
       });
     }
 
-    const teacher = await User.findById(req.params.teacherId).populate({
-      path: 'assignedSubjects',
-      populate: [
-        { path: 'branchId', select: 'name code' },
-        { path: 'semesterId', select: 'semesterNumber academicYear' }
-      ]
-    });
+    const teacher = await User.findById(req.params.teacherId).select('_id assignedSubjects');
     
     if (!teacher) {
       return res.status(404).json({ success: false, message: 'Teacher not found' });
     }
 
+    const timetableSubjectIds = await Timetable.distinct('subjectId', {
+      teacherId: teacher._id,
+      status: 'active'
+    });
+
+    const subjectIds = Array.from(new Set(
+      [
+        ...(Array.isArray(teacher.assignedSubjects) ? teacher.assignedSubjects : []),
+        ...timetableSubjectIds
+      ]
+        .filter(Boolean)
+        .map((id) => String(id))
+    ));
+
+    const subjects = await Subject.find({ _id: { $in: subjectIds } })
+      .populate('branchId', 'name code')
+      .populate('semesterId', 'semesterNumber academicYear')
+      .sort({ name: 1 });
+
     res.json({
       success: true,
-      subjects: teacher.assignedSubjects || []
+      subjects
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

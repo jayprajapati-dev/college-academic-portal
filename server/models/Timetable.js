@@ -115,6 +115,16 @@ const TimetableSchema = new mongoose.Schema(
       type: Number, // 1-based slot index (e.g., 1 = 08:00-09:00)
       required: true
     },
+    startTime: {
+      type: String,
+      match: /^([01]\d|2[0-3]):([0-5]\d)$/,
+      default: null
+    },
+    endTime: {
+      type: String,
+      match: /^([01]\d|2[0-3]):([0-5]\d)$/,
+      default: null
+    },
     lectureType: {
       type: String,
       enum: ['Theory', 'Lab'],

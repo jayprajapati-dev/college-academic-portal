@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const router = express.Router();
 const LibraryBook = require('../models/LibraryBook');
 const Subject = require('../models/Subject');
+const Timetable = require('../models/Timetable');
 const { protect, authorize } = require('../middleware/auth');
 
 const buildBranchScope = (user) => {
@@ -26,6 +27,86 @@ const buildSearchQuery = (search) => {
       { publisher: regex }
     ]
   };
+};
+
+const getSubjectScopes = (subject) => {
+  const scopes = [];
+
+  if (subject?.branchId) {
+    scopes.push({
+      branchId: String(subject.branchId),
+      semesterId: subject.semesterId ? String(subject.semesterId) : null
+    });
+  }
+
+  if (Array.isArray(subject?.offerings)) {
+    subject.offerings.forEach((offering) => {
+      if (!offering?.branchId) return;
+      scopes.push({
+        branchId: String(offering.branchId),
+        semesterId: offering.semesterId ? String(offering.semesterId) : null
+      });
+    });
+  }
+
+  const seen = new Set();
+  return scopes.filter((scope) => {
+    const key = `${scope.branchId}|${scope.semesterId || ''}`;
+    if (!scope.branchId || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const getEffectiveSubjectScope = (subject, allowedBranches) => {
+  const subjectScopes = getSubjectScopes(subject);
+  return subjectScopes.find((scope) => allowedBranches.includes(scope.branchId)) || null;
+};
+
+const getTeacherScopedSubjectIds = async (user) => {
+  if (!user || user.role !== 'teacher') return [];
+
+  const assigned = Array.isArray(user.assignedSubjects) ? user.assignedSubjects : [];
+  const timetableSubjectIds = await Timetable.distinct('subjectId', {
+    teacherId: user._id,
+    status: 'active'
+  });
+
+  return Array.from(new Set(
+    [...assigned, ...timetableSubjectIds]
+      .filter(Boolean)
+      .map((id) => String(id))
+  ));
+};
+
+const buildEffectiveBranchScope = async (user) => {
+  const branchSet = new Set(buildBranchScope(user));
+
+  if (user?.role === 'teacher') {
+    const teacherSubjectIds = await getTeacherScopedSubjectIds(user);
+
+    if (teacherSubjectIds.length > 0) {
+      const teacherSubjects = await Subject.find({ _id: { $in: teacherSubjectIds } })
+        .select('branchId offerings.branchId');
+
+      teacherSubjects.forEach((subject) => {
+        if (subject?.branchId) branchSet.add(String(subject.branchId));
+        if (Array.isArray(subject?.offerings)) {
+          subject.offerings.forEach((offering) => {
+            if (offering?.branchId) branchSet.add(String(offering.branchId));
+          });
+        }
+      });
+    }
+  }
+
+  return Array.from(branchSet).filter(Boolean);
+};
+
+const teacherCanAccessBook = (book, allowedBranches, teacherSubjectIds) => {
+  const branchAllowed = allowedBranches.includes(String(book?.branchId));
+  const subjectAllowed = teacherSubjectIds.includes(String(book?.subjectId));
+  return branchAllowed || subjectAllowed;
 };
 
 // PUBLIC: Get library books
@@ -68,10 +149,7 @@ router.get('/books', protect, authorize('admin', 'hod', 'teacher', 'coordinator'
     const { page = 1, limit = 10, subjectId, branchId, semesterId, status, search } = req.query;
 
     const query = {};
-    if (status && status !== 'all') {
-      query.status = status;
-    }
-
+    if (status && status !== 'all') query.status = status;
     if (subjectId && mongoose.Types.ObjectId.isValid(subjectId)) query.subjectId = subjectId;
     if (branchId && mongoose.Types.ObjectId.isValid(branchId)) query.branchId = branchId;
     if (semesterId && mongoose.Types.ObjectId.isValid(semesterId)) query.semesterId = semesterId;
@@ -80,27 +158,51 @@ router.get('/books', protect, authorize('admin', 'hod', 'teacher', 'coordinator'
     if (searchQuery) Object.assign(query, searchQuery);
 
     if (req.user.role !== 'admin') {
-      const allowedBranches = buildBranchScope(req.user);
+      const allowedBranches = await buildEffectiveBranchScope(req.user);
+      const teacherSubjectIds = req.user.role === 'teacher'
+        ? await getTeacherScopedSubjectIds(req.user)
+        : [];
+
       if (allowedBranches.length === 0) {
-        return res.json({
-          success: true,
-          count: 0,
-          total: 0,
-          pages: 0,
-          currentPage: Number(page),
-          data: []
-        });
+        if (req.user.role === 'teacher' && teacherSubjectIds.length > 0) {
+          if (query.subjectId && !teacherSubjectIds.includes(String(query.subjectId))) {
+            return res.status(403).json({
+              success: false,
+              message: 'You are not allowed to access this subject'
+            });
+          }
+
+          if (!query.subjectId) {
+            query.subjectId = { $in: teacherSubjectIds };
+          }
+        } else {
+          return res.json({
+            success: true,
+            count: 0,
+            total: 0,
+            pages: 0,
+            currentPage: Number(page),
+            data: []
+          });
+        }
       }
 
-      if (query.branchId && !allowedBranches.includes(String(query.branchId))) {
+      if (allowedBranches.length > 0 && query.branchId && !allowedBranches.includes(String(query.branchId))) {
         return res.status(403).json({
           success: false,
           message: 'You are not allowed to access this branch'
         });
       }
 
-      if (!query.branchId) {
+      if (allowedBranches.length > 0 && !query.branchId) {
         query.branchId = { $in: allowedBranches };
+      }
+
+      if (req.user.role === 'teacher' && query.subjectId && !teacherSubjectIds.includes(String(query.subjectId))) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not allowed to access this subject'
+        });
       }
     }
 
@@ -152,15 +254,30 @@ router.post('/books', protect, authorize('admin', 'hod', 'teacher', 'coordinator
       });
     }
 
+    let effectiveBranchId = subject.branchId;
+    let effectiveSemesterId = subject.semesterId;
+
     if (req.user.role !== 'admin') {
-      const allowedBranches = buildBranchScope(req.user);
-      const subjectBranch = subject.branchId ? String(subject.branchId) : null;
-      if (!subjectBranch || !allowedBranches.includes(subjectBranch)) {
+      const allowedBranches = await buildEffectiveBranchScope(req.user);
+      let subjectScope = getEffectiveSubjectScope(subject, allowedBranches);
+
+      if (!subjectScope && req.user.role === 'teacher') {
+        const teacherSubjectIds = await getTeacherScopedSubjectIds(req.user);
+        if (teacherSubjectIds.includes(String(subject._id))) {
+          const subjectScopes = getSubjectScopes(subject);
+          subjectScope = subjectScopes[0] || null;
+        }
+      }
+
+      if (!subjectScope) {
         return res.status(403).json({
           success: false,
           message: 'You can only add books for subjects in your branch'
         });
       }
+
+      effectiveBranchId = subjectScope.branchId;
+      effectiveSemesterId = subjectScope.semesterId || subject.semesterId;
     }
 
     const book = await LibraryBook.create({
@@ -173,8 +290,8 @@ router.post('/books', protect, authorize('admin', 'hod', 'teacher', 'coordinator
       edition,
       status: status === 'inactive' ? 'inactive' : 'active',
       subjectId: subject._id,
-      branchId: subject.branchId,
-      semesterId: subject.semesterId,
+      branchId: effectiveBranchId,
+      semesterId: effectiveSemesterId,
       addedBy: req.user._id,
       addedByRole: req.user.role
     });
@@ -213,8 +330,19 @@ router.put('/books/:id', protect, authorize('admin', 'hod', 'teacher', 'coordina
     }
 
     if (req.user.role !== 'admin') {
-      const allowedBranches = buildBranchScope(req.user);
-      if (!allowedBranches.includes(String(book.branchId))) {
+      const allowedBranches = await buildEffectiveBranchScope(req.user);
+      const teacherSubjectIds = req.user.role === 'teacher'
+        ? await getTeacherScopedSubjectIds(req.user)
+        : [];
+
+      if (req.user.role === 'teacher') {
+        if (!teacherCanAccessBook(book, allowedBranches, teacherSubjectIds)) {
+          return res.status(403).json({
+            success: false,
+            message: 'You are not allowed to update this book'
+          });
+        }
+      } else if (!allowedBranches.includes(String(book.branchId))) {
         return res.status(403).json({
           success: false,
           message: 'You are not allowed to update this book'
@@ -223,6 +351,9 @@ router.put('/books/:id', protect, authorize('admin', 'hod', 'teacher', 'coordina
     }
 
     let subject = null;
+    let effectiveBranchId = book.branchId;
+    let effectiveSemesterId = book.semesterId;
+
     if (req.body.subjectId && mongoose.Types.ObjectId.isValid(req.body.subjectId)) {
       subject = await Subject.findById(req.body.subjectId);
       if (!subject) {
@@ -233,14 +364,29 @@ router.put('/books/:id', protect, authorize('admin', 'hod', 'teacher', 'coordina
       }
 
       if (req.user.role !== 'admin') {
-        const allowedBranches = buildBranchScope(req.user);
-        const subjectBranch = subject.branchId ? String(subject.branchId) : null;
-        if (!subjectBranch || !allowedBranches.includes(subjectBranch)) {
+        const allowedBranches = await buildEffectiveBranchScope(req.user);
+        let subjectScope = getEffectiveSubjectScope(subject, allowedBranches);
+
+        if (!subjectScope && req.user.role === 'teacher') {
+          const teacherSubjectIds = await getTeacherScopedSubjectIds(req.user);
+          if (teacherSubjectIds.includes(String(subject._id))) {
+            const subjectScopes = getSubjectScopes(subject);
+            subjectScope = subjectScopes[0] || null;
+          }
+        }
+
+        if (!subjectScope) {
           return res.status(403).json({
             success: false,
             message: 'You can only assign books to subjects in your branch'
           });
         }
+
+        effectiveBranchId = subjectScope.branchId;
+        effectiveSemesterId = subjectScope.semesterId || subject.semesterId;
+      } else {
+        effectiveBranchId = subject.branchId;
+        effectiveSemesterId = subject.semesterId;
       }
     }
 
@@ -254,8 +400,8 @@ router.put('/books/:id', protect, authorize('admin', 'hod', 'teacher', 'coordina
       edition: req.body.edition ?? book.edition,
       status: req.body.status === 'inactive' ? 'inactive' : 'active',
       subjectId: subject ? subject._id : book.subjectId,
-      branchId: subject ? subject.branchId : book.branchId,
-      semesterId: subject ? subject.semesterId : book.semesterId
+      branchId: subject ? effectiveBranchId : book.branchId,
+      semesterId: subject ? effectiveSemesterId : book.semesterId
     };
 
     const updatedBook = await LibraryBook.findByIdAndUpdate(id, updatedFields, { new: true });
@@ -294,8 +440,19 @@ router.delete('/books/:id', protect, authorize('admin', 'hod', 'teacher', 'coord
     }
 
     if (req.user.role !== 'admin') {
-      const allowedBranches = buildBranchScope(req.user);
-      if (!allowedBranches.includes(String(book.branchId))) {
+      const allowedBranches = await buildEffectiveBranchScope(req.user);
+      const teacherSubjectIds = req.user.role === 'teacher'
+        ? await getTeacherScopedSubjectIds(req.user)
+        : [];
+
+      if (req.user.role === 'teacher') {
+        if (!teacherCanAccessBook(book, allowedBranches, teacherSubjectIds)) {
+          return res.status(403).json({
+            success: false,
+            message: 'You are not allowed to delete this book'
+          });
+        }
+      } else if (!allowedBranches.includes(String(book.branchId))) {
         return res.status(403).json({
           success: false,
           message: 'You are not allowed to delete this book'

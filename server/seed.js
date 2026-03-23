@@ -85,7 +85,7 @@ const seedData = async () => {
         semesterId: semesters[0]._id,
         credits: 4,
         description: 'Introduction to programming concepts and basics of C language',
-        syllabus: 'Basics of Programming, Variables, Data Types, Control Structures, Functions, Arrays, Strings',
+        syllabus: 'https://example.com/syllabus/it101-programming-fundamentals.pdf',
         type: 'theory+practical',
         faculty: {
           name: 'Prof. Rajesh Kumar',
@@ -133,7 +133,7 @@ const seedData = async () => {
         semesterId: semesters[0]._id,
         credits: 4,
         description: 'Fundamental data structures and algorithms analysis',
-        syllabus: 'Arrays, Linked Lists, Stacks, Queues, Trees, Graphs, Sorting, Searching',
+        syllabus: 'https://example.com/syllabus/it102-data-structures.pdf',
         type: 'theory+practical',
         faculty: {
           name: 'Prof. Priya Sharma',
@@ -173,7 +173,7 @@ const seedData = async () => {
         semesterId: semesters[1]._id,
         credits: 3,
         description: 'Introduction to DBMS concepts and SQL',
-        syllabus: 'DBMS Concepts, ER Model, Relational Model, SQL, Normalization, Transactions',
+        syllabus: 'https://example.com/syllabus/it201-dbms.pdf',
         type: 'theory',
         faculty: {
           name: 'Prof. Amit Patel',
@@ -205,7 +205,7 @@ const seedData = async () => {
         semesterId: semesters[1]._id,
         credits: 3,
         description: 'Full-stack web development with HTML, CSS, JavaScript',
-        syllabus: 'HTML5, CSS3, JavaScript, DOM, AJAX, Responsive Design, Web Frameworks',
+        syllabus: 'https://example.com/syllabus/it202-web-development.pdf',
         type: 'theory+practical',
         faculty: {
           name: 'Prof. Vikram Singh',
@@ -253,7 +253,7 @@ const seedData = async () => {
         semesterId: semesters[0]._id,
         credits: 4,
         description: 'OS concepts, processes, memory management and scheduling',
-        syllabus: 'OS Concepts, Processes and Threads, Scheduling, Memory Management, File Systems, Synchronization',
+        syllabus: 'https://example.com/syllabus/cs101-operating-systems.pdf',
         type: 'theory',
         faculty: {
           name: 'Prof. Deepak Verma',
@@ -285,7 +285,7 @@ const seedData = async () => {
         semesterId: semesters[0]._id,
         credits: 4,
         description: 'Computer hardware architecture and organization',
-        syllabus: 'Digital Logic, CPU Architecture, Memory Systems, I/O Systems, Performance Analysis',
+        syllabus: 'https://example.com/syllabus/cs102-computer-architecture.pdf',
         type: 'theory',
         faculty: {
           name: 'Prof. Neha Gupta',

@@ -79,7 +79,7 @@ const RoleTimetable = () => {
     branchId: '',
     subjectId: '',
     dayOfWeek: '',
-    status: 'all'
+    status: 'active'
   });
 
   const [semesters, setSemesters] = useState([]);
@@ -605,11 +605,11 @@ const RoleTimetable = () => {
     return `${hour}:${minute}`;
   };
 
-  const getSlotValue = (value) => {
+  const getSlotValue = useCallback((value) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric) || numeric <= 0) return 1;
     return Math.floor(numeric);
-  };
+  }, []);
 
   const getSlotRange = (entry) => {
     const slot = getSlotValue(entry?.slot);
@@ -978,6 +978,13 @@ const RoleTimetable = () => {
     return { total, theory, practical, todayCount };
   }, [filteredTimetables]);
 
+  const weeklyGridReady = useMemo(() => {
+    if (!(isAdmin || isHod)) return true;
+    const selectedBranchId = isHod ? activeHodBranchId : filters.branchId;
+    const selectedSemesterIds = Array.isArray(filters.semesterIds) ? filters.semesterIds : [];
+    return Boolean(selectedBranchId) && selectedSemesterIds.length > 0;
+  }, [activeHodBranchId, filters.branchId, filters.semesterIds, isAdmin, isHod]);
+
   const WEEKLY_TABLE_ROWS = useMemo(() => {
     if (!SLOT_OPTIONS.length) return [];
 
@@ -988,7 +995,7 @@ const RoleTimetable = () => {
         slot: slotMeta.value,
         start: slotMeta.start,
         end: slotMeta.end,
-        label: slotMeta.label.replace(`Slot ${slotMeta.value} `, '')
+        label: `${minutesToDisplayTime(slotMeta.start)}-${minutesToDisplayTime(slotMeta.end)}`
       });
 
       const nextSlotStart = SLOT_OPTIONS[index + 1]?.start ?? null;
@@ -1004,7 +1011,7 @@ const RoleTimetable = () => {
           key: `break-${win.index}-${win.start}-${win.end}`,
           start: win.start,
           end: win.end,
-          label: `(${minutesToDisplayTime(win.start)} to ${minutesToDisplayTime(win.end)})`,
+          label: `${minutesToDisplayTime(win.start)}-${minutesToDisplayTime(win.end)}`,
           title: `Break ${win.index + 1}`
         });
       });
@@ -1027,7 +1034,7 @@ const RoleTimetable = () => {
       if (dayDiff !== 0) return dayDiff;
       return getSlotValue(a?.slot) - getSlotValue(b?.slot);
     });
-  }, [dayOrderMap, managementFilteredTimetables]);
+  }, [dayOrderMap, getSlotValue, managementFilteredTimetables]);
 
   const managementTotalPages = useMemo(() => {
     const total = Math.ceil(managementRows.length / Math.max(1, managementRowsPerPage));
@@ -1055,7 +1062,7 @@ const RoleTimetable = () => {
       map[key].push(entry);
     });
     return map;
-  }, [filteredTimetables]);
+  }, [filteredTimetables, getSlotValue]);
 
   const conflictCount = useMemo(() => {
     return Object.values(slotMap).filter((entries) => entries.length > 1).length;
@@ -1093,6 +1100,46 @@ const RoleTimetable = () => {
     }
     return 'bg-white border-[#e5e7eb]';
   };
+
+  const weeklyCellModel = useMemo(() => {
+    const byDay = {};
+    days.forEach((day) => {
+      byDay[day] = { startMap: {}, skipRows: new Set() };
+    });
+
+    filteredTimetables.forEach((entry) => {
+      const day = entry?.dayOfWeek;
+      if (!days.includes(day)) return;
+
+      const slot = getSlotValue(entry?.slot);
+      const span = Number(entry?.slotSpan) > 1 ? Number(entry.slotSpan) : 1;
+
+      const startRowIndex = WEEKLY_TABLE_ROWS.findIndex((row) => row.type === 'slot' && row.slot === slot);
+      const endRowIndex = WEEKLY_TABLE_ROWS.findIndex((row) => row.type === 'slot' && row.slot === (slot + span - 1));
+      if (startRowIndex < 0 || endRowIndex < startRowIndex) return;
+
+      const rowSpan = endRowIndex - startRowIndex + 1;
+      const crossesBreak = WEEKLY_TABLE_ROWS.slice(startRowIndex, endRowIndex + 1).some((row) => row.type === 'break');
+      const canMergeRows = span > 1 && rowSpan > 1 && !crossesBreak;
+
+      if (!byDay[day].startMap[startRowIndex]) {
+        byDay[day].startMap[startRowIndex] = [];
+      }
+
+      byDay[day].startMap[startRowIndex].push({
+        entry,
+        rowSpan: canMergeRows ? rowSpan : 1
+      });
+
+      if (canMergeRows) {
+        for (let i = startRowIndex + 1; i <= endRowIndex; i += 1) {
+          byDay[day].skipRows.add(i);
+        }
+      }
+    });
+
+    return byDay;
+  }, [WEEKLY_TABLE_ROWS, days, filteredTimetables, getSlotValue]);
 
   const handleDownloadPdf = () => {
     const selectedSemesterIds = Array.isArray(filters.semesterIds) ? filters.semesterIds : [];
@@ -2231,7 +2278,7 @@ const RoleTimetable = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
             {(isAdmin || isHod) && (
               <select
                 value={isHod ? activeHodBranchId : filters.branchId}
@@ -2267,6 +2314,61 @@ const RoleTimetable = () => {
                 </option>
               ))}
             </select>
+
+            <select
+              value={filters.dayOfWeek}
+              onChange={(e) => setFilters((prev) => ({ ...prev, dayOfWeek: e.target.value }))}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="" className="text-gray-900 bg-white">All Days</option>
+              {days.map((day) => (
+                <option key={day} value={day} className="text-gray-900 bg-white">{day}</option>
+              ))}
+            </select>
+
+            <select
+              value={filters.subjectId}
+              onChange={(e) => setFilters((prev) => ({ ...prev, subjectId: e.target.value }))}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="" className="text-gray-900 bg-white">All Subjects</option>
+              {subjects.map((subject) => (
+                <option key={subject._id} value={subject._id} className="text-gray-900 bg-white">
+                  {subject.code || subject.name} - {subject.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filters.status}
+              onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="all" className="text-gray-900 bg-white">All Status</option>
+              <option value="active" className="text-gray-900 bg-white">Active</option>
+              <option value="cancelled" className="text-gray-900 bg-white">Cancelled</option>
+              <option value="archived" className="text-gray-900 bg-white">Archived</option>
+            </select>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFilters((prev) => ({
+                ...prev,
+                semesterIds: [],
+                subjectId: '',
+                dayOfWeek: '',
+                status: 'active',
+                branchId: isHod ? prev.branchId : ''
+              }))}
+              className="px-3 py-1.5 rounded-md border border-gray-300 bg-white text-xs font-bold text-gray-700 hover:bg-gray-50"
+            >
+              Clear Filters
+            </button>
+            <span className="text-xs text-gray-500">
+              Weekly grid below follows current filters.
+            </span>
           </div>
 
           <div className="mt-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/20 p-3 sm:p-4">
@@ -2398,7 +2500,7 @@ const RoleTimetable = () => {
             )}
           </div>
         </Card>
-        <Card className="hidden bg-white dark:bg-gray-800 p-4 sm:p-6">
+        <Card className="bg-white dark:bg-gray-800 p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <div>
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">Timetable Grid</h3>
@@ -2411,7 +2513,16 @@ const RoleTimetable = () => {
             )}
           </div>
 
-          {filteredTimetables.length === 0 ? (
+          {!weeklyGridReady ? (
+            <div className="text-center py-10 space-y-2">
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Select Branch and Semester to view weekly timetable grid.
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                First choose filters above, then timetable will appear.
+              </p>
+            </div>
+          ) : filteredTimetables.length === 0 ? (
             <p className="text-gray-500 dark:text-gray-400 text-center py-8">
               No timetable entries found
             </p>
@@ -2598,29 +2709,29 @@ const RoleTimetable = () => {
                 })()}
               </div>
 
-              <div className="hidden md:block w-full max-w-[1380px] mx-auto px-2">
-              <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
-              <table className="w-full min-w-[1240px] table-auto border-separate border-spacing-2">
+              <div className="hidden md:block w-full max-w-[1220px] mx-auto px-1">
+              <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+              <table className="w-full min-w-[1020px] table-fixed border-collapse">
                 <thead>
                   <tr>
-                    <th className="sticky left-0 z-30 min-w-[170px] px-3 py-3 text-center text-xs font-bold uppercase tracking-wide text-gray-700 bg-gray-100 rounded-xl">Time</th>
+                    <th className="sticky left-0 z-30 min-w-[88px] px-1.5 py-1.5 text-center text-[10px] font-bold uppercase tracking-wide text-gray-700 bg-gray-100 border border-gray-200">Time</th>
                     {days.map((day) => (
-                      <th key={day} className="min-w-[175px] px-3 py-3 text-center text-xs font-bold uppercase tracking-wide text-gray-700 bg-gray-100 rounded-xl">
+                      <th key={day} className="min-w-[130px] px-2 py-2 text-center text-[11px] font-bold uppercase tracking-wide text-gray-700 bg-gray-100 border border-gray-200">
                         {day}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {WEEKLY_TABLE_ROWS.map((row) => {
+                  {WEEKLY_TABLE_ROWS.map((row, rowIndex) => {
                     if (row.type === 'break') {
                       return (
                         <tr key={row.key}>
-                          <td className="sticky left-0 z-20 align-middle px-3 py-3 text-xs font-bold text-amber-800 bg-amber-100 rounded-xl whitespace-nowrap text-center">
+                          <td className="sticky left-0 z-20 align-middle px-1.5 py-1.5 text-[10px] font-bold text-amber-800 bg-amber-100 whitespace-nowrap text-center border border-amber-200">
                             {row.label}
                           </td>
-                          <td colSpan={days.length} className="align-middle px-3 py-3">
-                            <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 text-center text-xs font-semibold py-3">
+                          <td colSpan={days.length} className="align-middle px-2 py-2 border border-amber-200 bg-amber-50">
+                            <div className="text-amber-800 text-center text-[11px] font-semibold py-1">
                               {row.title}
                             </div>
                           </td>
@@ -2631,36 +2742,40 @@ const RoleTimetable = () => {
                     const slotMeta = SLOT_OPTIONS.find((item) => item.value === slot);
                     return (
                       <tr key={slot}>
-                        <td className="sticky left-0 z-20 align-middle px-3 py-3 text-xs font-bold text-gray-800 bg-gray-50 rounded-xl whitespace-nowrap text-center">
+                        <td className="sticky left-0 z-20 align-middle px-1.5 py-1.5 text-[10px] font-bold text-gray-800 bg-gray-50 whitespace-nowrap text-center border border-gray-200">
                           {row.label || (slotMeta ? slotMeta.label.replace(`Slot ${slot} `, '') : `Slot ${slot}`)}
                         </td>
                         {days.map((day) => {
-                          const key = `${day}|${slot}`;
-                          const entries = slotMap[key] || [];
+                          const model = weeklyCellModel[day];
+                          if (model?.skipRows?.has(rowIndex)) return null;
+
+                          const entries = model?.startMap?.[rowIndex] || [];
+                          const firstEntry = entries[0] || null;
+                          const rowSpan = entries.length === 1 ? (firstEntry?.rowSpan || 1) : 1;
+
                           return (
-                            <td key={key} className="align-top px-1.5 py-1 min-w-[185px]">
+                            <td key={`${day}-${slot}`} rowSpan={rowSpan} className="align-top px-1 py-1 min-w-[130px] border border-gray-200">
                               {entries.length === 0 ? (
-                                <div className="min-h-[96px] rounded-xl border border-gray-200 bg-white" />
+                                <div className="min-h-[44px] bg-white" />
                               ) : (
-                                <div className="space-y-2">
-                                  {entries.map((entry) => {
-                                    const entryId = getId(entry);
-                                    const statusBusy = isStatusUpdating(entryId);
+                                <div className="space-y-1">
+                                  {entries.map((item) => {
+                                    const entry = item.entry;
                                     return (
                                     <div
                                       key={entry._id}
-                                      className={`rounded-xl border border-gray-300 p-2 bg-white shadow-sm ${getLectureTone(entry)}`}
+                                      className={`rounded-md border border-gray-300 p-1.5 bg-white ${getLectureTone(entry)}`}
                                     >
-                                      <div className="mb-1.5">
+                                      <div className="mb-1">
                                         <div
-                                          className="text-[14px] font-extrabold text-gray-900 leading-snug break-words whitespace-normal min-h-[34px]"
+                                          className="text-[12px] font-extrabold text-gray-900 leading-snug break-words whitespace-normal"
                                           title={entry.subjectId?.name || 'Subject'}
                                         >
                                           {getSubjectShortLabel(entry.subjectId)}
                                         </div>
                                       </div>
-                                      <div className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-[10px] text-gray-700">
-                                        <div className="grid grid-cols-[52px_1fr] gap-x-1 gap-y-0.5">
+                                      <div className="rounded-md border border-gray-200 bg-gray-50 px-1.5 py-1 text-[9px] text-gray-700">
+                                        <div className="grid grid-cols-[44px_1fr] gap-x-1 gap-y-0.5">
                                           <span className="font-semibold text-gray-500">Code</span>
                                           <span className="font-bold text-gray-800 truncate">{entry.subjectId?.code || '-'}</span>
                                           {shouldShowSectionBadge(entry) && (
@@ -2675,49 +2790,9 @@ const RoleTimetable = () => {
                                           <span className="font-bold text-gray-800 truncate">{getRoomLabel(entry)}</span>
                                         </div>
                                       </div>
-                                      {canDirectlyControlEntry(entry) ? (
-                                        <div className="grid grid-cols-4 gap-1 mt-1.5 pt-1.5 border-t border-gray-200">
-                                          <button
-                                            onClick={() => handleToggleStatus(entry)}
-                                            disabled={statusBusy}
-                                            className={`inline-flex items-center justify-center gap-1 text-[10px] font-bold rounded-md border px-2 py-1.5 ${
-                                              statusBusy
-                                                ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                : getEntryStatus(entry) === 'active'
-                                                  ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
-                                                  : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                            }`}
-                                            title={getEntryStatus(entry) === 'active' ? 'Turn OFF' : 'Turn ON'}
-                                            aria-label={getEntryStatus(entry) === 'active' ? 'Turn OFF' : 'Turn ON'}
-                                          >
-                                            {statusBusy ? 'Updating...' : (getEntryStatus(entry) === 'active' ? 'Set Inactive' : 'Set Active')}
-                                          </button>
-                                          <button
-                                            onClick={() => openEditModal(entry, 'view')}
-                                            className="text-[10px] font-bold px-2 py-1.5 rounded-md border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
-                                          >
-                                            View
-                                          </button>
-                                          <button
-                                            onClick={() => openEditModal(entry, 'edit')}
-                                            className="text-[10px] font-bold px-2 py-1.5 rounded-md border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                                          >
-                                            Modify
-                                          </button>
-                                          <button
-                                            onClick={() => handleDeleteTimetable(getId(entry))}
-                                            className="text-[10px] font-bold px-2 py-1.5 rounded-md border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                                          >
-                                            Delete
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <div className="mt-1.5 flex flex-col items-start gap-1 pt-1.5 border-t border-gray-200">
-                                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                                            No Direct Control
-                                          </span>
-                                        </div>
-                                      )}
+                                      <div className="mt-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold border bg-white text-slate-600 border-slate-200">
+                                        {getEntryStatus(entry) === 'active' ? 'Active' : 'Inactive'}
+                                      </div>
                                     </div>
                                     );
                                   })}

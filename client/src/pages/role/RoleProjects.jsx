@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button, Card, Input, Modal, RoleLayout } from '../../components';
 import useRoleNav from '../../hooks/useRoleNav';
 
@@ -8,14 +8,14 @@ const EMPTY_FORM = {
   description: '',
   category: 'Mini Project',
   subjectId: '',
-  dueDate: '',
-  teamSize: 1,
   status: 'active',
   resources: [{ name: '', url: '' }]
 };
 
 const RoleProjects = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const preferredSubjectId = location.state?.subjectId || new URLSearchParams(location.search).get('subjectId') || '';
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
   const [role, setRole] = useState(storedUser?.role || 'teacher');
   const [user, setUser] = useState(storedUser);
@@ -28,6 +28,7 @@ const RoleProjects = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [subjectFilter, setSubjectFilter] = useState(preferredSubjectId);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState(EMPTY_FORM);
 
@@ -107,7 +108,10 @@ const RoleProjects = () => {
 
     try {
       setLoading(true);
-      const response = await fetch(`/api/projects/all?page=1&limit=100&status=${statusFilter}`, {
+      const params = new URLSearchParams({ page: '1', limit: '100', status: statusFilter });
+      if (subjectFilter) params.append('subjectId', subjectFilter);
+
+      const response = await fetch(`/api/projects/all?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await response.json();
@@ -123,7 +127,7 @@ const RoleProjects = () => {
     } finally {
       setLoading(false);
     }
-  }, [handleAuthError, statusFilter, token]);
+  }, [handleAuthError, statusFilter, subjectFilter, token]);
 
   useEffect(() => {
     fetchProfile();
@@ -137,9 +141,18 @@ const RoleProjects = () => {
     fetchProjects();
   }, [fetchProjects]);
 
+  useEffect(() => {
+    if (!subjects.length || !preferredSubjectId) return;
+    const hasPreferred = subjects.some((subject) => String(subject?._id) === String(preferredSubjectId));
+    if (!hasPreferred) return;
+
+    setSubjectFilter((prev) => (prev || preferredSubjectId));
+    setFormData((prev) => (prev.subjectId ? prev : { ...prev, subjectId: preferredSubjectId }));
+  }, [preferredSubjectId, subjects]);
+
   const openCreateModal = () => {
     setEditingProject(null);
-    setFormData(EMPTY_FORM);
+    setFormData({ ...EMPTY_FORM, subjectId: preferredSubjectId || '' });
     setShowModal(true);
   };
 
@@ -150,8 +163,6 @@ const RoleProjects = () => {
       description: project.description || '',
       category: project.category || 'Mini Project',
       subjectId: project.subjectId?._id || '',
-      dueDate: project.dueDate ? String(project.dueDate).slice(0, 10) : '',
-      teamSize: project.teamSize || 1,
       status: project.status || 'active',
       resources: Array.isArray(project.resources) && project.resources.length > 0
         ? project.resources.map((resource) => ({ name: resource.name || '', url: resource.url || '' }))
@@ -180,8 +191,6 @@ const RoleProjects = () => {
         description: formData.description,
         category: formData.category,
         subjectId: formData.subjectId,
-        dueDate: formData.dueDate || null,
-        teamSize: Number(formData.teamSize || 1),
         status: formData.status,
         resources: normalizeResources()
       };
@@ -351,6 +360,19 @@ const RoleProjects = () => {
             <option value="draft">Draft</option>
             <option value="archived">Archived</option>
           </select>
+
+          <select
+            value={subjectFilter}
+            onChange={(e) => setSubjectFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+          >
+            <option value="">All Subjects</option>
+            {subjects.map((subject) => (
+              <option key={subject._id} value={subject._id}>
+                {subject.code || subject.name} - {subject.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <Input
@@ -482,19 +504,6 @@ const RoleProjects = () => {
                   <option value="Custom">Custom</option>
                 </select>
               </div>
-
-              <Input
-                label="Due Date"
-                type="date"
-                value={formData.dueDate}
-                onChange={(e) => setFormData((prev) => ({ ...prev, dueDate: e.target.value }))}
-              />
-              <Input
-                label="Team Size"
-                type="number"
-                value={formData.teamSize}
-                onChange={(e) => setFormData((prev) => ({ ...prev, teamSize: e.target.value }))}
-              />
               <div className="md:col-span-2">
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Status</label>
                 <select

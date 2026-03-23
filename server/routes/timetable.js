@@ -30,6 +30,15 @@ const toMinutes = (timeValue) => {
   return (hour * 60) + minute;
 };
 
+const minutesToHHMM = (value) => {
+  const total = Number(value);
+  if (!Number.isFinite(total)) return null;
+  const normalized = ((Math.floor(total) % 1440) + 1440) % 1440;
+  const hour = Math.floor(normalized / 60);
+  const minute = normalized % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+};
+
 const normalizeDivision = (value, fallback = 'General') => {
   const normalized = String(value || '').trim();
   if (!normalized) return fallback;
@@ -543,10 +552,31 @@ router.post('/create', protect, authorize('admin', 'hod'), async (req, res) => {
       dayOfWeek,
       division: normalizedDivision,
       slot: normalizedSlot,
+      startTime: minutesToHHMM(getSlotTimeRange({
+        slot: normalizedSlot,
+        slotSpan: finalSlotSpan,
+        dayStartTime: settings.dayStartTime,
+        slotMinutes: settings.slotMinutes,
+        maxSlot: settings.maxSlot,
+        breakWindows: settings.breakWindows
+      })?.start),
+      endTime: minutesToHHMM(getSlotTimeRange({
+        slot: normalizedSlot,
+        slotSpan: finalSlotSpan,
+        dayStartTime: settings.dayStartTime,
+        slotMinutes: settings.slotMinutes,
+        maxSlot: settings.maxSlot,
+        breakWindows: settings.breakWindows
+      })?.end),
       lectureType: normalizedLectureType,
       slotSpan: finalSlotSpan,
       status: 'active'
     });
+
+    await User.findByIdAndUpdate(teacherId, {
+      $addToSet: { assignedSubjects: subjectId }
+    });
+
     res.status(201).json({ success: true, data: timetable });
   } catch (error) {
     console.error('Create timetable error:', error);
@@ -1137,6 +1167,16 @@ router.put('/change-requests/:requestId/review', protect, authorize('admin', 'ho
         timetable.slot = nextSlot;
         timetable.lectureType = nextLectureType;
         timetable.slotSpan = nextSlotSpan;
+        const nextRange = getSlotTimeRange({
+          slot: nextSlot,
+          slotSpan: nextSlotSpan,
+          dayStartTime: settings.dayStartTime,
+          slotMinutes: settings.slotMinutes,
+          maxSlot: settings.maxSlot,
+          breakWindows: settings.breakWindows
+        });
+        timetable.startTime = minutesToHHMM(nextRange?.start);
+        timetable.endTime = minutesToHHMM(nextRange?.end);
       }
     }
 
@@ -1243,6 +1283,16 @@ router.put('/:id', protect, authorize('admin', 'hod', 'teacher'), async (req, re
     timetable.slot = normalizedSlot;
     timetable.lectureType = normalizedLectureType;
     timetable.slotSpan = normalizedSlotSpan;
+    const updatedRange = getSlotTimeRange({
+      slot: normalizedSlot,
+      slotSpan: normalizedSlotSpan,
+      dayStartTime: settings.dayStartTime,
+      slotMinutes: settings.slotMinutes,
+      maxSlot: settings.maxSlot,
+      breakWindows: settings.breakWindows
+    });
+    timetable.startTime = minutesToHHMM(updatedRange?.start);
+    timetable.endTime = minutesToHHMM(updatedRange?.end);
     if (status) timetable.status = status;
     // Conflict check
     const conflictCheck = await checkSlotConflicts({

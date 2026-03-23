@@ -63,6 +63,7 @@ import StudentLibrary from './pages/student/StudentLibrary';
 import StudentExams from './pages/student/StudentExams';
 import TaskSubmissions from './pages/teacher/TaskSubmissions';
 import TeacherTimetableView from './pages/teacher/TeacherTimetableView';
+import TeacherSubjectWorkspace from './pages/teacher/TeacherSubjectWorkspace';
 import RoleExamsViewOnly from './pages/role/RoleExamsViewOnly';
 
 function App() {
@@ -162,6 +163,7 @@ function App() {
         <Route path="/admin/exams" element={<ExamManagement />} />
         <Route path="/hod/subjects" element={<RoleHODSubjects />} />
         <Route path="/teacher/subjects" element={<RoleSubjects />} />
+        <Route path="/teacher/subjects/:subjectId/open" element={<TeacherSubjectWorkspace />} />
         <Route path="/hod/academic-structure" element={<RoleAcademicStructure />} />
         <Route path="/teacher/academic-structure" element={<RoleAcademicStructure />} />
         <Route path="/teacher/timetable" element={<TeacherTimetableView />} />

@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { RoleLayout } from '../../components';
 import useRoleNav from '../../hooks/useRoleNav';
 
+const MATERIAL_CATEGORIES = ['Syllabus', 'Book', 'Notes', 'Manuals', 'Test', 'Mid Exam Paper', 'GTU Exam Paper', 'Other'];
+
 const RoleMaterials = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -27,7 +29,7 @@ const RoleMaterials = () => {
 
   const [formData, setFormData] = useState({
     title: '',
-    category: '',
+    category: 'Notes',
     description: '',
     link: ''
   });
@@ -197,7 +199,7 @@ const RoleMaterials = () => {
       const data = await res.json();
 
       if (data?.success) {
-        setFormData({ title: '', category: '', description: '', link: '' });
+        setFormData({ title: '', category: 'Notes', description: '', link: '' });
         setShowForm(false);
         setEditingId(null);
 
@@ -230,7 +232,7 @@ const RoleMaterials = () => {
   const handleEdit = (material) => {
     setFormData({
       title: material.title,
-      category: material.category,
+      category: MATERIAL_CATEGORIES.includes(material.category) ? material.category : 'Other',
       description: material.description,
       link: material.link
     });
@@ -268,7 +270,7 @@ const RoleMaterials = () => {
   const handleCancel = () => {
     setShowForm(false);
     setEditingId(null);
-    setFormData({ title: '', category: '', description: '', link: '' });
+    setFormData({ title: '', category: 'Notes', description: '', link: '' });
   };
 
   const handleSaveSyllabus = async () => {
@@ -459,13 +461,19 @@ const RoleMaterials = () => {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Category</label>
-                <input
+                <select
                   name="category"
                   value={formData.category}
                   onChange={handleInputChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                   required
-                />
+                >
+                  {MATERIAL_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>

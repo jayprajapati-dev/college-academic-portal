@@ -394,7 +394,7 @@ router.get('/hod', protect, authorize('hod'), async (req, res) => {
 
 router.get('/all', protect, authorize('hod', 'teacher', 'coordinator'), async (req, res) => {
   try {
-    const { page = 1, limit = 10, category, branchId, semesterId, status } = req.query;
+    const { page = 1, limit = 10, category, branchId, semesterId, status, subjectId } = req.query;
 
     const query = {};
 
@@ -407,6 +407,7 @@ router.get('/all', protect, authorize('hod', 'teacher', 'coordinator'), async (r
     if (category) query.category = category;
     if (branchId) query.branchId = branchId;
     if (semesterId) query.semesterId = semesterId;
+    if (subjectId) query.subjectId = subjectId;
 
     // Only show tasks created by the current subject teacher
     query.createdBy = req.user._id;

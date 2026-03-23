@@ -32,6 +32,8 @@ const ROLE_DEFAULTS = {
   ],
   teacher: [
     'dashboard',
+    'subjects',
+    'timetable',
     'materials',
     'library',
     'tasks',

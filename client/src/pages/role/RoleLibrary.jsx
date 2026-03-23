@@ -48,6 +48,16 @@ const RoleLibrary = () => {
     status: 'active'
   });
 
+  const getId = useCallback((value) => {
+    if (!value) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+      if (value._id) return String(value._id);
+      if (value.id) return String(value.id);
+    }
+    return String(value);
+  }, []);
+
   const bookStats = useMemo(() => {
     const total = books.length;
     const active = books.filter((b) => b.status === 'active').length;
@@ -55,6 +65,41 @@ const RoleLibrary = () => {
     const uniqueSubjects = new Set(books.map((b) => b.subjectId?._id).filter(Boolean)).size;
     return { total, active, inactive, uniqueSubjects };
   }, [books]);
+
+  const allowedBranchIds = useMemo(() => {
+    if (isAdmin) return [];
+
+    return Array.from(new Set(
+      [
+        user?.branch,
+        user?.department,
+        user?.coordinator?.branch,
+        ...(Array.isArray(user?.branches) ? user.branches : [])
+      ]
+        .map((branch) => getId(branch))
+        .filter(Boolean)
+    ));
+  }, [getId, isAdmin, user]);
+
+  const branchScopedSubjects = useMemo(() => {
+    if (isAdmin) return subjects;
+    if (allowedBranchIds.length === 0) return subjects;
+
+    const filteredSubjects = subjects.filter((subject) => {
+      const subjectBranchIds = [
+        getId(subject?.branchId),
+        ...(Array.isArray(subject?.offerings)
+          ? subject.offerings.map((offering) => getId(offering?.branchId))
+          : [])
+      ].filter(Boolean);
+
+      if (subjectBranchIds.length === 0) return true;
+      return subjectBranchIds.some((branchId) => allowedBranchIds.includes(branchId));
+    });
+
+    // Do not hide all options if branch metadata is partial/misaligned.
+    return filteredSubjects.length > 0 ? filteredSubjects : subjects;
+  }, [allowedBranchIds, getId, isAdmin, subjects]);
 
   const token = localStorage.getItem('token');
   const panelLabel = isAdmin
@@ -118,8 +163,11 @@ const RoleLibrary = () => {
       } else if (isCoordinator) {
         requests.push(axios.get('/api/academic/subjects/coordinator', { headers: { Authorization: `Bearer ${token}` } }));
       } else if (isTeacher) {
-        if (!user?._id) return;
-        requests.push(axios.get(`/api/academic/teacher/${user._id}/subjects`, { headers: { Authorization: `Bearer ${token}` } }));
+        if (user?._id) {
+          requests.push(axios.get(`/api/academic/teacher/${user._id}/subjects`, { headers: { Authorization: `Bearer ${token}` } }));
+        } else {
+          requests.push(axios.get('/api/academic/subjects', { headers: { Authorization: `Bearer ${token}` } }));
+        }
       } else {
         requests.push(axios.get('/api/academic/subjects', { headers: { Authorization: `Bearer ${token}` } }));
         requests.push(axios.get('/api/academic/branches', { headers: { Authorization: `Bearer ${token}` } }));
@@ -134,7 +182,22 @@ const RoleLibrary = () => {
       if (isHod || isCoordinator) {
         if (subjectsRes?.data?.success) setSubjects(subjectsRes.data.data || []);
       } else if (isTeacher) {
-        if (subjectsRes?.data?.success) setSubjects(subjectsRes.data.subjects || []);
+        if (subjectsRes?.data?.success) {
+          const teacherSubjects = subjectsRes.data.subjects || subjectsRes.data.data || [];
+
+          if (Array.isArray(teacherSubjects) && teacherSubjects.length > 0) {
+            setSubjects(teacherSubjects);
+          } else {
+            const fallbackRes = await axios.get('/api/academic/subjects', {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            if (fallbackRes?.data?.success) {
+              setSubjects(fallbackRes.data.data || []);
+            } else {
+              setSubjects([]);
+            }
+          }
+        }
       } else {
         if (subjectsRes?.data?.success) setSubjects(subjectsRes.data.data || []);
         if (results[2]?.data?.success) setBranches(results[2].data.data || []);
@@ -397,7 +460,7 @@ const RoleLibrary = () => {
               className="px-4 py-2 border border-gray-300 rounded-lg bg-white"
             >
               <option value="">All Subjects</option>
-              {subjects.map((subject) => (
+              {branchScopedSubjects.map((subject) => (
                 <option key={subject._id} value={subject._id}>
                   {subject.name} ({subject.code || 'N/A'})
                 </option>
@@ -544,7 +607,7 @@ const RoleLibrary = () => {
                 className="w-full h-10 px-3.5 border border-gray-300 rounded-lg bg-white text-sm text-gray-900"
               >
                 <option value="">Select subject</option>
-                {subjects.map((subject) => (
+                {branchScopedSubjects.map((subject) => (
                   <option key={subject._id} value={subject._id}>
                     {subject.name} ({subject.code || 'N/A'})
                   </option>

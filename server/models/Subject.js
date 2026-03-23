@@ -1,5 +1,22 @@
 const mongoose = require('mongoose');
 
+const MATERIAL_CATEGORY_OPTIONS = [
+  'Syllabus',
+  'Book',
+  'Notes',
+  'Manuals',
+  'Test',
+  'Mid Exam Paper',
+  'GTU Exam Paper',
+  'Other'
+];
+
+const normalizeMaterialCategory = (category) => {
+  const normalized = String(category || '').trim();
+  if (!normalized) return 'Notes';
+  return MATERIAL_CATEGORY_OPTIONS.includes(normalized) ? normalized : 'Other';
+};
+
 const subjectSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -79,7 +96,7 @@ const subjectSchema = new mongoose.Schema({
     title: String,
     category: {
       type: String,
-      enum: ['Syllabus', 'Book', 'Notes', 'Manuals', 'Test', 'Mid Exam Paper', 'GTU Exam Paper', 'Other'],
+      enum: MATERIAL_CATEGORY_OPTIONS,
       default: 'Notes'
     },
     description: String,
@@ -119,5 +136,16 @@ const subjectSchema = new mongoose.Schema({
 subjectSchema.index({ branchId: 1, semesterId: 1 });
 subjectSchema.index({ 'offerings.branchId': 1, 'offerings.semesterId': 1 });
 subjectSchema.index({ code: 1 });
+
+subjectSchema.pre('validate', function(next) {
+  if (Array.isArray(this.materials)) {
+    this.materials.forEach((material) => {
+      if (!material) return;
+      material.category = normalizeMaterialCategory(material.category);
+    });
+  }
+
+  next();
+});
 
 module.exports = mongoose.model('Subject', subjectSchema);

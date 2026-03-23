@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button, Card, Input, LoadingSpinner, Modal, RoleLayout } from '../../components';
 import useRoleNav from '../../hooks/useRoleNav';
 
 const RoleTasks = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const preferredSubjectId = location.state?.subjectId || new URLSearchParams(location.search).get('subjectId') || '';
   const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
   const [user, setUser] = useState(storedUser);
   const [role, setRole] = useState(storedUser?.role || 'teacher');
@@ -28,7 +30,8 @@ const RoleTasks = () => {
   });
   const [filters, setFilters] = useState({
     category: '',
-    semesterId: ''
+    semesterId: '',
+    subjectId: preferredSubjectId
   });
   const [subjects, setSubjects] = useState([]);
   const [semesters, setSemesters] = useState([]);
@@ -153,6 +156,7 @@ const RoleTasks = () => {
 
       if (filters.category) params.category = filters.category;
       if (filters.semesterId) params.semesterId = filters.semesterId;
+      if (filters.subjectId) params.subjectId = filters.subjectId;
 
       const res = await axios.get(tasksEndpoint, {
         headers: { Authorization: `Bearer ${token}` },
@@ -175,6 +179,15 @@ const RoleTasks = () => {
       setLoading(false);
     }
   }, [filters, handleAuthError, pagination.limit, pagination.page, statusFilter, tasksEndpoint, token]);
+
+  useEffect(() => {
+    if (!subjects.length || !preferredSubjectId) return;
+    const hasPreferred = subjects.some((subject) => String(subject?._id) === String(preferredSubjectId));
+    if (!hasPreferred) return;
+
+    setFilters((prev) => (prev.subjectId ? prev : { ...prev, subjectId: preferredSubjectId }));
+    setFormData((prev) => (prev.subjectId ? prev : { ...prev, subjectId: preferredSubjectId }));
+  }, [preferredSubjectId, subjects]);
 
   useEffect(() => {
     if (!token) {
@@ -204,7 +217,7 @@ const RoleTasks = () => {
       title: '',
       description: '',
       category: 'Task',
-      subjectId: '',
+      subjectId: preferredSubjectId || '',
       dueDate: '',
       attachments: []
     });
@@ -433,6 +446,19 @@ const RoleTasks = () => {
             <option value="">All Semesters</option>
             {semesters.map((s) => (
               <option key={s._id} value={s._id}>{s.name || `Semester ${s.semesterNumber}`}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.subjectId}
+            onChange={(e) => setFilters((prev) => ({ ...prev, subjectId: e.target.value }))}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
+          >
+            <option value="">All Subjects</option>
+            {subjects.map((subject) => (
+              <option key={subject._id} value={subject._id}>
+                {subject.code || subject.name} - {subject.name}
+              </option>
             ))}
           </select>
         </div>
