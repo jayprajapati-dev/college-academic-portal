@@ -43,6 +43,12 @@
    ├── 09-Testing-Checklist.md
    ├── 10-Phase-1-Plan.md
    ├── 11-Submission-Files.md
+   ├── 17-Report-Index-and-Structure.md
+   ├── 18-Report-Chapter-Wise-Content-Guide.md
+   ├── 19-Report-Real-Data-Collection-Sheet.md
+   ├── 20-Report-Screenshot-and-Figure-Plan.md
+   ├── 21-Report-Formatting-and-Writing-Standards.md
+   ├── 22-Final-Report-Assembly-Checklist.md
    ├── admin-subject-marks-material-flowchart.png
    └── student-subject-system-flowchart.png
 ```

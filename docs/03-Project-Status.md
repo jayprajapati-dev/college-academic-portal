@@ -1,6 +1,6 @@
 # Project Status
 
-Last Updated: March 6, 2026
+Last Updated: March 23, 2026
 
 ## Summary
 - Project: Smart College Academic Portal
@@ -33,6 +33,13 @@ Last Updated: March 6, 2026
 - SRS document
 - Final report
 - PPT and poster
+- Report documentation kit added:
+	- 17-Report-Index-and-Structure.md
+	- 18-Report-Chapter-Wise-Content-Guide.md
+	- 19-Report-Real-Data-Collection-Sheet.md
+	- 20-Report-Screenshot-and-Figure-Plan.md
+	- 21-Report-Formatting-and-Writing-Standards.md
+	- 22-Final-Report-Assembly-Checklist.md
 
 ## Remaining (Optional/Next)
 - Exam and results module

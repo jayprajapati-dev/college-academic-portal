@@ -762,7 +762,20 @@ const UserManagement = () => {
         setTeacherForm({ name: '', mobile: '', selectedBranches: [], selectedSemesters: [], selectedSubjects: [] });
         setTeacherSubjects([]);
         fetchUsers();
-        setSuccessMessage('Teacher added successfully! Temporary credentials sent.');
+
+        const generatedTempPassword = data?.data?.tempPassword || '';
+        if (generatedTempPassword) {
+          setTempCredentialData({
+            role: 'TEACHER',
+            name: data?.data?.name || teacherForm.name,
+            mobile: data?.data?.mobile || teacherForm.mobile,
+            tempPassword: generatedTempPassword
+          });
+          setShowTempCredentialModal(true);
+          setSuccessMessage('Teacher added successfully! Temporary password generated.');
+        } else {
+          setSuccessMessage('Teacher added successfully! Temporary credentials sent.');
+        }
       } else {
         setAddTeacherError(data.message || 'Error adding teacher');
       }
@@ -1140,7 +1153,7 @@ const UserManagement = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3.5 sm:p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 mb-4 sm:mb-5">
             {/* Search Bar */}
-            <div className="flex-1 min-w-[220px] relative">
+            <div className="w-full lg:flex-1 lg:min-w-[220px] relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xl">search</span>
               <input
                 type="text"
@@ -1155,7 +1168,7 @@ const UserManagement = () => {
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="h-10 px-3.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[130px]"
+              className="h-10 px-3.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium w-[calc(50%-0.4rem)] sm:w-auto"
             >
               {roleOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -1166,7 +1179,7 @@ const UserManagement = () => {
               <select
                 value={branchFilter}
                 onChange={(e) => setBranchFilter(e.target.value)}
-                className="h-10 px-3.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[140px]"
+                className="h-10 px-3.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium w-[calc(50%-0.4rem)] sm:w-auto"
               >
                 <option value="">All Branches</option>
                 {branches.map((branch) => (
@@ -1179,7 +1192,7 @@ const UserManagement = () => {
               <select
                 value={semesterFilter}
                 onChange={(e) => setSemesterFilter(e.target.value)}
-                className="h-10 px-3.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[140px]"
+                className="h-10 px-3.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium w-[calc(50%-0.4rem)] sm:w-auto"
               >
                 <option value="">All Semesters</option>
                 {semesters.map((semester) => (
@@ -1194,7 +1207,7 @@ const UserManagement = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-10 px-3.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium min-w-[130px]"
+              className="h-10 px-3.5 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium w-[calc(50%-0.4rem)] sm:w-auto"
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -1203,7 +1216,7 @@ const UserManagement = () => {
             </select>
 
             {/* Add User Buttons (Role-Based) */}
-            <div className="flex flex-wrap gap-2.5 sm:gap-3 ml-auto w-full sm:w-auto sm:justify-end">
+            <div className="flex flex-wrap gap-2.5 sm:gap-3 lg:ml-auto w-full lg:w-auto lg:justify-end">
               {isAdminMode && (
                 <>
                   <button
@@ -1314,28 +1327,28 @@ const UserManagement = () => {
         {/* Users Table */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-200 dark:border-gray-700">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px]">
+            <table className="w-full min-w-[820px] xl:min-w-[980px]">
               <thead className="bg-gradient-to-r from-gray-50 via-gray-100 to-gray-50 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 border-b-2 border-gray-200 dark:border-gray-600">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">User Details</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Role</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Contact</th>
+                  <th className="px-3 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">User Details</th>
+                  <th className="px-3 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Role</th>
+                  <th className="px-3 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Contact</th>
                   {(isAdminMode || role === 'hod' || role === 'coordinator') && (
                     <>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Branch</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Semester</th>
+                      <th className="px-3 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Branch</th>
+                      <th className="px-3 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Semester</th>
                     </>
                   )}
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Joined</th>
-                  <th className="px-4 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">Actions</th>
+                  <th className="px-3 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Status</th>
+                  <th className="hidden xl:table-cell px-3 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Joined</th>
+                  <th className="px-3 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {currentUsers.length > 0 ? (
                   currentUsers.map((user) => (
                     <tr key={user._id} className="hover:bg-gray-50 transition-colors duration-150">
-                      <td className="px-4 py-3.5">
+                      <td className="px-3 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-400 to-orange-400 flex items-center justify-center text-white font-bold text-sm shadow-md">
                             {user.name.charAt(0).toUpperCase()}
@@ -1346,7 +1359,7 @@ const UserManagement = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-3 py-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${getRoleColor(user.role)} shadow-sm`}>
                             {getRoleLabel(user)}
@@ -1358,7 +1371,7 @@ const UserManagement = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-3 py-3">
                         <div className="text-sm space-y-1">
                           <p className="text-gray-900 font-medium">{user.email}</p>
                           <p className="text-gray-500">{user.mobile || 'N/A'}</p>
@@ -1366,7 +1379,7 @@ const UserManagement = () => {
                       </td>
                       {(isAdminMode || role === 'hod' || role === 'coordinator') && (
                         <>
-                          <td className="px-4 py-3.5">
+                          <td className="px-3 py-3">
                             {user.role === 'student' ? (
                               <span className="text-sm text-gray-900 font-medium">
                                 {getBranchName(user) || '-'}
@@ -1375,7 +1388,7 @@ const UserManagement = () => {
                               <span className="text-xs text-gray-400">-</span>
                             )}
                           </td>
-                          <td className="px-4 py-3.5">
+                          <td className="px-3 py-3">
                             {user.role === 'student' ? (
                               <span className="text-sm text-gray-900 font-medium">
                                 {getSemesterName(user) || '-'}
@@ -1386,7 +1399,7 @@ const UserManagement = () => {
                           </td>
                         </>
                       )}
-                      <td className="px-4 py-3.5">
+                      <td className="px-3 py-3">
                         <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(user.status)}`}>
                           <div className={`w-2 h-2 rounded-full mr-2 ${
                             user.status === 'active' ? 'bg-emerald-500' :
@@ -1396,10 +1409,10 @@ const UserManagement = () => {
                           {user.status?.toUpperCase()}
                         </div>
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="hidden xl:table-cell px-3 py-3">
                         <p className="text-sm text-gray-600">{new Date(user.createdAt).toLocaleDateString()}</p>
                       </td>
-                      <td className="px-4 py-3.5 text-right">
+                      <td className="px-3 py-3 text-right">
                         <div className="flex justify-end gap-0.5">
                           <button
                             onClick={() => handleViewUser(user)}

@@ -215,8 +215,14 @@ const SubjectMaterialsPublic = () => {
     })
     .slice(0, 3);
 
+  const handleStudentLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login', { replace: true });
+  };
+
   const pageContent = (
-    <main className={`mx-auto space-y-4 sm:space-y-8 ${isStudentContext ? 'max-w-[1400px] px-2 sm:px-5 py-3 sm:py-5' : 'max-w-[1200px] px-4 sm:px-6 py-8 pt-24 sm:pt-28'}`}>
+    <section className={`space-y-4 sm:space-y-8 ${isStudentContext ? 'sm:space-y-6' : 'mx-auto max-w-[1200px] px-4 sm:px-6 py-8 pt-24 sm:pt-28'}`}>
       <div className={`flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-3 ${isStudentContext ? 'sticky top-2 z-20 bg-white/90 dark:bg-black/40 backdrop-blur-sm p-2 rounded-xl border border-[#e5e7eb] dark:border-white/10' : ''}`}>
         <button
           onClick={() => navigate(isStudentContext ? '/student/subjects' : `/subjects/${id}`)}
@@ -566,12 +572,16 @@ const SubjectMaterialsPublic = () => {
             </section>
           </>
         )}
-      </main>
+      </section>
   );
 
   if (isStudentContext) {
     return (
-      <StudentLayout title={subject?.name || 'Subject Materials'} userName={storedUser?.name || 'Student'}>
+      <StudentLayout
+        title={subject?.name || 'Subject Materials'}
+        userName={storedUser?.name || 'Student'}
+        onLogout={handleStudentLogout}
+      >
         {pageContent}
       </StudentLayout>
     );

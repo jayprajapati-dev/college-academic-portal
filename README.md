@@ -138,9 +138,27 @@ REACT_APP_API_URL=http://localhost:5000
 - docs/07-Database-Schema.md
 - docs/09-Testing-Checklist.md
 - docs/11-Submission-Files.md
+- docs/17-Report-Index-and-Structure.md
+- docs/18-Report-Chapter-Wise-Content-Guide.md
+- docs/19-Report-Real-Data-Collection-Sheet.md
+- docs/20-Report-Screenshot-and-Figure-Plan.md
+- docs/21-Report-Formatting-and-Writing-Standards.md
+- docs/22-Final-Report-Assembly-Checklist.md
 - docs/13-Website-Design-Brief.md
 - docs/admin-subject-marks-material-flowchart.png
 - docs/student-subject-system-flowchart.png
+
+## Final Report Kit (New)
+For professional, real-data final report preparation, use this sequence:
+
+1) docs/17-Report-Index-and-Structure.md
+2) docs/19-Report-Real-Data-Collection-Sheet.md
+3) docs/18-Report-Chapter-Wise-Content-Guide.md
+4) docs/20-Report-Screenshot-and-Figure-Plan.md
+5) docs/21-Report-Formatting-and-Writing-Standards.md
+6) docs/22-Final-Report-Assembly-Checklist.md
+
+This kit is designed to avoid fake content, inconsistent formatting, broken pagination, and weak screenshot evidence.
 
 ## Scripts
 Backend (server/)

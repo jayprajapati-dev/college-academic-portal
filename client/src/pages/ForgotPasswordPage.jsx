@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { LandingFrame } from '../components';
+import useLandingAuth from '../hooks/useLandingAuth';
 
 const ForgotPasswordPage = () => {
   const navigate = useNavigate();
+  const { isLoggedIn, currentUser, userProfile, notifications } = useLandingAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -140,33 +143,17 @@ const ForgotPasswordPage = () => {
   };
 
   return (
-    <div className="font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-white antialiased min-h-screen flex flex-col">
-      <header className="fixed top-0 w-full z-50 bg-white/40 dark:bg-white/5 backdrop-blur-xl border-b border-white/20 dark:border-white/10">
-        <div className="max-w-[1280px] mx-auto px-6 md:px-20 lg:px-40 h-20 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <div className="p-1.5 bg-gradient-to-br from-primary to-primary/80 rounded-lg text-white shadow-lg shadow-primary/20">
-              <span className="material-symbols-outlined text-5xl">lock_reset</span>
-            </div>
-            <div className="flex flex-col">
-              <h2 className="text-slate-900 dark:text-white text-lg font-black tracking-tight">SmartAcademics</h2>
-              <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Password Recovery</p>
-            </div>
-          </a>
-          <button
-            onClick={() => navigate('/login')}
-            className="flex items-center justify-center rounded-lg h-11 px-6 bg-primary/10 dark:bg-primary/15 border border-primary/30 dark:border-primary/40 hover:bg-primary hover:text-white text-primary dark:text-primary text-sm font-bold transition-all duration-300 shadow-sm"
-          >
-            <span className="material-symbols-outlined text-lg mr-2">arrow_back</span>
-            <span>Return to Login</span>
-          </button>
-        </div>
-      </header>
+    <LandingFrame
+      isLoggedIn={isLoggedIn}
+      currentUser={currentUser}
+      userProfile={userProfile}
+      notifications={notifications}
+    >
+      <section className="max-w-[1200px] mx-auto px-4 py-10 sm:py-14 min-h-[calc(100vh-56px)] flex items-center justify-center relative overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-72 h-72 sm:w-96 sm:h-96 bg-primary/5 rounded-full blur-[100px] -z-10"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-72 h-72 sm:w-96 sm:h-96 bg-blue-200/20 rounded-full blur-[100px] -z-10"></div>
 
-      <main className="flex flex-1 items-center justify-center p-6 md:p-12 pt-32 relative overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-[100px] -z-10"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-200/20 rounded-full blur-[100px] -z-10"></div>
-
-        <div className="w-full max-w-[540px] bg-white/70 dark:bg-slate-900/70 backdrop-blur-md rounded-xl overflow-hidden transition-all duration-500 border border-white/20 dark:border-white/10 shadow-2xl">
+        <div className="w-full max-w-[540px] bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-xl overflow-hidden transition-all duration-500 border border-white/20 dark:border-white/10 shadow-2xl">
           <div className="p-8 pb-4">
             <div className="flex flex-col gap-4">
               <div className="flex justify-between items-end">
@@ -303,33 +290,18 @@ const ForgotPasswordPage = () => {
                 </button>
               </form>
             )}
-          </div>
-        </div>
-      </main>
 
-      <footer className="w-full mt-16 border-t border-slate-200 bg-white/50 backdrop-blur-sm">
-        <div className="px-6 md:px-10 py-12">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-8">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary rounded text-white">
-                <svg className="size-5" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M4 4H17.3334V17.3334H30.6666V30.6666H44V44H4V4Z" fill="currentColor"></path>
-                </svg>
-              </div>
-              <span className="font-bold text-slate-900">SmartAcademics</span>
-            </div>
-            <div className="flex items-center gap-6 text-sm">
-              <a className="text-slate-600 hover:text-primary transition-colors font-semibold" href="/privacy">Privacy</a>
-              <a className="text-slate-600 hover:text-primary transition-colors font-semibold" href="/terms">Terms</a>
-              <a className="text-slate-600 hover:text-primary transition-colors font-semibold" href="/contact">Contact</a>
-            </div>
-          </div>
-          <div className="border-t border-slate-200 pt-8">
-            <p className="text-xs text-slate-500 text-center font-medium">© 2026 SmartAcademics. All rights reserved.</p>
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              className="w-full h-12 border border-slate-300 hover:border-primary text-slate-700 hover:text-primary dark:text-slate-200 dark:border-slate-600 rounded-xl font-bold text-sm transition-colors"
+            >
+              Back to Login
+            </button>
           </div>
         </div>
-      </footer>
-    </div>
+      </section>
+    </LandingFrame>
   );
 };
 
