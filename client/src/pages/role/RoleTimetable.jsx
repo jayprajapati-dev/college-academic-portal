@@ -1744,10 +1744,25 @@ const RoleTimetable = () => {
       return;
     }
 
-    const mapped = mapTimeRangeToSlot(formData.startTime, formData.endTime, formData.lectureType);
-    if (mapped.error) {
-      alert(mapped.error);
-      return;
+    // Check if times or lecture type changed
+    const originalStart = formatTime(selectedTimetable?.startTime || '08:00');
+    const originalEnd = formatTime(selectedTimetable?.endTime || '09:00');
+    const originalLectureType = selectedTimetable?.lectureType || 'Theory';
+    const timesChanged = formData.startTime !== originalStart || formData.endTime !== originalEnd;
+    const lectureTypeChanged = formData.lectureType !== originalLectureType;
+
+    let finalSlot = selectedTimetable?.slot;
+    let finalSlotSpan = selectedTimetable?.slotSpan;
+
+    // If times changed OR lecture type changed (e.g., Theory->Lab), remap the pair
+    if (timesChanged || lectureTypeChanged) {
+      const mapped = mapTimeRangeToSlot(formData.startTime, formData.endTime, formData.lectureType);
+      if (mapped.error) {
+        alert(mapped.error);
+        return;
+      }
+      finalSlot = mapped.slot;
+      finalSlotSpan = mapped.slotSpan;
     }
 
     try {
@@ -1758,8 +1773,8 @@ const RoleTimetable = () => {
           roomId: formData.roomId,
           division: formData.division,
           dayOfWeek: formData.dayOfWeek,
-          slot: mapped.slot,
-          slotSpan: mapped.slotSpan,
+          slot: finalSlot,
+          slotSpan: finalSlotSpan,
           lectureType: formData.lectureType,
           status: formData.status
         },
@@ -2085,12 +2100,8 @@ const RoleTimetable = () => {
   };
 
   const openEditModal = (timetable, mode = 'edit') => {
-    const entrySlot = Number(timetable?.slot) || 1;
-    const entrySpan = Number(timetable?.slotSpan) > 1 ? Number(timetable.slotSpan) : 1;
-    const dayStart = toMinutes(settingsData.dayStartTime) ?? (10 * 60 + 30);
-    const slotMinutes = Number(settingsData.slotMinutes) || 60;
-    const startValue = minutesToHHMM(dayStart + ((entrySlot - 1) * slotMinutes));
-    const endValue = minutesToHHMM(dayStart + ((entrySlot - 1 + entrySpan) * slotMinutes));
+    const fallbackStart = formatTime(timetable?.startTime || '08:00');
+    const fallbackEnd = formatTime(timetable?.endTime || '09:00');
 
     setSelectedTimetable(timetable);
     setEditModalMode(mode === 'view' ? 'view' : 'edit');
@@ -2102,8 +2113,8 @@ const RoleTimetable = () => {
       roomId: timetable.roomId?._id || '',
       division: timetable.division || 'General',
       dayOfWeek: timetable.dayOfWeek,
-      startTime: startValue,
-      endTime: endValue,
+      startTime: fallbackStart,
+      endTime: fallbackEnd,
       lectureType: timetable.lectureType,
       notes: timetable.notes || ''
     });
@@ -2751,20 +2762,28 @@ const RoleTimetable = () => {
 
                           const entries = model?.startMap?.[rowIndex] || [];
                           const firstEntry = entries[0] || null;
-                          const rowSpan = entries.length === 1 ? (firstEntry?.rowSpan || 1) : 1;
+                          // Use rowSpan from first entry even if there are conflicts
+                          const rowSpan = firstEntry?.rowSpan || 1;
+                          const hasConflict = entries.length > 1;
 
                           return (
-                            <td key={`${day}-${slot}`} rowSpan={rowSpan} className="align-top px-1 py-1 min-w-[130px] border border-gray-200">
+                            <td key={`${day}-${slot}`} rowSpan={rowSpan} className={`align-top px-1 py-1 min-w-[130px] border ${hasConflict ? 'border-red-400 bg-red-50' : 'border-gray-200'}`}>
                               {entries.length === 0 ? (
-                                <div className="min-h-[44px] bg-white" />
+                                <div className={`bg-white ${rowSpan > 1 ? 'min-h-[88px]' : 'min-h-[44px]'}`} />
                               ) : (
-                                <div className="space-y-1">
+                                <div className={`space-y-1 ${hasConflict ? 'ring-2 ring-red-300 p-1 rounded-md' : ''}`}>
+                                  {hasConflict && (
+                                    <div className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded mb-1">
+                                      ⚠️ CONFLICT: {entries.length} entries
+                                    </div>
+                                  )}
                                   {entries.map((item) => {
                                     const entry = item.entry;
                                     return (
                                     <div
                                       key={entry._id}
                                       className={`rounded-md border border-gray-300 p-1.5 bg-white ${getLectureTone(entry)}`}
+                                      title={`${formatDisplayTime(entry.startTime)} to ${formatDisplayTime(entry.endTime)}`}
                                     >
                                       <div className="mb-1">
                                         <div
@@ -2788,6 +2807,12 @@ const RoleTimetable = () => {
                                           <span className="font-bold text-gray-800 truncate">{getTeacherShortLabel(entry.teacherId)}</span>
                                           <span className="font-semibold text-gray-500">Room</span>
                                           <span className="font-bold text-gray-800 truncate">{getRoomLabel(entry)}</span>
+                                          {Number(entry.slotSpan || 1) > 1 && (
+                                            <>
+                                              <span className="font-semibold text-gray-500">Time</span>
+                                              <span className="font-bold text-blue-600 truncate">{formatDisplayTime(entry.startTime)}-{formatDisplayTime(entry.endTime)}</span>
+                                            </>
+                                          )}
                                         </div>
                                       </div>
                                       <div className="mt-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold border bg-white text-slate-600 border-slate-200">

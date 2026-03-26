@@ -387,6 +387,25 @@ const checkSlotConflicts = async ({
       for (let j = 0; j < (entry.slotSpan || 1); j++) entrySlots.push(entry.slot + j);
       if (!entrySlots.includes(s)) continue;
       
+      // Semester-Branch conflict: same semester AND branch cannot have different subjects at same time
+      if (String(entry.semesterId._id) === String(semesterId) && String(entry.branchId._id) === String(branchId)) {
+        hasConflict = true;
+        conflicts.push({
+          type: 'semester-branch',
+          message: `${entry.branchId.name} Sem ${entry.semesterId.semesterNumber} already has class at slot ${s} (${entry.dayOfWeek}). Cannot schedule another subject at same time.`,
+          details: {
+            subject: entry.subjectId.name,
+            teacher: entry.teacherId.name,
+            room: entry.roomId.roomNo,
+            branch: entry.branchId.name,
+            semester: entry.semesterId.name,
+            slot: s,
+            day: entry.dayOfWeek,
+            addedBy: entry.addedBy?.name || 'Unknown'
+          }
+        });
+      }
+      
       // Teacher conflict
       if (String(entry.teacherId._id) === String(teacherId)) {
         hasConflict = true;

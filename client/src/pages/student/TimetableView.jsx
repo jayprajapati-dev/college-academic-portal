@@ -116,7 +116,7 @@ const StudentTimetableView = () => {
     const endSlotMeta = slotOptions.find((item) => item.value === (slot + span - 1));
     if (!endSlotMeta) return `${slotMeta.label} (${span} slots)`;
     return `${slotMeta.label.split(' - ')[0]} - ${endSlotMeta.label.split(' - ')[1]}`;
-  }, [slotOptions]);
+  }, [minutesToHHMM, slotOptions, toMinutes]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -210,19 +210,45 @@ const StudentTimetableView = () => {
     });
   }, [filters.day, filters.division, filters.lectureType, filters.subjectId, getId, timetable]);
 
-  const slotMap = useMemo(() => {
-    const map = {};
+  const weeklyCellModel = useMemo(() => {
+    const byDay = {};
+    days.forEach((day) => {
+      byDay[day] = { startMap: {}, skipRows: new Set() };
+    });
+
     filteredTimetable.forEach((entry) => {
-      const baseSlot = Number(entry?.slot) || 1;
+      const day = entry?.dayOfWeek;
+      if (!days.includes(day)) return;
+
+      const slot = Number(entry?.slot) || 1;
       const span = Number(entry?.slotSpan) > 1 ? Number(entry.slotSpan) : 1;
-      for (let offset = 0; offset < span; offset += 1) {
-        const key = `${entry.dayOfWeek}|${baseSlot + offset}`;
-        if (!map[key]) map[key] = [];
-        map[key].push(entry);
+
+      const startRowIndex = slotOptions.findIndex((row) => !row.isBreak && Number(row.value) === slot);
+      const endRowIndex = slotOptions.findIndex((row) => !row.isBreak && Number(row.value) === (slot + span - 1));
+      if (startRowIndex < 0 || endRowIndex < startRowIndex) return;
+
+      const rowSpan = endRowIndex - startRowIndex + 1;
+      const crossesBreak = slotOptions.slice(startRowIndex, endRowIndex + 1).some((row) => row.isBreak);
+      const canMergeRows = span > 1 && rowSpan > 1 && !crossesBreak;
+
+      if (!byDay[day].startMap[startRowIndex]) {
+        byDay[day].startMap[startRowIndex] = [];
+      }
+
+      byDay[day].startMap[startRowIndex].push({
+        entry,
+        rowSpan: canMergeRows ? rowSpan : 1
+      });
+
+      if (canMergeRows) {
+        for (let i = startRowIndex + 1; i <= endRowIndex; i += 1) {
+          byDay[day].skipRows.add(i);
+        }
       }
     });
-    return map;
-  }, [filteredTimetable]);
+
+    return byDay;
+  }, [days, filteredTimetable, slotOptions]);
 
   const divisions = useMemo(
     () => Array.from(new Set(timetable.map((entry) => String(entry.division || 'General')))).sort(),
@@ -305,7 +331,7 @@ const StudentTimetableView = () => {
     printWindow.document.close();
     printWindow.focus();
     setTimeout(() => printWindow.print(), 250);
-  }, [dailyList, days, filters, getSlotRange, settings.dayEndTime, settings.dayStartTime, settings.slotMinutes]);
+  }, [dailyList, days, filters, filteredTimetable.length, getSlotRange, settings.dayEndTime, settings.dayStartTime, settings.slotMinutes]);
 
   if (loading) {
     return (
@@ -409,7 +435,7 @@ const StudentTimetableView = () => {
                 </tr>
               </thead>
               <tbody>
-                {slotOptions.map((slotOption) => {
+                {slotOptions.map((slotOption, rowIndex) => {
                   if (slotOption.isBreak) {
                     return (
                       <tr key={slotOption.value}>
@@ -426,24 +452,41 @@ const StudentTimetableView = () => {
                       <td className="px-2 py-3 text-xs font-semibold text-gray-800 bg-gray-50 rounded-xl whitespace-nowrap">{slotOption.label}</td>
                       {days.map((day) => {
                         const key = `${day}|${slotOption.value}`;
-                        const entries = slotMap[key] || [];
+                        const dayModel = weeklyCellModel[day] || { startMap: {}, skipRows: new Set() };
+                        if (dayModel.skipRows.has(rowIndex)) {
+                          return null;
+                        }
+
+                        const mergedEntries = dayModel.startMap[rowIndex] || [];
+                        const primaryMerged = mergedEntries.length === 1 ? mergedEntries[0] : null;
+                        const rowSpanAttr = primaryMerged && primaryMerged.rowSpan > 1
+                          ? { rowSpan: primaryMerged.rowSpan }
+                          : {};
+
                         return (
-                          <td key={key} className="align-top px-1">
-                            {entries.length === 0 ? (
+                          <td key={key} className="align-top px-1" {...rowSpanAttr}>
+                            {mergedEntries.length === 0 ? (
                               <div className="min-h-[88px] rounded-xl border border-dashed border-gray-200 bg-gray-50/40" />
                             ) : (
                               <div className="space-y-2">
-                                {entries.map((entry) => (
+                                {mergedEntries.map((item) => {
+                                  const entry = item.entry;
+                                  const isMerged = Number(item.rowSpan) > 1;
+                                  return (
                                   <button
                                     key={`${entry._id}-${slotOption.value}`}
                                     onClick={() => setSelectedSchedule(entry)}
-                                    className="w-full text-left rounded-xl border border-blue-100 bg-blue-50 p-2 hover:bg-blue-100"
+                                    className={`w-full text-left rounded-xl border border-blue-100 bg-blue-50 p-2 hover:bg-blue-100 ${isMerged ? 'min-h-[180px]' : ''}`}
                                   >
                                     <p className="text-xs font-bold text-gray-900">{entry.subjectId?.name || 'Subject'}</p>
                                     <p className="text-[11px] text-gray-600">{entry.division || 'General'} | {entry.lectureType}</p>
+                                    {isMerged ? (
+                                      <p className="text-[11px] text-blue-700 font-semibold">2-hour lab block</p>
+                                    ) : null}
                                     <p className="text-[11px] text-gray-600">Room: {entry.roomId?.roomNo || '-'}</p>
                                   </button>
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
                           </td>
